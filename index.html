@@ -378,8 +378,9 @@
                                     <option value="claude">Claude</option>
                                 </select>
                             </div>
-                             <div>
-                                <label for="apiKey" class="block text-sm font-medium text-gray-700">AI API Key</label>
+                            <!-- Removed OpenAI API Key input -->
+                            <div v-if="teacherPlan.aiProvider !== 'openai'">
+                                <label for="apiKey" class="block text-sm font-medium text-gray-700">{{ teacherPlan.aiProvider.toUpperCase() }} API Key</label>
                                 <input type="password" id="apiKey" v-model="teacherPlan.apiKey" placeholder="선택한 AI 모델의 API 키를 입력하세요" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
                             </div>
                              <div>
@@ -402,7 +403,7 @@
                                 <label class="block text-sm font-medium text-gray-700">성취기준 {{ index + 1 }}</label>
                                 <textarea v-model="achievement.text" class="w-full p-2 border border-gray-300 rounded-md" rows="2"></textarea>
                                 <div class="flex items-center justify-between">
-                                    <button @click="generateStatement(index)" class="px-3 py-1.5 bg-blue-500 text-white text-sm rounded-md hover:bg-blue-600 disabled:bg-gray-400" :disabled="!teacherPlan.apiKey || achievement.loading">
+                                    <button @click="generateStatement(index)" class="px-3 py-1.5 bg-blue-500 text-white text-sm rounded-md hover:bg-blue-600 disabled:bg-gray-400" :disabled="(teacherPlan.aiProvider !== 'openai' && !teacherPlan.apiKey) || achievement.loading">
                                         <span v-if="!achievement.loading">최소 성취수준 진술문 생성</span>
                                         <span v-else>생성 중...</span>
                                     </button>
@@ -1167,7 +1168,7 @@
 
 
             // --- Methods ---
-            async initApp() {
+            async initApp() { // Changed: Made this a method
                 this.isLoading = true;
                 onAuthStateChanged(auth, async (user) => {
                     if (user) {
@@ -2030,7 +2031,9 @@
                     this.teacherPlanError = 'AI 진술문을 생성하려면 성취기준을 먼저 입력해주세요.';
                     return;
                 }
-                if (!this.teacherPlan.apiKey) {
+                
+                // API Key check only needed for Gemini/Claude
+                if (this.teacherPlan.aiProvider !== 'openai' && !this.teacherPlan.apiKey) {
                     this.teacherPlanError = 'AI API 키를 먼저 입력해주세요.';
                     return;
                 }
@@ -2040,24 +2043,23 @@
 
                 const systemPrompt = "당신은 교육 전문가로서 성취기준을 바탕으로 최소 성취수준과 최소 성취수준 학생들의 행동 특성을 설명하는 역할입니다. 입력한 성취기준에 대한 학습자들의 성취수준을 A~E 5단계로 나누었을 때 최하 수준인 E수준을 한 문장으로 진술하세요. 성취수준이란 입력한 성취기준을 학습한 결과로 나타나는 학습자들의 학습 수준을 의미해. 최소 성취수준이므로 간단하고 기초적인 수준으로 입력하되, 부정적인 진술은 하지 말고, 최소한의 노력을 하고 성취기준에 해당하는 내용을 기초적인 수준에서 찾아보았다는 식으로 진술하세요. '학생들은~',  '최소 성취수준:' 또는 'E수준:~' 이라는 별도의 설명 구문 없이 바로 성취수준 진술문만 제시해야 합니다.      예를 들어 성취기준이 '논증 요소에 따른 분석을 바탕으로 효과적으로 내용을 조직하여 논증하는 글을 쓴다.'인 경우 최소 성취수준은 '논증 요소에 대한 제한적인 분석을 바탕으로 논증하는 글을 쓴다.'로 진술할 수 있습니다. 예시로 든 진술문의 형식을 유지하면서 최소 성취수준 진술문을 제시해주세요. ";                 const userQuery = achievement.text;
 
-                let apiUrl, payload, headers, responseParser;
+                let apiUrl, payload, headers = {}, responseParser;
                 const provider = this.teacherPlan.aiProvider;
                 const apiKey = this.teacherPlan.apiKey;
 
                 if (provider === 'gemini') {
                     apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-                    headers = { 'Content-Type': 'application/json' };
+                    headers['Content-Type'] = 'application/json';
                     payload = {
                         systemInstruction: { parts: [{ text: systemPrompt }] },
                         contents: [{ parts: [{ text: userQuery }] }],
                     };
                     responseParser = (result) => result.candidates?.[0]?.content?.parts?.[0]?.text;
                 } else if (provider === 'openai') {
-                    apiUrl = 'https://api.openai.com/v1/chat/completions';
-                    headers = {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${apiKey}`
-                    };
+                    // Use the Netlify Function proxy
+                    apiUrl = '/.netlify/functions/openai-proxy'; 
+                    headers['Content-Type'] = 'application/json';
+                    // The proxy will handle the Authorization header using environment variable
                     payload = {
                         model: "gpt-3.5-turbo",
                         messages: [
@@ -2067,7 +2069,9 @@
                     };
                     responseParser = (result) => result.choices?.[0]?.message?.content;
                 } else if (provider === 'claude') {
-                    apiUrl = 'https://api.anthropic.com/v1/messages';
+                    // Note: Claude might also benefit from a proxy depending on their CORS policy.
+                    // Assuming direct call for now.
+                    apiUrl = 'https://api.anthropic.com/v1/messages'; 
                     headers = {
                         'Content-Type': 'application/json',
                         'x-api-key': apiKey,
@@ -2091,7 +2095,8 @@
 
                     if (!response.ok) {
                         const errorBody = await response.json().catch(() => ({}));
-                        const errorMessage = errorBody.error?.message || response.statusText;
+                        // Use error structure from proxy if available
+                        const errorMessage = errorBody.error?.message || errorBody.error || response.statusText; 
                         throw new Error(`API 요청 실패 (${response.status}): ${errorMessage}`);
                     }
 
@@ -2099,7 +2104,6 @@
                     const generatedText = responseParser(result);
 
                     if (generatedText) {
-                        // 프롬프트에도 불구하고 가끔 접두사가 붙는 경우가 있어, 여기서 제거합니다.
                         let cleanedText = generatedText.trim().replace(/^(E수준:|최소 성취수준:)\s*/, '');
                         achievement.statement = cleanedText;
                     } else {
@@ -2633,20 +2637,32 @@
             // For now, it will look for data saved by the *current* user if they are also a teacher,
             // or return '정보 없음'. A more robust solution would involve Firestore rules
             // allowing homeroom teachers to read specific subject data or storing summary data.
-            getSubjectCompletionStatus(studentId, subjectName){
-                 // Attempt to load guidance data for the specific subject (might not be the current user's)
-                 // This requires knowing WHICH teacher teaches that subject or having broader read access.
-                 // Simplified: Check if data exists locally (assuming homeroom teacher might also teach)
-                 // TODO: Replace localStorage check with Firestore query if possible/needed
-                 const guidanceDataStr = localStorage.getItem(`guidanceData_${subjectName}`); // Check localStorage temporarily for existing logic structure
-                 let guidanceData;
-                 if(guidanceDataStr) {
-                     guidanceData = JSON.parse(guidanceDataStr);
-                 } else {
-                     // In a full Firestore implementation, we'd query Firestore here based on subject/teacher
-                     // For now, return '정보 없음' if not found locally (simulating lack of cross-teacher access)
-                     return { status: '정보 없음', color: 'text-gray-500'};
+           async getSubjectCompletionStatus(studentId, subjectName){ // Changed to async
+                 // Attempt to load guidance data for the specific subject from Firestore
+                 let guidanceData = null;
+                 // We need to know the teacher's UID for this subject.
+                 // This requires a lookup based on subject, which isn't available.
+                 // Alternative: Query Firestore for ANY document matching the subject name pattern?
+                 // This requires specific Firestore indexing or a different data structure.
+
+                 // === SIMPLIFIED TEMPORARY LOGIC ===
+                 // Check if the current user (homeroom teacher) might have taught this subject.
+                 // This is NOT a robust solution for multiple teachers.
+                 if (this.user) {
+                     const docPath = `teacherData/${this.user.uid}/${subjectName}`;
+                     try {
+                         const docSnap = await getDoc(doc(db, docPath));
+                         if (docSnap.exists()) {
+                             guidanceData = docSnap.data();
+                         }
+                     } catch (error) {
+                         console.error("Error fetching subject data:", error);
+                     }
                  }
+                // === END OF SIMPLIFIED LOGIC ===
+
+
+                 if(!guidanceData) return { status: '정보 없음', color: 'text-gray-500'}; // Return if no data found
 
                  const subjectInfo = this.curriculumData.find(s => s.과목명 === subjectName);
                  if(!subjectInfo) return { status: '정보 없음', color: 'text-gray-500'};
