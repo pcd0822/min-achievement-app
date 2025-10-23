@@ -147,8 +147,13 @@
 
         <!-- Main Content -->
         <main class="flex-grow container mx-auto p-4 sm:p-6 lg:p-8">
+            <!-- Loading Indicator -->
+             <div v-if="isLoading" class="text-center mt-10">
+                 <p class="text-gray-600">데이터 로딩 중...</p>
+             </div>
+
             <!-- Login Button -->
-            <div v-if="!isLoggedIn" class="text-center mt-10">
+            <div v-if="!isLoggedIn && !isLoading" class="text-center mt-10">
                 <button @click="login" class="px-8 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition text-lg shadow-md">
                     Google 계정으로 로그인
                 </button>
@@ -156,7 +161,7 @@
             </div>
 
             <!-- Role Selection Modal (After Login) -->
-            <div v-if="isLoggedIn && !role" class="modal-overlay">
+            <div v-if="isLoggedIn && !role && !isLoading" class="modal-overlay">
                 <div class="modal-content">
                     <h3 class="text-2xl font-bold mb-6 text-center">역할 선택</h3>
                     <div class="space-y-4">
@@ -176,7 +181,7 @@
             </div>
 
             <!-- Main Dashboard (After Login and Role Selection) -->
-            <div v-if="isLoggedIn && role">
+            <div v-if="isLoggedIn && role && !isLoading">
                 <!-- Admin View -->
                 <div v-if="role === '관리자'">
                     <!-- Admin Content Here -->
@@ -782,13 +787,13 @@
 
         // Firebase configuration (Replace with your actual config)
         const firebaseConfig = {
-            apiKey: "AIzaSyCDk2QrhTusyOPy8zlux7TAJLChjJhz7fI",
-            authDomain: "min-achievement-app.firebaseapp.com",
-            projectId: "min-achievement-app",
-            storageBucket: "min-achievement-app.appspot.com", // Corrected: remove firebasestorage
-            messagingSenderId: "641840341301",
-            appId: "1:641840341301:web:990fdb274acef957912c7c",
-            measurementId: "G-4XPPB9RTZS"
+            apiKey: "AIzaSyC6pjFO1NHZcIPD-I-G3Puc6d6ix6Bg9AM",
+            authDomain: "min-achievement-app-948da.firebaseapp.com",
+            projectId: "min-achievement-app-948da",
+            storageBucket: "min-achievement-app-948da.appspot.com", // Corrected version
+            messagingSenderId: "983725694755",
+            appId: "1:983725694755:web:f2e95ea13b38135b08b696",
+            measurementId: "G-V9WM5MB7SX"
         };
 
 
@@ -1175,12 +1180,15 @@
                     if (user) {
                         this.user = user;
                         this.isLoggedIn = true;
-                        await this.loadUserRole(); // Attempt to load role
-                        // console.log("Role loaded:", this.role); // Debug log
-                        await this.loadCommonData();
-                        // console.log("Common data loaded."); // Debug log
-                        // The role selection modal is controlled by `v-if="isLoggedIn && !role"`
-                        // No explicit action needed here to show it if role is still null
+                        // Attempt to load role first
+                        await this.loadUserRole();
+                        // console.log("Role after loadUserRole:", this.role); // Debug log
+                        // If role is loaded, then load common data
+                        if (this.role) {
+                            await this.loadCommonData();
+                           // console.log("Common data loaded."); // Debug log
+                        }
+                        // If role is still null after loading attempt, the role selection modal will show
                     } else {
                         this.user = null;
                         this.isLoggedIn = false;
@@ -1245,7 +1253,7 @@
                        // console.log("Role loaded from Firestore:", this.role); // Debug log
                         if(this.role === '교과교사') {
                             // Trigger loading teacher-specific data if needed initially
-                            // await this.loadGuidanceData(); // Example
+                             await this.loadGuidanceData(); // Load data after confirming teacher role
                         }
                     } else {
                         this.role = null; // No role saved, show selection modal
@@ -1308,9 +1316,10 @@
             },
             resetRole() {
                 this.role = null; // Show role selection again
-                // Optionally delete the role from Firestore if needed
-                // const userDocRef = doc(db, `userData/${this.user.uid}`);
-                // await deleteDoc(userDocRef); // Or updateDoc to set role to null
+                 // Also clear the role from Firestore
+                 if (this.user) {
+                     this.saveUserRole(null); // Save null to Firestore
+                 }
             },
              async selectRole(selectedRole) {
                 if (selectedRole === '관리자') {
@@ -1320,8 +1329,9 @@
                     this.role = selectedRole;
                      if(selectedRole === '교과교사') {
                         // Load teacher-specific data after role selection if needed
-                        // await this.loadGuidanceData();
+                         await this.loadGuidanceData(); // Load data when role becomes teacher
                     }
+                    await this.loadCommonData(); // Load common data after role selection
                 }
             },
             async submitAdminCode() {
@@ -1330,6 +1340,7 @@
                     this.role = '관리자';
                     this.adminCodeError = '';
                     this.showAdminCodeInput = false;
+                    await this.loadCommonData(); // Load common data after role selection
                 } else {
                     this.adminCodeError = '코드가 올바르지 않습니다.';
                 }
@@ -1339,11 +1350,11 @@
                  this.statusMessage = '역할 저장 중...';
                  const userDocRef = doc(db, `userData/${this.user.uid}`);
                  try {
-                     await setDoc(userDocRef, { role: roleToSave });
-                     this.statusMessage = '역할이 저장되었습니다.';
+                     await setDoc(userDocRef, { role: roleToSave }); // Save null if logging out or resetting
+                     this.statusMessage = roleToSave ? '역할이 저장되었습니다.' : '역할이 초기화되었습니다.';
                  } catch (error) {
                      console.error("Error saving role:", error);
-                     this.statusMessage = '역할 저장 실패.';
+                     this.statusMessage = '역할 저장/초기화 실패.';
                  } finally {
                      setTimeout(() => this.statusMessage = '', 2000);
                  }
@@ -2654,26 +2665,29 @@
            async getSubjectCompletionStatus(studentId, subjectName){ // Changed to async
                  // Attempt to load guidance data for the specific subject from Firestore
                  let guidanceData = null;
-                 // We need to know the teacher's UID for this subject.
-                 // This requires a lookup based on subject, which isn't available.
-                 // Alternative: Query Firestore for ANY document matching the subject name pattern?
-                 // This requires specific Firestore indexing or a different data structure.
+                 // === This is the difficult part: Finding the correct teacher's data ===
+                 // Option 1 (Simple but limited): Check if current user taught it
+                 // Option 2 (Better): Query Firestore based on subject (needs indexing/structure change)
+                 // Option 3 (Best for security): Use Firestore Rules + Cloud Function to aggregate status
 
-                 // === SIMPLIFIED TEMPORARY LOGIC ===
-                 // Check if the current user (homeroom teacher) might have taught this subject.
-                 // This is NOT a robust solution for multiple teachers.
+                 // Using Option 1 for now (simplified)
                  if (this.user) {
+                     // Check if data exists under current user's ID
                      const docPath = `teacherData/${this.user.uid}/${subjectName}`;
                      try {
                          const docSnap = await getDoc(doc(db, docPath));
                          if (docSnap.exists()) {
                              guidanceData = docSnap.data();
+                         } else {
+                            // TODO: Implement logic to search other teachers' data if needed/allowed
+                            // This would likely involve querying a different collection or using Cloud Functions
+                            // console.log(`Guidance data for ${subjectName} not found under current user.`);
                          }
                      } catch (error) {
                          console.error("Error fetching subject data:", error);
                      }
                  }
-                // === END OF SIMPLIFIED LOGIC ===
+                 // === End of Simplified Logic ===
 
 
                  if(!guidanceData) return { status: '정보 없음', color: 'text-gray-500'}; // Return if no data found
@@ -2740,15 +2754,28 @@
                 this.previewForm(type, [student]);
             }
 
-        }).mount('#app'); // Mount the app first
+        }); // End of createApp
+
+        app.mount('#app'); // Mount the app first
         
-        // Call initApp on the mounted instance
-        // Ensure this runs after the app instance is available
+        // Call initApp on the mounted instance after DOM is ready
         window.addEventListener('DOMContentLoaded', () => {
-             if (app && typeof app.initApp === 'function') {
-                 app.initApp();
+             // Ensure petite-vue app instance exists before calling initApp
+             // petite-vue doesn't expose the instance globally, so we access it via the mounted element.
+             const appElement = document.getElementById('app');
+             if (appElement && appElement.__vue_app__ && typeof appElement.__vue_app__.initApp === 'function') {
+                 appElement.__vue_app__.initApp();
              } else {
-                 console.error("Vue app instance or initApp not found after mount.");
+                 // Fallback if petite-vue's internal structure changes
+                 // Try accessing the instance differently or wait a bit longer
+                 setTimeout(() => {
+                     const appElementRetry = document.getElementById('app');
+                     if (appElementRetry && appElementRetry.__vue_app__ && typeof appElementRetry.__vue_app__.initApp === 'function') {
+                        appElementRetry.__vue_app__.initApp();
+                     } else {
+                        console.error("Vue app instance or initApp not found after mount.");
+                     }
+                 }, 0); 
              }
         });
 
