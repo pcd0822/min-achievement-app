@@ -797,7 +797,7 @@
         const auth = getAuth(firebaseApp);
         const db = getFirestore(firebaseApp);
         
-        const appInstance = createApp({ // Create the app instance
+        const app = createApp({ // Create the app instance
             // State
             user: null,
             isLoggedIn: false,
@@ -1171,11 +1171,13 @@
             async initApp() { // Changed: Made this a method
                 this.isLoading = true;
                 onAuthStateChanged(auth, async (user) => {
+                    console.log("Auth state changed. User:", user); // Added log
                     if (user) {
                         this.user = user;
                         this.isLoggedIn = true;
                         await this.loadUserRole(); // Load role from Firestore
                         await this.loadCommonData(); // Load shared data
+                        console.log("After loading role and common data. Current role:", this.role); // Added log
                     } else {
                         this.user = null;
                         this.isLoggedIn = false;
@@ -1232,14 +1234,17 @@
                 if (!this.user) return;
                 const userDocRef = doc(db, `userData/${this.user.uid}`);
                 const userDocSnap = await getDoc(userDocRef);
+                console.log("Loading user role for:", this.user.uid); // Added log
                 if (userDocSnap.exists()) {
                     this.role = userDocSnap.data().role;
+                    console.log("Role loaded from Firestore:", this.role); // Added log
                      if(this.role === '교과교사') {
                         // Trigger loading teacher-specific data if needed initially
                         // await this.loadGuidanceData(); // Example
                     }
                 } else {
                     this.role = null; // No role saved, show selection modal
+                    console.log("No role found in Firestore for this user."); // Added log
                 }
             },
 
@@ -2728,8 +2733,8 @@
 
         }); // End of createApp
 
-        appInstance.mount('#app'); // Mount the app first
-        appInstance.initApp(); // Then call initApp on the instance
+        app.mount('#app'); // Mount the app first
+        app.initApp(); // Then call initApp on the instance
 
     </script>
 </body>
