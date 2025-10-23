@@ -124,7 +124,7 @@
 </head>
 <body class="bg-gray-100">
 
-    <div id="app" v-cloak class="min-h-screen flex flex-col">
+    <div id="app" v-cloak @mount="initApp()" class="min-h-screen flex flex-col">
         <!-- Header -->
         <header class="bg-white shadow-md">
             <div class="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -778,7 +778,7 @@
 
     <script type="module">
         // Vue 3 CDN (petite-vue for simplicity)
-        import { createApp, reactive } from 'https://unpkg.com/petite-vue?module'
+        import { createApp } from 'https://unpkg.com/petite-vue?module'
         
         // Import Firebase modules
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -790,7 +790,7 @@
             apiKey: "AIzaSyC6pjFO1NHZcIPD-I-G3Puc6d6ix6Bg9AM",
             authDomain: "min-achievement-app-948da.firebaseapp.com",
             projectId: "min-achievement-app-948da",
-            storageBucket: "min-achievement-app-948da.firebasestorage.app",
+            storageBucket: "min-achievement-app-948da.appspot.com", // Corrected version
             messagingSenderId: "983725694755",
             appId: "1:983725694755:web:f2e95ea13b38135b08b696",
             measurementId: "G-V9WM5MB7SX"
@@ -802,7 +802,7 @@
         const auth = getAuth(firebaseApp);
         const db = getFirestore(firebaseApp);
         
-        const app = createApp({ // Create the app instance
+        createApp({ // Create the app instance
             // State
             user: null,
             isLoggedIn: false,
@@ -817,7 +817,7 @@
             uploadStatus: { curriculum: '', student: '', emotionalSupport: '' },
             
             // Admin Data (Load from Firestore or defaults)
-            moduleConfig: reactive({
+            moduleConfig: {
                 hoursPerCredit: 1,
                 preventiveRatio: 50,
                 emotionalSupportRatio: 20,
@@ -830,9 +830,9 @@
                     { name: '대면지도', hours: 1 },
                     { name: '보충과제부여', hours: 1 }
                 ]
-            }),
+            },
             moduleConfigStatus: '',
-            newsletterForm: reactive({
+            newsletterForm: {
                 title: '최소 성취수준 보장지도 참여 안내', 
                 docNumber: '교무기획부-123', 
                 department: '교무기획부 (02-123-4567)',
@@ -841,13 +841,13 @@
                 dispatchDate: '2025.07.14.',
                 includeSeal: false, 
                 sealUrl: null
-            }),
-            pledgeForm: reactive({
+            },
+            pledgeForm: {
                 content: '본인은 최소 성취수준 보장지도 프로그램의 모든 활동에 성실하게 참여할 것을 서약합니다.', 
                 dispatchDate: '2025.07.14.',
                 includeSeal: false, 
                 sealUrl: null
-            }),
+            },
             showPreviewModal: false,
             previewHtml: '',
 
@@ -872,7 +872,7 @@
             homeroomMessage: '',
 
             // Teacher Data (Specific to the logged-in teacher)
-            teacherPlan: reactive({
+            teacherPlan: {
                 aiProvider: 'gemini',
                 apiKey: '',
                 subjectName: '',
@@ -888,11 +888,11 @@
                 supplementaryPeriod: [],
                 supplementarySessions: [{ plan: '' }, { plan: '' }, { plan: '' }],
                 maxSupplementaryHours: 0,
-            }),
+            },
             teacherPlanError: '',
             
             // Logbook Data (Specific to teacher and subject)
-            teacherGuidanceData: reactive({
+            teacherGuidanceData: {
                 preventive: {
                     students: [],
                     sessions: Array.from({ length: 10 }, () => ({ date: '', time: '', isSaved: false, place: '', content: '', attendance: {} })),
@@ -903,7 +903,7 @@
                     sessions: Array.from({ length: 10 }, () => ({ date: '', time: '', isSaved: false, place: '', content: '', attendance: {} })),
                     error: ''
                 }
-            }),
+            },
 
             // Computed Properties
              get formattedTeacherNames() {
@@ -2673,6 +2673,7 @@
                 // Reverting to checking CURRENT user's data as a temporary fix.
                 // A full solution requires Firestore Rules redesign or Cloud Functions.
                  if (this.user) {
+                     // Check if data exists under current user's ID
                      const docPath = `teacherData/${this.user.uid}/${subjectName}`;
                      try {
                          const docSnap = await getDoc(doc(db, docPath));
@@ -2748,19 +2749,14 @@
                      return;
                  }
                 this.previewForm(type, [student]);
-            },
-
-            // Mounted hook
-            mounted() {
-                this.initApp();
             }
+            
+            // Removed the explicit mounted hook
+            // initApp() is now called by @mount in the HTML
 
-        }); // End of createApp
-
-        app.mount('#app'); // Mount the app
+        }).mount('#app'); // Mount the app
         
         // Removed the problematic DOMContentLoaded listener
-        // The 'mounted' hook inside createApp will now handle initialization.
 
     </script>
 </body>
