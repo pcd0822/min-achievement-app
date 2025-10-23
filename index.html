@@ -1171,18 +1171,22 @@
             async initApp() { // Changed: Made this a method
                 this.isLoading = true;
                 onAuthStateChanged(auth, async (user) => {
-                    console.log("Auth state changed. User:", user); // Added log
+                    // console.log("Auth state changed. User:", user); // Debug log
                     if (user) {
                         this.user = user;
                         this.isLoggedIn = true;
-                        await this.loadUserRole(); // Load role from Firestore
-                        await this.loadCommonData(); // Load shared data
-                        console.log("After loading role and common data. Current role:", this.role); // Added log
+                        await this.loadUserRole(); // Attempt to load role
+                        // console.log("Role loaded:", this.role); // Debug log
+                        await this.loadCommonData();
+                        // console.log("Common data loaded."); // Debug log
+                        // The role selection modal is controlled by `v-if="isLoggedIn && !role"`
+                        // No explicit action needed here to show it if role is still null
                     } else {
                         this.user = null;
                         this.isLoggedIn = false;
                         this.role = null;
                         this.resetData(); // Clear data on logout
+                        // console.log("User logged out."); // Debug log
                     }
                     this.isLoading = false;
                 });
@@ -1233,18 +1237,23 @@
             async loadUserRole() {
                 if (!this.user) return;
                 const userDocRef = doc(db, `userData/${this.user.uid}`);
-                const userDocSnap = await getDoc(userDocRef);
-                console.log("Loading user role for:", this.user.uid); // Added log
-                if (userDocSnap.exists()) {
-                    this.role = userDocSnap.data().role;
-                    console.log("Role loaded from Firestore:", this.role); // Added log
-                     if(this.role === '교과교사') {
-                        // Trigger loading teacher-specific data if needed initially
-                        // await this.loadGuidanceData(); // Example
+                try {
+                    const userDocSnap = await getDoc(userDocRef);
+                   // console.log("Loading user role for:", this.user.uid); // Debug log
+                    if (userDocSnap.exists()) {
+                        this.role = userDocSnap.data().role;
+                       // console.log("Role loaded from Firestore:", this.role); // Debug log
+                        if(this.role === '교과교사') {
+                            // Trigger loading teacher-specific data if needed initially
+                            // await this.loadGuidanceData(); // Example
+                        }
+                    } else {
+                        this.role = null; // No role saved, show selection modal
+                       // console.log("No role found in Firestore for this user."); // Debug log
                     }
-                } else {
-                    this.role = null; // No role saved, show selection modal
-                    console.log("No role found in Firestore for this user."); // Added log
+                } catch (error) {
+                    console.error("Error loading user role:", error);
+                    this.role = null; // Ensure role is null if there's an error
                 }
             },
 
@@ -2731,10 +2740,18 @@
                 this.previewForm(type, [student]);
             }
 
-        }); // End of createApp
+        }).mount('#app'); // Mount the app first
+        
+        // Call initApp on the mounted instance
+        // Ensure this runs after the app instance is available
+        window.addEventListener('DOMContentLoaded', () => {
+             if (app && typeof app.initApp === 'function') {
+                 app.initApp();
+             } else {
+                 console.error("Vue app instance or initApp not found after mount.");
+             }
+        });
 
-        app.mount('#app'); // Mount the app first
-        app.initApp(); // Then call initApp on the instance
 
     </script>
 </body>
