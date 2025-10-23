@@ -785,12 +785,12 @@
         import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc, collection, query, where, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Firebase configuration (Replace with your actual config)
+        // Firebase configuration (From user)
         const firebaseConfig = {
             apiKey: "AIzaSyC6pjFO1NHZcIPD-I-G3Puc6d6ix6Bg9AM",
             authDomain: "min-achievement-app-948da.firebaseapp.com",
             projectId: "min-achievement-app-948da",
-            storageBucket: "min-achievement-app-948da.appspot.com", // Corrected version
+            storageBucket: "min-achievement-app-948da.firebasestorage.app",
             messagingSenderId: "983725694755",
             appId: "1:983725694755:web:f2e95ea13b38135b08b696",
             measurementId: "G-V9WM5MB7SX"
@@ -1176,25 +1176,18 @@
             async initApp() { // Changed: Made this a method
                 this.isLoading = true;
                 onAuthStateChanged(auth, async (user) => {
-                    // console.log("Auth state changed. User:", user); // Debug log
                     if (user) {
                         this.user = user;
                         this.isLoggedIn = true;
-                        // Attempt to load role first
-                        await this.loadUserRole();
-                        // console.log("Role after loadUserRole:", this.role); // Debug log
-                        // If role is loaded, then load common data
+                        await this.loadUserRole(); // Attempt to load role
                         if (this.role) {
                             await this.loadCommonData();
-                           // console.log("Common data loaded."); // Debug log
                         }
-                        // If role is still null after loading attempt, the role selection modal will show
                     } else {
                         this.user = null;
                         this.isLoggedIn = false;
                         this.role = null;
                         this.resetData(); // Clear data on logout
-                        // console.log("User logged out."); // Debug log
                     }
                     this.isLoading = false;
                 });
@@ -1247,17 +1240,13 @@
                 const userDocRef = doc(db, `userData/${this.user.uid}`);
                 try {
                     const userDocSnap = await getDoc(userDocRef);
-                   // console.log("Loading user role for:", this.user.uid); // Debug log
                     if (userDocSnap.exists()) {
                         this.role = userDocSnap.data().role;
-                       // console.log("Role loaded from Firestore:", this.role); // Debug log
                         if(this.role === '교과교사') {
-                            // Trigger loading teacher-specific data if needed initially
                              await this.loadGuidanceData(); // Load data after confirming teacher role
                         }
                     } else {
                         this.role = null; // No role saved, show selection modal
-                       // console.log("No role found in Firestore for this user."); // Debug log
                     }
                 } catch (error) {
                     console.error("Error loading user role:", error);
@@ -1327,11 +1316,11 @@
                 } else {
                     await this.saveUserRole(selectedRole);
                     this.role = selectedRole;
+                    await this.loadCommonData(); // Load common data after role selection
                      if(selectedRole === '교과교사') {
                         // Load teacher-specific data after role selection if needed
                          await this.loadGuidanceData(); // Load data when role becomes teacher
                     }
-                    await this.loadCommonData(); // Load common data after role selection
                 }
             },
             async submitAdminCode() {
@@ -2657,37 +2646,44 @@
                     this.homeroomMessage = `해당 학급에 미도달 학생이 없습니다.`;
                 }
             },
-            // Note: getSubjectCompletionStatus now needs to load data potentially from other teachers
-            // This is complex and might require restructuring how guidance data is stored or accessed.
-            // For now, it will look for data saved by the *current* user if they are also a teacher,
-            // or return '정보 없음'. A more robust solution would involve Firestore rules
-            // allowing homeroom teachers to read specific subject data or storing summary data.
-           async getSubjectCompletionStatus(studentId, subjectName){ // Changed to async
-                 // Attempt to load guidance data for the specific subject from Firestore
-                 let guidanceData = null;
-                 // === This is the difficult part: Finding the correct teacher's data ===
-                 // Option 1 (Simple but limited): Check if current user taught it
-                 // Option 2 (Better): Query Firestore based on subject (needs indexing/structure change)
-                 // Option 3 (Best for security): Use Firestore Rules + Cloud Function to aggregate status
+            
+            // This logic needs to be async to handle potential async data fetching
+            async getSubjectCompletionStatus(studentId, subjectName){ 
+                let guidanceData = null;
+                
+                // This is the core problem: A homeroom teacher needs to find data
+                // saved by *another* teacher. This requires knowing the UID of the teacher
+                // who taught that subject, or querying all teacherData.
+                // This is complex and requires robust Firestore Rules or a Cloud Function.
 
-                 // Using Option 1 for now (simplified)
+                // === SIMPLIFIED LOGIC (assuming data must be manually loaded by teacher) ===
+                // Try to find if *any* loaded guidance data (e.g., from local storage simulation) matches
+                // This logic is flawed because it relies on local storage which is removed.
+                // We'll query Firestore for *all* teacher data matching the subject name.
+                // This is generally NOT secure or scalable without proper rules.
+                
+                // TEMPORARY & INSECURE QUERY (for demonstration):
+                // A better structure would be to store guidance data by subject, then by teacher UID.
+                // e.g., /subjects/{subjectName}/guidance/{teacherUID}
+                // For now, we assume the simple structure: /teacherData/{teacherUID}/{subjectName}
+                
+                // This logic is difficult to implement correctly on the client-side without
+                // exposing all teacher UIDs.
+                
+                // Reverting to checking CURRENT user's data as a temporary fix.
+                // A full solution requires Firestore Rules redesign or Cloud Functions.
                  if (this.user) {
-                     // Check if data exists under current user's ID
                      const docPath = `teacherData/${this.user.uid}/${subjectName}`;
                      try {
                          const docSnap = await getDoc(doc(db, docPath));
                          if (docSnap.exists()) {
                              guidanceData = docSnap.data();
-                         } else {
-                            // TODO: Implement logic to search other teachers' data if needed/allowed
-                            // This would likely involve querying a different collection or using Cloud Functions
-                            // console.log(`Guidance data for ${subjectName} not found under current user.`);
                          }
                      } catch (error) {
                          console.error("Error fetching subject data:", error);
                      }
                  }
-                 // === End of Simplified Logic ===
+                 // === END OF TEMPORARY FIX ===
 
 
                  if(!guidanceData) return { status: '정보 없음', color: 'text-gray-500'}; // Return if no data found
@@ -2752,33 +2748,19 @@
                      return;
                  }
                 this.previewForm(type, [student]);
+            },
+
+            // Mounted hook
+            mounted() {
+                this.initApp();
             }
 
         }); // End of createApp
 
-        app.mount('#app'); // Mount the app first
+        app.mount('#app'); // Mount the app
         
-        // Call initApp on the mounted instance after DOM is ready
-        window.addEventListener('DOMContentLoaded', () => {
-             // Ensure petite-vue app instance exists before calling initApp
-             // petite-vue doesn't expose the instance globally, so we access it via the mounted element.
-             const appElement = document.getElementById('app');
-             if (appElement && appElement.__vue_app__ && typeof appElement.__vue_app__.initApp === 'function') {
-                 appElement.__vue_app__.initApp();
-             } else {
-                 // Fallback if petite-vue's internal structure changes
-                 // Try accessing the instance differently or wait a bit longer
-                 setTimeout(() => {
-                     const appElementRetry = document.getElementById('app');
-                     if (appElementRetry && appElementRetry.__vue_app__ && typeof appElementRetry.__vue_app__.initApp === 'function') {
-                        appElementRetry.__vue_app__.initApp();
-                     } else {
-                        console.error("Vue app instance or initApp not found after mount.");
-                     }
-                 }, 0); 
-             }
-        });
-
+        // Removed the problematic DOMContentLoaded listener
+        // The 'mounted' hook inside createApp will now handle initialization.
 
     </script>
 </body>
