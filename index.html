@@ -1,0 +1,2721 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>최소 성취수준 보장지도 관리 웹 앱</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.0/FileSaver.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ko.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
+    <style>
+        body { font-family: 'Inter', 'Pretendard', sans-serif; }
+        .tab-button {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+        .tab-button.active {
+            border-bottom-color: #4f46e5;
+            color: #4f46e5;
+            font-weight: 600;
+        }
+        .form-section {
+            display: none;
+        }
+        .form-section.active {
+            display: block;
+        }
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            max-width: 90%;
+            width: 500px;
+        }
+        .modal-preview {
+             width: 800px;
+             max-width: 95%;
+        }
+
+        [v-cloak] { display: none; }
+
+        .table-cell-content {
+            padding: 0.5rem 0;
+            min-height: 2.5rem; /* Ensures consistent row height */
+            display: flex;
+            align-items: center;
+        }
+
+        .table-cell-content:not(:last-child) {
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .scroll-arrow {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 30;
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 9999px;
+            background-color: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: #4a5568;
+            transition: all 0.2s ease-in-out;
+        }
+        .scroll-arrow:hover {
+            background-color: rgba(255, 255, 255, 0.9);
+            transform: translateY(-50%) scale(1.1);
+        }
+        .scroll-arrow.left { left: -1.25rem; }
+        .scroll-arrow.right { right: -1.25rem; }
+
+
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #print-area, #print-area * {
+                visibility: visible;
+            }
+            #print-area {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                margin: 0;
+                border: 0;
+            }
+            @page {
+                size: A4;
+                margin: 20mm;
+            }
+            .page-break {
+                page-break-after: always;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+
+    <div id="app" v-cloak class="min-h-screen flex flex-col">
+        <!-- Header -->
+        <header class="bg-white shadow-md">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-16">
+                    <div class="flex items-center">
+                        <svg class="h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v11.494m-9-5.747h18"/>
+                        </svg>
+                        <h1 class="ml-2 text-2xl font-bold text-gray-800">최소 성취수준 보장지도 관리</h1>
+                    </div>
+                     <div v-if="isLoggedIn" class="flex items-center space-x-4">
+                         <span class="text-gray-600 text-sm"> {{ user?.email }}</span>
+                         <span v-if="role" class="text-gray-600 font-semibold">[{{ role }}] 모드</span>
+                         <button @click="logout" class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition text-sm">로그아웃</button>
+                         <button v-if="role" @click="resetRole" class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition text-sm">역할 재선택</button>
+                     </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-grow container mx-auto p-4 sm:p-6 lg:p-8">
+            <!-- Login Button -->
+            <div v-if="!isLoggedIn" class="text-center mt-10">
+                <button @click="login" class="px-8 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition text-lg shadow-md">
+                    Google 계정으로 로그인
+                </button>
+                 <p class="mt-4 text-gray-600">로그인 후 서비스를 이용해주세요.</p>
+            </div>
+
+            <!-- Role Selection Modal (After Login) -->
+            <div v-if="isLoggedIn && !role" class="modal-overlay">
+                <div class="modal-content">
+                    <h3 class="text-2xl font-bold mb-6 text-center">역할 선택</h3>
+                    <div class="space-y-4">
+                        <button @click="selectRole('교과교사')" class="w-full text-left px-6 py-4 bg-gray-100 rounded-lg hover:bg-gray-200 transition">교과교사</button>
+                        <button @click="selectRole('담임교사')" class="w-full text-left px-6 py-4 bg-gray-100 rounded-lg hover:bg-gray-200 transition">담임교사</button>
+                        <div>
+                            <button @click="selectRole('관리자')" class="w-full text-left px-6 py-4 bg-gray-100 rounded-lg hover:bg-gray-200 transition">관리자</button>
+                            <div v-if="showAdminCodeInput" class="mt-2">
+                                <input type="password" v-model="adminCode" @keyup.enter="submitAdminCode" placeholder="관리자 코드 입력 (0822)" class="w-full p-2 border rounded-md">
+                                <button @click="submitAdminCode" class="w-full mt-2 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition">확인</button>
+                                <p v-if="adminCodeError" class="text-red-500 text-sm mt-1">{{ adminCodeError }}</p>
+                            </div>
+                        </div>
+                    </div>
+                     <p v-if="statusMessage" class="mt-4 text-center text-sm text-blue-600">{{ statusMessage }}</p>
+                </div>
+            </div>
+
+            <!-- Main Dashboard (After Login and Role Selection) -->
+            <div v-if="isLoggedIn && role">
+                <!-- Admin View -->
+                <div v-if="role === '관리자'">
+                    <!-- Admin Content Here -->
+                    <div class="space-y-8">
+                        <h2 class="text-3xl font-bold text-gray-800">관리자 대시보드</h2>
+
+                        <!-- 1. 교육과정 편제표 업로드 -->
+                        <div class="bg-white p-6 rounded-lg shadow-md">
+                            <h3 class="text-xl font-semibold mb-4">1. 교육과정 편제표 업로드</h3>
+                            <div class="flex space-x-4">
+                                <button @click="downloadTemplate('curriculum')" class="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition">양식 다운로드</button>
+                                <input type="file" @change="uploadFile($event, 'curriculum')" class="hidden" id="curriculum-upload">
+                                <label for="curriculum-upload" class="cursor-pointer px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition">엑셀 파일 업로드</label>
+                            </div>
+                             <p v-if="uploadStatus.curriculum" class="mt-2 text-sm font-medium">{{ uploadStatus.curriculum }}</p>
+                        </div>
+
+                        <!-- 2. 학적 정보 업로드 -->
+                        <div class="bg-white p-6 rounded-lg shadow-md">
+                            <h3 class="text-xl font-semibold mb-4">2. 학적 정보 업로드</h3>
+                            <div class="flex space-x-4">
+                                <button @click="downloadTemplate('student')" class="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition">양식 다운로드</button>
+                                <input type="file" @change="uploadFile($event, 'student')" class="hidden" id="student-upload">
+                                <label for="student-upload" class="cursor-pointer px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition">엑셀 파일 업로드</label>
+                            </div>
+                             <p v-if="uploadStatus.student" class="mt-2 text-sm font-medium">{{ uploadStatus.student }}</p>
+                        </div>
+
+                        <!-- 2-1. 정서지원프로그램 이수시간 업로드 -->
+                        <div class="bg-white p-6 rounded-lg shadow-md">
+                            <h3 class="text-xl font-semibold mb-4">2-1. 정서지원프로그램 이수시간 업로드</h3>
+                            <div class="flex space-x-4">
+                                <button @click="downloadTemplate('emotionalSupport')" class="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition">양식 다운로드</button>
+                                <input type="file" @change="uploadFile($event, 'emotionalSupport')" class="hidden" id="emotional-support-upload">
+                                <label for="emotional-support-upload" class="cursor-pointer px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition">엑셀 파일 업로드</label>
+                            </div>
+                            <p v-if="uploadStatus.emotionalSupport" class="mt-2 text-sm font-medium">{{ uploadStatus.emotionalSupport }}</p>
+                        </div>
+                        
+                        <!-- 3. 운영 모듈 설계 -->
+                         <div class="bg-white p-6 rounded-lg shadow-md">
+                             <h3 class="text-xl font-semibold mb-4">3. 운영 모듈 설계</h3>
+                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                 <div>
+                                     <label class="block text-sm font-medium text-gray-700">학점당 시수</label>
+                                     <input type="number" v-model.number="moduleConfig.hoursPerCredit" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                                 </div>
+                                 <div>
+                                     <label class="block text-sm font-medium text-gray-700">예방지도 연계 비율 (%)</label>
+                                     <input type="number" v-model.number="moduleConfig.preventiveRatio" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                                 </div>
+                                 <div>
+                                     <label class="block text-sm font-medium text-gray-700">정서지원 프로그램 연계 비율 (%)</label>
+                                     <input type="number" v-model.number="moduleConfig.emotionalSupportRatio" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                                 </div>
+                                 <div>
+                                     <label class="block text-sm font-medium text-gray-700">학습지원대상자 예방지도 인정비율 (%)</label>
+                                     <input type="number" v-model.number="moduleConfig.specialPreventiveRatio" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                                 </div>
+                             </div>
+                             <h4 class="text-lg font-semibold mt-6 mb-2">항목별 인정시수 (1회 기준)</h4>
+                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                 <div v-for="(item, index) in moduleConfig.recognizedHours" :key="index">
+                                     <label class="block text-sm font-medium text-gray-700">{{ item.name }}</label>
+                                     <input type="number" step="0.1" v-model.number="item.hours" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                                 </div>
+                             </div>
+                             <button @click="saveModuleConfig" class="mt-6 px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition">운영 모듈 저장</button>
+                              <p v-if="moduleConfigStatus" class="mt-2 text-sm font-medium text-green-600">{{ moduleConfigStatus }}</p>
+                         </div>
+
+                        <!-- 4. 대상자 선정 -->
+                        <div class="bg-white p-6 rounded-lg shadow-md">
+                            <h3 class="text-xl font-semibold mb-4">4. 대상자 선정</h3>
+                            <div class="flex space-x-4">
+                                <input type="file" @change="processGradeFiles" multiple class="hidden" id="grade-upload">
+                                <label for="grade-upload" class="cursor-pointer px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition">성적 파일 업로드 (복수 선택 가능)</label>
+                                <button @click="showAttendanceModal = true" class="px-4 py-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 transition">출석률 미도달 학생 입력</button>
+                            </div>
+                             <p v-if="fileProcessingError" class="mt-2 text-sm font-medium text-red-500">{{ fileProcessingError }}</p>
+                            
+                            <div v-if="underachievers.length > 0" class="mt-6">
+                               <h4 class="text-lg font-semibold mb-2">학업성취율/출석률 미도달 학생 현황</h4>
+                               <div class="overflow-x-auto">
+                                   <table class="min-w-full" id="underachievers-table">
+                                       <thead class="bg-gray-50">
+                                           <tr>
+                                               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">학번</th>
+                                               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">이름</th>
+                                               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">특기사항</th>
+                                               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">미도달내역</th>
+                                               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">미도달 과목(학점수)</th>
+                                               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">보충지도(추가학습) 내역</th>
+                                               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">조치</th>
+                                           </tr>
+                                       </thead>
+                                       <tbody v-for="student in groupedUnderachievers" :key="student.id" class="bg-white">
+                                           <tr v-for="(detail, detailIndex) in student.details" :key="detail.reason">
+                                               <td v-if="detailIndex === 0" :rowspan="student.details.length" class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200">{{ student.id }}</td>
+                                               <td v-if="detailIndex === 0" :rowspan="student.details.length" class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200">{{ student.name }}</td>
+                                               <td v-if="detailIndex === 0" :rowspan="student.details.length" class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200">{{ student.specialNotes }}</td>
+                                               <td class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200">{{ detail.reason }}</td>
+                                               <td class="px-6 py-4 whitespace-normal align-top border-b border-gray-200">{{ detail.subjects }}</td>
+                                               <td class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200">{{ detail.lessonDetails }}</td>
+                                               <td class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200 text-sm font-medium">
+                                                   <button @click="deleteDetailGroup(detail)" class="text-red-600 hover:text-red-900">삭제</button>
+                                               </td>
+                                           </tr>
+                                       </tbody>
+                                   </table>
+                               </div>
+                                <div class="mt-6 flex justify-end items-center space-x-4">
+                                    <div class="relative">
+                                        <button @click="toggleExportOptions" class="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition">내보내기</button>
+                                        <div v-if="showExportOptions" class="absolute right-0 bottom-full mb-2 w-48 bg-white rounded-md shadow-lg z-20">
+                                            <a href="#" @click.prevent="exportTable('pdf')" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">PDF로 저장</a>
+                                            <a href="#" @click.prevent="exportTable('xlsx')" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">XLSX 파일</a>
+                                            <a href="#" @click.prevent="exportTable('csv')" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">CSV (Google Sheets용)</a>
+                                        </div>
+                                    </div>
+                                    <!-- 임시 저장 버튼은 Firestore 사용 시 필요 없어 제거 -->
+                                    <button @click="deployUnderachievers" class="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition">배포하기</button>
+                                </div>
+                                <p v-if="underachieversStatus" class="mt-2 text-right text-sm font-medium text-green-600">{{ underachieversStatus }}</p>
+                            </div>
+                        </div>
+
+                        <!-- 5. 가정통신문 및 서약서 양식 관리 -->
+                        <div class="bg-white p-6 rounded-lg shadow-md">
+                            <h3 class="text-xl font-semibold mb-4">5. 가정통신문 및 서약서 양식 관리</h3>
+                            <div class="flex border-b">
+                                <button class="tab-button" :class="{ 'active': adminFormTab === 'newsletter' }" @click="adminFormTab = 'newsletter'">가정통신문</button>
+                                <button class="tab-button" :class="{ 'active': adminFormTab === 'pledge' }" @click="adminFormTab = 'pledge'">서약서</button>
+                            </div>
+                            
+                            <!-- 가정통신문 폼 -->
+                            <div v-if="adminFormTab === 'newsletter'" class="mt-6 space-y-4">
+                                <input type="text" v-model="newsletterForm.title" placeholder="제목" class="w-full p-2 border rounded">
+                                <input type="text" v-model="newsletterForm.docNumber" placeholder="문서 번호 (예: 한국고 2025-00호)" class="w-full p-2 border rounded">
+                                <input type="text" v-model="newsletterForm.department" placeholder="담당 부서 및 연락처" class="w-full p-2 border rounded">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">학교 로고 이미지</label>
+                                    <input type="file" @change="handleImageUpload($event, 'newsletter', 'logoUrl')" accept="image/*" class="w-full">
+                                </div>
+                                <textarea v-model="newsletterForm.body" placeholder="본문 내용" rows="10" class="w-full p-2 border rounded"></textarea>
+                                <input type="text" v-model="newsletterForm.dispatchDate" placeholder="발송일 (예: 2025.7.14.)" class="w-full p-2 border rounded">
+                                <div class="flex items-center space-x-2">
+                                    <input type="checkbox" v-model="newsletterForm.includeSeal" id="newsletterSealCheck">
+                                    <label for="newsletterSealCheck">학교장 날인 포함</label>
+                                </div>
+                                <div v-if="newsletterForm.includeSeal">
+                                    <label class="block text-sm font-medium text-gray-700">학교장 날인 이미지</label>
+                                    <input type="file" @change="handleImageUpload($event, 'newsletter', 'sealUrl')" accept="image/*" class="w-full">
+                                </div>
+                                <div class="flex space-x-2">
+                                    <button @click="previewForm('newsletter', underachievers)" class="mt-4 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">미리보기 및 출력</button>
+                                    <button @click="saveFormTemplates" class="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">양식 저장</button>
+                                </div>
+                            </div>
+
+                            <!-- 서약서 폼 -->
+                             <div v-if="adminFormTab === 'pledge'" class="mt-6 space-y-4">
+                                 <textarea v-model="pledgeForm.content" placeholder="서약서 동의 내용" rows="10" class="w-full p-2 border rounded"></textarea>
+                                 <input type="text" v-model="pledgeForm.dispatchDate" placeholder="서약일 (예: 2025.7.14.)" class="w-full p-2 border rounded">
+                                  <div class="flex items-center space-x-2">
+                                      <input type="checkbox" v-model="pledgeForm.includeSeal" id="pledgeSealCheck">
+                                      <label for="pledgeSealCheck">학교장 날인 포함</label>
+                                  </div>
+                                 <div v-if="pledgeForm.includeSeal">
+                                     <label class="block text-sm font-medium text-gray-700">학교장 날인 이미지</label>
+                                     <input type="file" @change="handleImageUpload($event, 'pledge', 'sealUrl')" accept="image/*" class="w-full">
+                                 </div>
+                                 <div class="flex space-x-2">
+                                    <button @click="previewForm('pledge', underachievers)" class="mt-4 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">미리보기 및 출력</button>
+                                    <button @click="saveFormTemplates" class="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">양식 저장</button>
+                                </div>
+                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Teacher View -->
+                <div v-if="role === '교과교사'" v-effect="initTeacherView()">
+                    <h2 class="text-3xl font-bold text-gray-800 mb-6">교과교사 대시보드</h2>
+                    <div class="flex border-b mb-6">
+                        <button class="tab-button" :class="{ 'active': teacherTab === 'plan' }" @click="teacherTab = 'plan'">계획서 작성</button>
+                        <button class="tab-button" :class="{ 'active': teacherTab === 'preventive' }" @click="switchTeacherTab('preventive')">예방지도 출석부 & 수업일지</button>
+                        <button class="tab-button" :class="{ 'active': teacherTab === 'supplementary' }" @click="switchTeacherTab('supplementary')">보충지도(추가학습) 출석부&수업일지</button>
+                    </div>
+
+                    <!-- 계획서 작성 탭 -->
+                    <div v-if="teacherTab === 'plan'" class="space-y-6">
+                        <div class="bg-white p-6 rounded-lg shadow-md space-y-4">
+                            <div>
+                                <label for="aiProvider" class="block text-sm font-medium text-gray-700">AI 모델 선택</label>
+                                <select id="aiProvider" v-model="teacherPlan.aiProvider" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                                    <option value="gemini">Gemini</option>
+                                    <option value="openai">OpenAI</option>
+                                    <option value="claude">Claude</option>
+                                </select>
+                            </div>
+                             <div>
+                                <label for="apiKey" class="block text-sm font-medium text-gray-700">AI API Key</label>
+                                <input type="password" id="apiKey" v-model="teacherPlan.apiKey" placeholder="선택한 AI 모델의 API 키를 입력하세요" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                            </div>
+                             <div>
+                                <label for="subjectName" class="block text-sm font-medium text-gray-700">과목명</label>
+                                <input type="text" id="subjectName" v-model="teacherPlan.subjectName" @change="updateMaxHours" placeholder="편제표에 등록된 과목명을 정확히 입력하세요" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                            </div>
+                             <div>
+                                <label class="block text-sm font-medium text-gray-700">교과교사명</label>
+                                <div v-for="(name, index) in teacherPlan.teacherNames" :key="index" class="flex items-center space-x-2 mt-2">
+                                    <input type="text" v-model="teacherPlan.teacherNames[index]" placeholder="교과교사 이름을 입력하세요" class="w-full p-2 border border-gray-300 rounded-md">
+                                    <button @click="removeTeacher(index)" v-if="teacherPlan.teacherNames.length > 1" class="px-3 py-1 bg-red-500 text-white rounded-md hover:bg-red-600">&times;</button>
+                                </div>
+                                <button @click="addTeacher" class="mt-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">+ 교과교사 추가</button>
+                            </div>
+                        </div>
+
+                          <div class="bg-white p-6 rounded-lg shadow-md space-y-4">
+                            <h3 class="text-lg font-semibold">성취기준 및 최소 성취수준 진술문</h3>
+                            <div v-for="(achievement, index) in teacherPlan.achievements" :key="index" class="p-4 border rounded-md space-y-2">
+                                <label class="block text-sm font-medium text-gray-700">성취기준 {{ index + 1 }}</label>
+                                <textarea v-model="achievement.text" class="w-full p-2 border border-gray-300 rounded-md" rows="2"></textarea>
+                                <div class="flex items-center justify-between">
+                                    <button @click="generateStatement(index)" class="px-3 py-1.5 bg-blue-500 text-white text-sm rounded-md hover:bg-blue-600 disabled:bg-gray-400" :disabled="!teacherPlan.apiKey || achievement.loading">
+                                        <span v-if="!achievement.loading">최소 성취수준 진술문 생성</span>
+                                        <span v-else>생성 중...</span>
+                                    </button>
+                                    <button @click="removeAchievement(index)" class="px-3 py-1.5 bg-red-500 text-white text-sm rounded-md hover:bg-red-600">&times; 삭제</button>
+                                </div>
+                                <div v-if="achievement.statement" class="mt-2 p-2 bg-gray-100 rounded-md">
+                                    <p class="text-sm font-semibold">최소 성취수준 진술문:</p>
+                                    <p class="text-sm text-gray-800">{{ achievement.statement }}</p>
+                                </div>
+                            </div>
+                            <button @click="addAchievement" class="mt-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">+ 성취기준 추가</button>
+                             <p v-if="teacherPlanError" class="text-red-500 text-sm mt-2">{{ teacherPlanError }}</p>
+                        </div>
+                        
+                         <div class="bg-white p-6 rounded-lg shadow-md space-y-4">
+                             <h3 class="text-lg font-semibold">학기말 성적 산출 방법</h3>
+                             <div class="flex space-x-4">
+                                  <label><input type="radio" v-model="teacherPlan.gradeCalculation" value="추정분할점수"> 추정분할점수</label>
+                                  <label><input type="radio" v-model="teacherPlan.gradeCalculation" value="고정분할점수"> 고정분할점수</label>
+                             </div>
+                         </div>
+
+                        <div class="bg-white p-6 rounded-lg shadow-md space-y-4">
+                            <h3 class="text-lg font-semibold">최소 성취수준 미도달 예방 지도 계획</h3>
+                            <div class="flex space-x-4">
+                                <label><input type="radio" v-model="teacherPlan.conductPrevention" value="O"> 진행함</label>
+                                <label><input type="radio" v-model="teacherPlan.conductPrevention" value="X"> 진행하지 않음</label>
+                            </div>
+                            <div v-if="teacherPlan.conductPrevention === 'O'" class="space-y-4 pt-4 border-t">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">예방지도 대상자 선정기준</label>
+                                    <textarea v-model="teacherPlan.preventionTarget" rows="3" class="mt-1 block w-full p-2 border rounded-md"></textarea>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">예방지도 방법 (복수선택 가능)</label>
+                                    <div class="mt-2 grid grid-cols-2 md:grid-cols-3 gap-2">
+                                        <label v-for="method in moduleConfig.recognizedHours" :key="method.name" class="flex items-center space-x-2">
+                                            <input type="checkbox" :value="method.name" v-model="teacherPlan.preventionMethods">
+                                            <span>{{ method.name }}</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                 <div>
+                                    <label class="block text-sm font-medium text-gray-700">예방지도 운영 기간</label>
+                                    <input type="text" class="flatpickr-range mt-1 block w-full p-2 border rounded-md">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">차시별 지도 계획</label>
+                                    <div v-for="(session, index) in teacherPlan.preventionSessions" :key="index" class="flex items-center space-x-2 mt-2">
+                                        <span class="font-semibold">{{ index + 1 }}차시:</span>
+                                        <input type="text" v-model="session.plan" class="w-full p-2 border rounded-md" placeholder="지도 계획을 입력하세요">
+                                        <button @click="removePreventionSession(index)" class="px-2 py-1 bg-red-500 text-white rounded-md">&times;</button>
+                                    </div>
+                                    <button @click="addPreventionSession" class="mt-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">+ 차시 추가</button>
+                                </div>
+                            </div>
+                        </div>
+
+                         <div class="bg-white p-6 rounded-lg shadow-md space-y-4">
+                            <h3 class="text-lg font-semibold">보충 지도 및 추가 학습 운영 계획</h3>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">보충지도/추가학습 방법 (복수선택 가능)</label>
+                                <div class="mt-2 grid grid-cols-2 md:grid-cols-3 gap-2">
+                                    <label v-for="method in moduleConfig.recognizedHours" :key="method.name" class="flex items-center space-x-2">
+                                        <input type="checkbox" :value="method.name" v-model="teacherPlan.supplementaryMethods">
+                                        <span>{{ method.name }}</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">보충지도/추가학습 운영 기간</label>
+                                <input type="text" class="flatpickr-range mt-1 block w-full p-2 border rounded-md">
+                            </div>
+                             <div>
+                                <label class="block text-sm font-medium text-gray-700">차시별 지도 계획 (최대 {{ teacherPlan.maxSupplementaryHours }}차시)</label>
+                                <div v-for="(session, index) in teacherPlan.supplementarySessions" :key="index" class="flex items-center space-x-2 mt-2">
+                                    <span class="font-semibold">{{ index + 1 }}차시:</span>
+                                    <input type="text" v-model="session.plan" class="w-full p-2 border rounded-md" placeholder="지도 계획을 입력하세요">
+                                    <button @click="removeSupplementarySession(index)" class="px-2 py-1 bg-red-500 text-white rounded-md">&times;</button>
+                                </div>
+                                <button @click="addSupplementarySession" :disabled="teacherPlan.supplementarySessions.length >= teacherPlan.maxSupplementaryHours" class="mt-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 disabled:bg-gray-400">+ 차시 추가</button>
+                            </div>
+                        </div>
+                        
+                        <div class="text-center">
+                            <button @click="generatePlanPreview" class="mt-6 px-8 py-3 bg-indigo-600 text-white font-bold rounded-md hover:bg-indigo-700 transition text-lg">계획안 미리보기</button>
+                        </div>
+                    </div>
+
+                    <!-- 지도 출석부 & 수업일지 -->
+                    <div v-if="currentGuidanceData" class="space-y-8">
+                        <div class="bg-white p-6 rounded-lg shadow-md flex justify-between items-start">
+                            <h3 class="text-xl font-semibold">{{ teacherTab === 'preventive' ? '예방지도' : '보충지도(추가학습)' }} 출석부 & 수업일지</h3>
+                            <div class="text-right">
+                                <p><strong>과목명:</strong> {{ teacherPlan.subjectName || '미입력' }}</p>
+                                <p><strong>교과교사:</strong> {{ formattedTeacherNames }}</p>
+                                <div class="mt-2 flex space-x-2">
+                                    <button @click="generateCompletionStatusPdf(teacherTab)" class="px-3 py-1.5 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition text-xs">이수현황표 PDF</button>
+                                    <button @click="generateAttendancePdf(teacherTab)" class="px-3 py-1.5 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition text-xs">출석부 PDF</button>
+                                    <button @click="generateLessonLogPdf(teacherTab)" class="px-3 py-1.5 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition text-xs">수업일지 PDF</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 이수현황표 -->
+                        <div class="bg-white p-6 rounded-lg shadow-md">
+                            <h4 class="text-lg font-semibold mb-4">{{ teacherTab === 'preventive' ? '예방지도' : '보충지도(추가학습)' }} 이수현황표</h4>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full text-sm text-center">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="p-2 border">학생</th>
+                                            <th v-if="teacherTab === 'supplementary'" class="p-2 border">특기사항</th>
+                                            <th v-if="teacherTab === 'supplementary'" class="p-2 border">미도달 항목</th>
+                                            <th v-if="teacherTab === 'supplementary'" class="p-2 border">예방지도</th>
+                                            <th v-if="teacherTab === 'supplementary'" class="p-2 border">정서지원프로그램</th>
+                                            <th v-for="rh in moduleConfig.recognizedHours" :key="rh.name" class="p-2 border">{{ rh.name }}</th>
+                                            <th class="p-2 border bg-gray-100">총계</th>
+                                            <th v-if="teacherTab === 'supplementary'" class="p-2 border bg-gray-100">이수여부</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="student in currentGuidanceData.students" :key="student.id">
+                                            <td class="p-2 border font-semibold whitespace-nowrap">{{ student.name }} ({{ student.id }})</td>
+                                            <td v-if="teacherTab === 'supplementary'" class="p-2 border">
+                                                {{ guidanceCompletionStatus[student.id] ? guidanceCompletionStatus[student.id].specialNotes : '일반학생' }}
+                                            </td>
+                                            <td v-if="teacherTab === 'supplementary'" class="p-2 border">{{ student.reason }}</td>
+                                            <td v-if="teacherTab === 'supplementary'" class="p-2 border">
+                                                {{ guidanceCompletionStatus[student.id] ? guidanceCompletionStatus[student.id].preventiveHours : 0 }}
+                                            </td>
+                                            <td v-if="teacherTab === 'supplementary'" class="p-2 border">
+                                                {{ guidanceCompletionStatus[student.id] ? guidanceCompletionStatus[student.id].emotionalSupportHours : 0 }}
+                                            </td>
+                                            <td v-for="rh in moduleConfig.recognizedHours" :key="rh.name" class="p-2 border">
+                                                {{ guidanceCompletionStatus[student.id] ? guidanceCompletionStatus[student.id][rh.name] : 0 }}
+                                            </td>
+                                            <td class="p-2 border bg-gray-100 font-bold">
+                                                {{ guidanceCompletionStatus[student.id] ? guidanceCompletionStatus[student.id].total : 0 }}
+                                            </td>
+                                            <td v-if="teacherTab === 'supplementary'" 
+                                                class="p-2 border font-bold"
+                                                :class="{ 
+                                                    'text-green-600': guidanceCompletionStatus[student.id] && guidanceCompletionStatus[student.id].completionStatus === '이수',
+                                                    'text-red-600': guidanceCompletionStatus[student.id] && guidanceCompletionStatus[student.id].completionStatus === '미이수'
+                                                }">
+                                                {{ guidanceCompletionStatus[student.id] ? guidanceCompletionStatus[student.id].completionStatus : '' }}
+                                            </td>
+                                        </tr>
+                                         <tr v-if="currentGuidanceData.students.length === 0">
+                                             <td :colspan="moduleConfig.recognizedHours.length + (teacherTab === 'supplementary' ? 7 : 2)" class="text-center p-4 text-gray-500">학생이 없습니다.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <!-- 출석부 -->
+                        <div class="bg-white p-6 rounded-lg shadow-md">
+                            <h4 class="text-lg font-semibold mb-4">출석부</h4>
+                            <div v-if="teacherTab === 'preventive'">
+                                <div class="flex space-x-2 mb-4">
+                                    <input type="text" v-model="newGuidanceStudentId" @keyup.enter="addGuidanceStudent(teacherTab)" placeholder="학번 입력 후 Enter" class="p-2 border rounded-md w-48">
+                                    <button @click="addGuidanceStudent(teacherTab)" class="px-4 py-2 bg-blue-500 text-white rounded-md">학생 추가</button>
+                                </div>
+                                <p v-if="currentGuidanceData.error" class="text-red-500 text-sm mb-4 -mt-2">{{ currentGuidanceData.error }}</p>
+                            </div>
+                            <div v-else class="mb-4">
+                                <div class="flex space-x-2">
+                                    <button @click="showImportModal = true" class="px-4 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 transition">대상자 가져오기</button>
+                                    <button @click="resetSupplementaryStudents" class="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition">대상자 초기화</button>
+                                </div>
+                                <p class="mt-2 text-sm text-gray-600">관리자가 배포한 미도달 학생 명단에서 과목, 학급별로 대상자를 검색하여 가져옵니다.</p>
+                            </div>
+                            
+                            <div class="relative">
+                                <button @click="scrollAttendance('left', $event)" class="scroll-arrow left">‹</button>
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full text-sm border-collapse">
+                                        <thead>
+                                            <tr class="text-center">
+                                                <th class="sticky left-0 bg-gray-100 z-20 p-2 border-y border-l border-r border-gray-300 w-[80px]">학번</th>
+                                                <th class="sticky left-[50px] bg-gray-100 z-20 p-2 border-y border-r border-gray-300 w-[96px] whitespace-nowrap">이름</th>
+                                                <th v-for="(session, index) in currentGuidanceData.sessions" :key="index" class="p-2 border border-gray-300 min-w-[150px]">
+                                                    <div class="flex items-center justify-center space-x-2 mb-2">
+                                                        <p class="font-bold">{{ index + 1 }}차시</p>
+                                                        <button v-if="session.isSaved" @click="toggleSaveSession(session)" title="수정" class="p-1 hover:bg-gray-200 rounded">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-600"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+                                                        </button>
+                                                    </div>
+                                                    <input type="text" class="flatpickr-single w-full p-1 border rounded text-center text-xs mb-1" placeholder="날짜 선택" :value="session.date" @change="session.date = $event.target.value" :disabled="session.isSaved">
+                                                    <input type="text" class="w-full p-1 border rounded text-center text-xs" placeholder="예: 16:00~17:00" v-model="session.time" :disabled="session.isSaved">
+                                                     <button v-if="!session.isSaved" @click="toggleSaveSession(session)" :disabled="!isSessionReadyToSave(session)" class="w-full mt-1 px-2 py-1 text-xs rounded text-white bg-green-500 hover:bg-green-600 disabled:bg-gray-400">저장</button>
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr v-for="student in currentGuidanceData.students" :key="student.id" class="text-center">
+                                                <td class="sticky left-0 bg-white z-20 p-2 border-l border-r border-b border-gray-300">{{ student.id }}</td>
+                                                <td class="sticky left-[50px] bg-white z-20 p-2 border-r border-b border-gray-300 font-semibold whitespace-nowrap">{{ student.name }}</td>
+                                                <td v-for="(session, index) in currentGuidanceData.sessions" :key="index" class="p-2 border border-gray-300">
+                                                    <select class="w-full p-1 border rounded text-xs" v-model="session.attendance[student.id]" :disabled="session.isSaved">
+                                                        <option value="">선택</option> <!-- Allow unselecting -->
+                                                        <option v-for="rh in moduleConfig.recognizedHours" :key="rh.name" :value="rh.name">{{ rh.name }}</option>
+                                                    </select>
+                                                </td>
+                                            </tr>
+                                            <tr v-if="currentGuidanceData.students.length === 0">
+                                                <td :colspan="currentGuidanceData.sessions.length + 2" class="text-center p-4 border border-gray-300 text-gray-500">학생을 추가해주세요.</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <button @click="scrollAttendance('right', $event)" class="scroll-arrow right">›</button>
+                            </div>
+                            <button @click="addGuidanceSession(teacherTab)" class="mt-4 px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 text-sm">+ 차시 추가</button>
+                        </div>
+
+                        <!-- 수업일지 -->
+                        <div class="bg-white p-6 rounded-lg shadow-md">
+                             <h4 class="text-lg font-semibold mb-4">수업일지</h4>
+                             <div class="mb-6 p-4 border rounded-md bg-gray-50 grid grid-cols-2 gap-4 text-sm">
+                                 <div><strong>과목명:</strong> {{ teacherPlan.subjectName || '미입력' }}</div>
+                                 <div><strong>운영차시:</strong> {{ savedGuidanceSessions.length }} 차시</div>
+                                 <div><strong>지도교사:</strong> {{ formattedTeacherNames }}</div>
+                                 <div><strong>운영기간:</strong> {{ guidanceOperationPeriod }}</div>
+                             </div>
+                             <div class="space-y-4">
+                                 <div v-for="(session, index) in savedGuidanceSessions" :key="session.date + index" class="p-4 border rounded-md">
+                                     <p class="font-bold mb-2">{{ index + 1 }}차시 수업일지 ({{ session.date }} / {{ session.time }})</p>
+                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                         <p><strong>수업방법:</strong> {{ [...new Set(Object.values(session.attendance))].filter(Boolean).join(', ') }}</p>
+                                         <div class="flex items-center">
+                                              <label class="font-semibold mr-2 shrink-0">장소:</label>
+                                              <input type="text" class="w-full p-1 border rounded" v-model="session.place">
+                                         </div>
+                                     </div>
+                                     <div class="mt-2">
+                                         <label class="font-semibold text-sm">지도내용:</label>
+                                         <textarea rows="3" class="w-full p-1 border rounded mt-1 text-sm" v-model="session.content"></textarea>
+                                     </div>
+                                 </div>
+                                 <p v-if="savedGuidanceSessions.length === 0" class="text-center text-gray-500">저장된 수업일지가 없습니다.</p>
+                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Homeroom Teacher View -->
+                <div v-if="role === '담임교사'" class="space-y-6">
+                    <h2 class="text-3xl font-bold text-gray-800">담임교사 대시보드</h2>
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <div class="flex items-end space-x-2">
+                            <div class="flex-grow">
+                                <label for="homeroom-class-input" class="block text-sm font-medium text-gray-700">학급 번호 입력</label>
+                                <input id="homeroom-class-input" type="text" v-model="homeroomClassInput" @keyup.enter="searchHomeroomClass" placeholder="예: 101" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                            </div>
+                            <button @click="searchHomeroomClass" class="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">조회</button>
+                        </div>
+                        <p v-if="homeroomMessage" class="mt-2 text-sm text-gray-600">{{ homeroomMessage }}</p>
+                    </div>
+
+                    <div v-if="processedHomeroomStudents.length > 0" class="bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-xl font-semibold mb-4">{{ homeroomClassInput }}반 미도달 학생 현황</h3>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="p-2 border">학번</th>
+                                        <th class="p-2 border">이름</th>
+                                        <th class="p-2 border">미도달 과목</th>
+                                        <th class="p-2 border">미도달 내역</th>
+                                        <th class="p-2 border">이수 현황</th>
+                                        <th class="p-2 border">서류 출력</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template v-for="row in processedHomeroomStudents" :key="row.id + row.subject">
+                                        <tr>
+                                            <td v-if="row.isFirstRow" :rowspan="row.rowspan" class="p-2 border align-top text-center">{{ row.id }}</td>
+                                            <td v-if="row.isFirstRow" :rowspan="row.rowspan" class="p-2 border align-top text-center">{{ row.name }}</td>
+                                            <td class="p-2 border">{{ row.subject }}</td>
+                                            <td class="p-2 border text-center">{{ row.reason }}</td>
+                                            <td class="p-2 border text-center font-bold" :class="row.statusColor">{{ row.status }}</td>
+                                            <td v-if="row.isFirstRow" :rowspan="row.rowspan" class="p-2 border align-top text-center">
+                                                <div class="flex flex-col space-y-2">
+                                                    <button @click="printHomeroomStudentForm(row.originalStudent, 'newsletter')" class="px-2 py-1 bg-blue-500 text-white text-xs rounded-md hover:bg-blue-600">가정통신문</button>
+                                                    <button @click="printHomeroomStudentForm(row.originalStudent, 'pledge')" class="px-2 py-1 bg-green-500 text-white text-xs rounded-md hover:bg-green-600">서약서</button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Modals -->
+        <!-- 출석률 미도달 학생 입력 모달 -->
+        <div v-if="showAttendanceModal" class="modal-overlay" @click.self="closeAttendanceModal">
+            <div class="modal-content">
+                <h3 class="text-xl font-bold mb-4">출석률 미도달 학생 추가</h3>
+                <form @submit.prevent="addAttendanceStudent">
+                    <div class="space-y-4">
+                        <input v-model="newAttendanceStudent.id" placeholder="학번" required class="w-full p-2 border rounded-md">
+                        
+                        <div v-for="(subject, index) in newAttendanceStudent.subjects" :key="index" class="flex items-center space-x-2">
+                             <input v-model="newAttendanceStudent.subjects[index]" placeholder="출석률 미도달 과목" required class="w-full p-2 border rounded-md">
+                             <button type="button" v-if="newAttendanceStudent.subjects.length > 1" @click="removeAttendanceSubject(index)" class="px-2 py-1 bg-red-500 text-white rounded-md">-</button>
+                        </div>
+                         <button type="button" @click="addAttendanceSubject" class="w-full px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">+</button>
+                    </div>
+                    <p v-if="attendanceModalError" class="text-red-500 text-sm mt-2">{{ attendanceModalError }}</p>
+                    <div class="mt-6 flex justify-end space-x-2">
+                        <button type="button" @click="closeAttendanceModal" class="px-4 py-2 bg-gray-300 rounded-md">취소</button>
+                        <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-md">추가</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Preview Modal -->
+        <div v-if="showPreviewModal" class="modal-overlay" @click.self="closePreviewModal">
+            <div class="modal-content modal-preview overflow-auto max-h-screen">
+                <div v-html="previewHtml"></div>
+                 <p v-if="teacherPlanError" class="text-sm mt-4 text-center font-semibold" :class="teacherPlanError.includes('오류') ? 'text-red-500' : 'text-blue-600'">{{ teacherPlanError }}</p>
+                <div class="mt-6 flex justify-end space-x-2">
+                    <button @click="closePreviewModal" class="px-4 py-2 bg-gray-300 rounded-md">닫기</button>
+                    <button @click="printPreview" class="px-4 py-2 bg-indigo-600 text-white rounded-md">pdf로 저장</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 대상자 가져오기 모달 -->
+        <div v-if="showImportModal" class="modal-overlay" @click.self="closeImportModal">
+            <div class="modal-content">
+                <h3 class="text-xl font-bold mb-4">보충지도 대상자 가져오기</h3>
+                <form @submit.prevent="importUnderachievers">
+                    <div class="space-y-4">
+                        <input v-model="importSubject" placeholder="과목명" required class="w-full p-2 border rounded-md">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">학급</label>
+                            <p class="text-xs text-gray-500 mb-2">한 칸에 하나의 학급만 입력해주세요. (예: 101)</p>
+                            <div v-for="(classNum, index) in importClasses" :key="index" class="flex items-center space-x-2 mb-2">
+                                <input v-model="importClasses[index]" placeholder="학급 입력" required class="w-full p-2 border rounded-md">
+                                <button type="button" v-if="importClasses.length > 1" @click="removeImportClassInput(index)" class="px-3 py-1 bg-red-500 text-white rounded-md hover:bg-red-600">-</button>
+                            </div>
+                            <button type="button" @click="addImportClassInput" class="w-full px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">+ 학급 추가</button>
+                        </div>
+                    </div>
+                    <p v-if="importModalError" class="text-red-500 text-sm mt-2">{{ importModalError }}</p>
+                    <div class="mt-6 flex justify-end space-x-2">
+                        <button type="button" @click="closeImportModal" class="px-4 py-2 bg-gray-300 rounded-md">취소</button>
+                        <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-md">가져오기</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 인쇄용 컨테이너 (숨김) -->
+        <div id="print-area-container" class="hidden"></div>
+        
+    </div>
+
+    <script type="module">
+        // Vue 3 CDN (petite-vue for simplicity)
+        import { createApp, reactive } from 'https://unpkg.com/petite-vue?module'
+        
+        // Import Firebase modules
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, query, where, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase configuration (Replace with your actual config)
+        const firebaseConfig = {
+            apiKey: "AIzaSyCDk2QrhTusyOPy8zlux7TAJLChjJhz7fI",
+            authDomain: "min-achievement-app.firebaseapp.com",
+            projectId: "min-achievement-app",
+            storageBucket: "min-achievement-app.appspot.com", // Corrected: remove firebasestorage
+            messagingSenderId: "641840341301",
+            appId: "1:641840341301:web:990fdb274acef957912c7c",
+            measurementId: "G-4XPPB9RTZS"
+        };
+
+
+        // Initialize Firebase
+        const firebaseApp = initializeApp(firebaseConfig);
+        const auth = getAuth(firebaseApp);
+        const db = getFirestore(firebaseApp);
+        
+        const appInstance = createApp({ // Create the app instance
+            // State
+            user: null,
+            isLoggedIn: false,
+            role: null, // User's selected role
+            isLoading: true, // Flag for initial loading
+            statusMessage: '', // General status messages
+            showAdminCodeInput: false,
+            adminCode: '',
+            adminCodeError: '',
+            teacherTab: 'plan',
+            adminFormTab: 'newsletter',
+            uploadStatus: { curriculum: '', student: '', emotionalSupport: '' },
+            
+            // Admin Data (Load from Firestore or defaults)
+            moduleConfig: reactive({
+                hoursPerCredit: 1,
+                preventiveRatio: 50,
+                emotionalSupportRatio: 20,
+                specialPreventiveRatio: 30,
+                recognizedHours: [
+                    { name: '수업시간별도지도', hours: 1 },
+                    { name: '온라인콘텐츠수강', hours: 1 },
+                    { name: 'RunUP과정수강', hours: 1 },
+                    { name: '학습멘토링', hours: 1 },
+                    { name: '대면지도', hours: 1 },
+                    { name: '보충과제부여', hours: 1 }
+                ]
+            }),
+            moduleConfigStatus: '',
+            newsletterForm: reactive({
+                title: '최소 성취수준 보장지도 참여 안내', 
+                docNumber: '교무기획부-123', 
+                department: '교무기획부 (02-123-4567)',
+                logoUrl: null, 
+                body: '학부모님, 안녕하십니까?\n\n귀 자녀는 다음과 같은 사유로 최소 성취수준 보장지도 대상자로 선정되었음을 알려드립니다. 본교에서는 학생의 학업 능력 향상을 위해 보충 학습 프로그램을 운영하고 있으니, 학생이 프로그램에 성실히 참여할 수 있도록 가정에서도 많은 격려와 지도 부탁드립니다.', 
+                dispatchDate: '2025.07.14.',
+                includeSeal: false, 
+                sealUrl: null
+            }),
+            pledgeForm: reactive({
+                content: '본인은 최소 성취수준 보장지도 프로그램의 모든 활동에 성실하게 참여할 것을 서약합니다.', 
+                dispatchDate: '2025.07.14.',
+                includeSeal: false, 
+                sealUrl: null
+            }),
+            showPreviewModal: false,
+            previewHtml: '',
+
+            curriculumData: [],
+            studentData: [],
+            emotionalSupportData: [],
+            underachievers: [], // This will now be loaded from Firestore
+            underachieversStatus: '',
+            fileProcessingError: '',
+            showAttendanceModal: false,
+            newAttendanceStudent: { id: '', subjects: [''] },
+            attendanceModalError: '',
+            showExportOptions: false,
+            showImportModal: false,
+            importSubject: '',
+            importClasses: [''],
+            importModalError: '',
+            
+            // Homeroom Teacher Data
+            homeroomClassInput: '',
+            searchedStudents: [],
+            homeroomMessage: '',
+
+            // Teacher Data (Specific to the logged-in teacher)
+            teacherPlan: reactive({
+                aiProvider: 'gemini',
+                apiKey: '',
+                subjectName: '',
+                teacherNames: [''],
+                achievements: [{ text: '', statement: '', loading: false }],
+                gradeCalculation: '추정분할점수',
+                conductPrevention: 'X',
+                preventionTarget: '',
+                preventionMethods: [],
+                preventionPeriod: [],
+                preventionSessions: [{ plan: '' }, { plan: '' }, { plan: '' }],
+                supplementaryMethods: [],
+                supplementaryPeriod: [],
+                supplementarySessions: [{ plan: '' }, { plan: '' }, { plan: '' }],
+                maxSupplementaryHours: 0,
+            }),
+            teacherPlanError: '',
+            
+            // Logbook Data (Specific to teacher and subject)
+            teacherGuidanceData: reactive({
+                preventive: {
+                    students: [],
+                    sessions: Array.from({ length: 10 }, () => ({ date: '', time: '', isSaved: false, place: '', content: '', attendance: {} })),
+                    error: ''
+                },
+                supplementary: {
+                    students: [],
+                    sessions: Array.from({ length: 10 }, () => ({ date: '', time: '', isSaved: false, place: '', content: '', attendance: {} })),
+                    error: ''
+                }
+            }),
+
+            // Computed Properties
+             get formattedTeacherNames() {
+                 return this.teacherPlan.teacherNames
+                   .map(name => name.trim())
+                   .filter(name => name)
+                   .map(name => `${name} (인)`)
+                   .join(', ');
+            },
+            get groupedUnderachievers() {
+                const result = [];
+                this.underachievers.forEach(student => {
+                    const studentInfo = this.studentData.find(s => String(s.학번) === student.id);
+                    const specialNotes = (studentInfo && studentInfo.특기사항) ? studentInfo.특기사항 : '일반학생';
+
+                    const studentEntry = {
+                        id: student.id,
+                        name: student.name,
+                        specialNotes: specialNotes,
+                        details: [] // This will hold the rows for the table
+                    };
+
+                    const subjectsByReason = new Map();
+
+                    // 1. Collect all subjects and their reasons into a map
+                    const allSubjects = new Map();
+                    student.gradeSubjects.forEach(subject => {
+                        if (!allSubjects.has(subject.name)) {
+                            allSubjects.set(subject.name, { grade: true, attendance: false, credits: subject.credits });
+                        } else { allSubjects.get(subject.name).grade = true; }
+                    });
+                    student.attendanceSubjects.forEach(subjectName => {
+                        if (!allSubjects.has(subjectName)) {
+                            const curriculumInfo = this.curriculumData.find(c => c.과목명 === subjectName);
+                            const credits = curriculumInfo ? curriculumInfo.학점 : 'N/A';
+                            allSubjects.set(subjectName, { grade: false, attendance: true, credits: credits });
+                        } else { allSubjects.get(subjectName).attendance = true; }
+                    });
+
+                    // 2. Group subjects by calculated reason
+                    allSubjects.forEach((details, subjectName) => {
+                        let reason = '';
+                        if (details.grade && details.attendance) reason = '학업성취율&과목출석률';
+                        else if (details.grade) reason = '학업성취율';
+                        else if (details.attendance) reason = '과목출석률';
+
+                        if (!subjectsByReason.has(reason)) {
+                            subjectsByReason.set(reason, []);
+                        }
+                        subjectsByReason.get(reason).push({ name: subjectName, ...details });
+                    });
+
+                    // 3. Format the grouped data for display
+                    subjectsByReason.forEach((subjectsArray, reason) => {
+                        const consolidatedSubjects = subjectsArray.map(s => `${s.name}(${s.credits}학점)`).join(', ');
+                        const lessonType = subjectsArray.some(s => s.grade) ? '보충지도' : '추가학습';
+                        const lessonDetails = `${lessonType}(과목 학점수*${this.moduleConfig.hoursPerCredit}시수)`;
+
+                        studentEntry.details.push({
+                            reason: reason,
+                            subjects: consolidatedSubjects,
+                            lessonDetails: lessonDetails,
+                            // Pass original data for actions
+                            originalSubjects: subjectsArray,
+                            id: student.id,
+                            name: student.name
+                        });
+                    });
+                    
+                    if (studentEntry.details.length > 0) {
+                        result.push(studentEntry);
+                    }
+                });
+                return result;
+            },
+            
+            get currentGuidanceData() {
+                if (this.teacherTab === 'preventive' || this.teacherTab === 'supplementary') {
+                    return this.teacherGuidanceData[this.teacherTab];
+                }
+                return null;
+            },
+
+            get guidanceCompletionStatus() {
+                const data = this.currentGuidanceData;
+                if (!data) return {};
+
+                const preventiveTotals = {};
+                const preventiveData = this.teacherGuidanceData.preventive;
+                preventiveData.sessions.forEach(session => {
+                    if (session.isSaved) {
+                        for (const studentId in session.attendance) {
+                            const methodName = session.attendance[studentId];
+                            if (methodName) {
+                                const methodConfig = this.moduleConfig.recognizedHours.find(m => m.name === methodName);
+                                if (methodConfig) {
+                                    if (!preventiveTotals[studentId]) preventiveTotals[studentId] = 0;
+                                    preventiveTotals[studentId] += methodConfig.hours;
+                                }
+                            }
+                        }
+                    }
+                });
+
+                const status = {};
+                
+                let requiredHoursForCompletion = 0;
+                let maxEmotionalSupportHours = 0;
+                let supplementaryHours = 0;
+
+                if (this.teacherTab === 'supplementary') {
+                    const subjectInfo = this.curriculumData.find(s => s.과목명 === this.teacherPlan.subjectName);
+                    if (subjectInfo) {
+                        supplementaryHours = Number(subjectInfo.학점) * this.moduleConfig.hoursPerCredit;
+                        requiredHoursForCompletion = (supplementaryHours * 2) / 3;
+                        maxEmotionalSupportHours = supplementaryHours * (this.moduleConfig.emotionalSupportRatio / 100);
+                    }
+                }
+
+                data.students.forEach(student => {
+                    status[student.id] = { name: student.name };
+                    const studentInfo = this.studentData.find(s => String(s['학번']) === student.id);
+                    status[student.id].specialNotes = (studentInfo && studentInfo['특기사항']) ? studentInfo['특기사항'] : '일반학생';
+                    this.moduleConfig.recognizedHours.forEach(rh => {
+                        status[student.id][rh.name] = 0;
+                    });
+                    status[student.id].total = 0;
+                    if (this.teacherTab === 'supplementary') {
+                        status[student.id].preventiveHours = 0;
+                        status[student.id].emotionalSupportHours = 0;
+                    }
+                });
+
+                data.sessions.forEach(session => {
+                    if (session.isSaved) {
+                        for (const studentId in session.attendance) {
+                            if (!status[studentId]) continue;
+                            const methodName = session.attendance[studentId];
+                            if (methodName) {
+                                const methodConfig = this.moduleConfig.recognizedHours.find(m => m.name === methodName);
+                                if (methodConfig) {
+                                    status[studentId][methodName] = parseFloat((status[studentId][methodName] + methodConfig.hours).toFixed(2));
+                                    status[studentId].total = parseFloat((status[studentId].total + methodConfig.hours).toFixed(2));
+                                }
+                            }
+                        }
+                    }
+                });
+
+                if (this.teacherTab === 'supplementary') {
+                    data.students.forEach(student => {
+                        // Add preventive hours
+                        const totalPreventiveHours = preventiveTotals[student.id] || 0;
+                        if (totalPreventiveHours > 0) {
+                            const studentInfo = this.studentData.find(s => String(s['학번']) === student.id);
+                            const isSpecialSupport = studentInfo && studentInfo['특기사항'] === '학습지원대상';
+                            
+                            let maxAllowedHours = 0;
+                            let creditedPreventiveHours = 0;
+
+                            if (isSpecialSupport) {
+                                maxAllowedHours = supplementaryHours * (this.moduleConfig.specialPreventiveRatio / 100);
+                                creditedPreventiveHours = Math.min(totalPreventiveHours, maxAllowedHours);
+                            } else {
+                                maxAllowedHours = supplementaryHours * (this.moduleConfig.preventiveRatio / 100);
+                                creditedPreventiveHours = Math.floor(Math.min(totalPreventiveHours, maxAllowedHours));
+                            }
+                            
+                            status[student.id].preventiveHours = creditedPreventiveHours;
+                            status[student.id].total = parseFloat((status[student.id].total + creditedPreventiveHours).toFixed(2));
+                        }
+
+                        // Add emotional support hours
+                        const emotionalData = this.emotionalSupportData.find(e => String(e['학번']) === student.id);
+                        const uploadedHours = emotionalData ? Number(emotionalData['정서지원프로그램 참여시간']) : 0;
+                        const creditedEmotionalHours = Math.min(uploadedHours, maxEmotionalSupportHours);
+                        
+                        status[student.id].emotionalSupportHours = creditedEmotionalHours;
+                        status[student.id].total = parseFloat((status[student.id].total + creditedEmotionalHours).toFixed(2));
+
+                        // Check completion status
+                        if (status[student.id].total >= requiredHoursForCompletion) {
+                            status[student.id].completionStatus = '이수';
+                        } else {
+                            status[student.id].completionStatus = '미이수';
+                        }
+                    });
+                }
+
+                return status;
+            },
+
+            get processedHomeroomStudents() {
+                const studentMap = new Map();
+
+                this.searchedStudents.forEach(student => {
+                    const allSubjects = new Map();
+                    student.gradeSubjects.forEach(subject => {
+                        if (!allSubjects.has(subject.name)) {
+                            allSubjects.set(subject.name, { grade: true, attendance: false });
+                        } else {
+                            allSubjects.get(subject.name).grade = true;
+                        }
+                    });
+                    student.attendanceSubjects.forEach(subjectName => {
+                        if (!allSubjects.has(subjectName)) {
+                            allSubjects.set(subjectName, { grade: false, attendance: true });
+                        } else {
+                            allSubjects.get(subjectName).attendance = true;
+                        }
+                    });
+                    
+                    const subjectsArray = Array.from(allSubjects.entries()).map(([name, reasons]) => {
+                         let reason = '';
+                        if (reasons.grade && reasons.attendance) reason = '학업성취율&과목출석률';
+                        else if (reasons.grade) reason = '학업성취율';
+                        else if (reasons.attendance) reason = '과목출석률';
+
+                        const completion = this.getSubjectCompletionStatus(student.id, name);
+                        
+                        return {
+                            subject: name,
+                            reason: reason,
+                            status: completion.status,
+                            statusColor: completion.color
+                        };
+                    });
+
+                    studentMap.set(student.id, {
+                        id: student.id,
+                        name: student.name,
+                        subjects: subjectsArray,
+                        originalStudent: student // Keep original student for printing
+                    });
+                });
+
+                const tableRows = [];
+                studentMap.forEach(studentData => {
+                    studentData.subjects.forEach((subjectInfo, index) => {
+                        tableRows.push({
+                            ...studentData,
+                            ...subjectInfo,
+                            isFirstRow: index === 0,
+                            rowspan: studentData.subjects.length
+                        });
+                    });
+                });
+
+                return tableRows;
+            },
+
+            get savedGuidanceSessions() {
+                const data = this.currentGuidanceData;
+                if (!data) return [];
+                return data.sessions.filter(s => s.isSaved && s.date);
+            },
+
+            get guidanceOperationPeriod() {
+                const savedSessions = this.savedGuidanceSessions;
+                if (savedSessions.length === 0) return '미정';
+                
+                const dates = savedSessions.map(s => new Date(s.date)).sort((a, b) => a - b);
+                const startDate = dates[0].toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
+                const endDate = dates[dates.length - 1].toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
+                return `${startDate} ~ ${endDate}`;
+            },
+
+
+            // --- Methods ---
+            async initApp() {
+                this.isLoading = true;
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        this.user = user;
+                        this.isLoggedIn = true;
+                        await this.loadUserRole(); // Load role from Firestore
+                        await this.loadCommonData(); // Load shared data
+                    } else {
+                        this.user = null;
+                        this.isLoggedIn = false;
+                        this.role = null;
+                        this.resetData(); // Clear data on logout
+                    }
+                    this.isLoading = false;
+                });
+            },
+            
+            resetData() {
+                // Clear all loaded data
+                this.curriculumData= [];
+                this.studentData= [];
+                this.emotionalSupportData= [];
+                this.underachievers= [];
+                 // Reset moduleConfig to its default structure
+                Object.assign(this.moduleConfig, {
+                     hoursPerCredit: 1,
+                     preventiveRatio: 50,
+                     emotionalSupportRatio: 20,
+                     specialPreventiveRatio: 30,
+                     recognizedHours: [
+                         { name: '수업시간별도지도', hours: 1 },
+                         { name: '온라인콘텐츠수강', hours: 1 },
+                         { name: 'RunUP과정수강', hours: 1 },
+                         { name: '학습멘토링', hours: 1 },
+                         { name: '대면지도', hours: 1 },
+                         { name: '보충과제부여', hours: 1 }
+                     ]
+                 });
+                 // Reset form templates to defaults
+                 Object.assign(this.newsletterForm, {
+                     title: '최소 성취수준 보장지도 참여 안내', docNumber: '교무기획부-123', department: '교무기획부 (02-123-4567)', logoUrl: null, body: '학부모님, 안녕하십니까?\n\n귀 자녀는 다음과 같은 사유로 최소 성취수준 보장지도 대상자로 선정되었음을 알려드립니다. 본교에서는 학생의 학업 능력 향상을 위해 보충 학습 프로그램을 운영하고 있으니, 학생이 프로그램에 성실히 참여할 수 있도록 가정에서도 많은 격려와 지도 부탁드립니다.', dispatchDate: '2025.07.14.', includeSeal: false, sealUrl: null
+                 });
+                 Object.assign(this.pledgeForm, {
+                    content: '본인은 최소 성취수준 보장지도 프로그램의 모든 활동에 성실하게 참여할 것을 서약합니다.', dispatchDate: '2025.07.14.', includeSeal: false, sealUrl: null
+                 });
+                // Reset teacher specific data
+                 Object.assign(this.teacherPlan, {
+                    aiProvider: 'gemini', apiKey: '', subjectName: '', teacherNames: [''], achievements: [{ text: '', statement: '', loading: false }], gradeCalculation: '추정분할점수', conductPrevention: 'X', preventionTarget: '', preventionMethods: [], preventionPeriod: [], preventionSessions: [{ plan: '' }, { plan: '' }, { plan: '' }], supplementaryMethods: [], supplementaryPeriod: [], supplementarySessions: [{ plan: '' }, { plan: '' }, { plan: '' }], maxSupplementaryHours: 0
+                });
+                // Reset guidance data structure
+                this.teacherGuidanceData = {
+                    preventive: { students: [], sessions: Array.from({ length: 10 }, () => ({ date: '', time: '', isSaved: false, place: '', content: '', attendance: {} })), error: ''},
+                    supplementary: { students: [], sessions: Array.from({ length: 10 }, () => ({ date: '', time: '', isSaved: false, place: '', content: '', attendance: {} })), error: ''}
+                };
+                this.homeroomClassInput= '';
+                this.searchedStudents= [];
+                this.homeroomMessage= '';
+            },
+
+            async loadUserRole() {
+                if (!this.user) return;
+                const userDocRef = doc(db, `userData/${this.user.uid}`);
+                const userDocSnap = await getDoc(userDocRef);
+                if (userDocSnap.exists()) {
+                    this.role = userDocSnap.data().role;
+                     if(this.role === '교과교사') {
+                        // Trigger loading teacher-specific data if needed initially
+                        // await this.loadGuidanceData(); // Example
+                    }
+                } else {
+                    this.role = null; // No role saved, show selection modal
+                }
+            },
+
+            async loadCommonData() {
+                this.statusMessage = '공용 데이터 로딩 중...';
+                try {
+                    const commonDataRef = collection(db, "commonData/shared");
+                    const [
+                        curriculumSnap, studentsSnap, emotionalSupportSnap, 
+                        moduleConfigSnap, formTemplatesSnap, underachieversSnap
+                    ] = await Promise.all([
+                        getDoc(doc(commonDataRef, "curriculum")),
+                        getDoc(doc(commonDataRef, "students")),
+                        getDoc(doc(commonDataRef, "emotionalSupport")),
+                        getDoc(doc(commonDataRef, "moduleConfig")),
+                        getDoc(doc(commonDataRef, "formTemplates")),
+                        getDoc(doc(commonDataRef, "underachievers"))
+                    ]);
+
+                    if (curriculumSnap.exists()) this.curriculumData = curriculumSnap.data().data || [];
+                    if (studentsSnap.exists()) this.studentData = studentsSnap.data().data || [];
+                    if (emotionalSupportSnap.exists()) this.emotionalSupportData = emotionalSupportSnap.data().data || [];
+                    if (moduleConfigSnap.exists()) Object.assign(this.moduleConfig, moduleConfigSnap.data());
+                    if (formTemplatesSnap.exists()) {
+                        Object.assign(this.newsletterForm, formTemplatesSnap.data().newsletter || {});
+                        Object.assign(this.pledgeForm, formTemplatesSnap.data().pledge || {});
+                    }
+                     if (underachieversSnap.exists()) this.underachievers = underachieversSnap.data().data || [];
+
+                    this.statusMessage = '데이터 로딩 완료.';
+                } catch (error) {
+                    console.error("Error loading common data:", error);
+                    this.statusMessage = '데이터 로딩 중 오류 발생.';
+                } finally {
+                     setTimeout(() => this.statusMessage = '', 2000);
+                }
+            },
+
+            async login() {
+                const provider = new GoogleAuthProvider();
+                try {
+                    await signInWithPopup(auth, provider);
+                    // onAuthStateChanged will handle the rest
+                } catch (error) {
+                    console.error("Login failed:", error);
+                    alert(`로그인 실패: ${error.message}`);
+                }
+            },
+            async logout() {
+                await signOut(auth);
+                // onAuthStateChanged will handle resetting state
+            },
+            resetRole() {
+                this.role = null; // Show role selection again
+                // Optionally delete the role from Firestore if needed
+                // const userDocRef = doc(db, `userData/${this.user.uid}`);
+                // await deleteDoc(userDocRef); // Or updateDoc to set role to null
+            },
+             async selectRole(selectedRole) {
+                if (selectedRole === '관리자') {
+                    this.showAdminCodeInput = true;
+                } else {
+                    await this.saveUserRole(selectedRole);
+                    this.role = selectedRole;
+                     if(selectedRole === '교과교사') {
+                        // Load teacher-specific data after role selection if needed
+                        // await this.loadGuidanceData();
+                    }
+                }
+            },
+            async submitAdminCode() {
+                if (this.adminCode === '0822') {
+                    await this.saveUserRole('관리자');
+                    this.role = '관리자';
+                    this.adminCodeError = '';
+                    this.showAdminCodeInput = false;
+                } else {
+                    this.adminCodeError = '코드가 올바르지 않습니다.';
+                }
+            },
+             async saveUserRole(roleToSave) {
+                 if (!this.user) return;
+                 this.statusMessage = '역할 저장 중...';
+                 const userDocRef = doc(db, `userData/${this.user.uid}`);
+                 try {
+                     await setDoc(userDocRef, { role: roleToSave });
+                     this.statusMessage = '역할이 저장되었습니다.';
+                 } catch (error) {
+                     console.error("Error saving role:", error);
+                     this.statusMessage = '역할 저장 실패.';
+                 } finally {
+                     setTimeout(() => this.statusMessage = '', 2000);
+                 }
+             },
+            toggleExportOptions() {
+                this.showExportOptions = !this.showExportOptions;
+            },
+            downloadTemplate(type) {
+                let data, filename;
+                if (type === 'curriculum') {
+                    data = [["분류", "과목명", "학년", "학기", "학점", "교과군"]];
+                    filename = "교육과정_편제표_양식.xlsx";
+                } else if (type === 'student') {
+                    data = [["학번", "이름", "특기사항"]];
+                    filename = "학적정보_양식.xlsx";
+                } else if (type === 'emotionalSupport') {
+                    data = [["학번", "이름", "정서지원프로그램 참여시간"]];
+                    filename = "정서지원프로그램_이수시간_양식.xlsx";
+                }
+                const ws = XLSX.utils.aoa_to_sheet(data);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+                XLSX.writeFile(wb, filename);
+            },
+            async uploadFile(event, type) {
+                const file = event.target.files[0];
+                if (!file) return;
+                this.uploadStatus[type] = `${file.name} 처리 중...`;
+
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const sheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[sheetName];
+                        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                        
+                        // Save data to Firestore
+                        const docRef = doc(db, `commonData/shared/${type}`);
+                        await setDoc(docRef, { data: jsonData });
+
+                        // Update local data
+                        if (type === 'curriculum') this.curriculumData = jsonData;
+                        if (type === 'student') this.studentData = jsonData;
+                        if (type === 'emotionalSupport') this.emotionalSupportData = jsonData;
+
+                        this.uploadStatus[type] = `${file.name} 업로드 및 저장 완료.`;
+
+                    } catch (error) {
+                         console.error(`Error processing/saving ${type} file:`, error);
+                         this.uploadStatus[type] = `${file.name} 처리 중 오류 발생: ${error.message}`;
+                    } finally {
+                         // Clear the input field to allow re-uploading the same file
+                        event.target.value = null;
+                        setTimeout(() => this.uploadStatus[type] = '', 5000);
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            },
+            async saveModuleConfig() {
+                this.moduleConfigStatus = "운영 모듈 설정 저장 중...";
+                try {
+                    const docRef = doc(db, "commonData/shared/moduleConfig");
+                    // Ensure moduleConfig is not a Proxy when saving
+                    const configToSave = JSON.parse(JSON.stringify(this.moduleConfig)); 
+                    await setDoc(docRef, configToSave);
+                    this.moduleConfigStatus = "운영 모듈 설정이 저장되었습니다.";
+                } catch (error) {
+                    console.error("Error saving module config:", error);
+                    this.moduleConfigStatus = "저장 중 오류 발생.";
+                } finally {
+                     setTimeout(() => this.moduleConfigStatus = '', 3000);
+                }
+            },
+            async saveFormTemplates(){
+                this.statusMessage = '양식 저장 중...';
+                 try {
+                     const docRef = doc(db, "commonData/shared/formTemplates");
+                     // Ensure forms are not Proxies and handle potential large image data URLs (consider alternatives later if needed)
+                     const templatesToSave = {
+                         newsletter: JSON.parse(JSON.stringify(this.newsletterForm)),
+                         pledge: JSON.parse(JSON.stringify(this.pledgeForm))
+                     };
+                     await setDoc(docRef, templatesToSave);
+                     this.statusMessage = '가정통신문 및 서약서 양식이 저장되었습니다.';
+                 } catch (error) {
+                     console.error("Error saving form templates:", error);
+                     this.statusMessage = '양식 저장 실패.';
+                 } finally {
+                     setTimeout(() => this.statusMessage = '', 3000);
+                 }
+            },
+            handleImageUpload(event, formType, field) {
+                const file = event.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    // Store as data URL for now. Consider Firebase Storage for larger files later.
+                    if (formType === 'newsletter') {
+                        this.newsletterForm[field] = e.target.result;
+                    } else if (formType === 'pledge') {
+                        this.pledgeForm[field] = e.target.result;
+                    }
+                };
+                reader.readAsDataURL(file);
+            },
+            previewForm(type, studentsToPrint) {
+                 if (!studentsToPrint || studentsToPrint.length === 0) {
+                     alert("출력할 학생 데이터가 없습니다. 대상자를 먼저 선정해주세요.");
+                     return;
+                 }
+
+                if (type === 'newsletter') {
+                    let allPreviewsHtml = '';
+                    const form = this.newsletterForm;
+
+                    const logoImg = form.logoUrl ? `<img src="${form.logoUrl}" alt="School Logo" style="width: 70px; height: 70px; margin: 0 auto 15px auto; display: block;">` : '';
+                    const sealSection = form.includeSeal && form.sealUrl
+                        ? `<div style="text-align: center; margin-top: 50px;"><p style="margin-bottom: 20px;">${form.dispatchDate || '2025.00.00.'}</p><img src="${form.sealUrl}" alt="Principal Seal" style="width: 80px; height: 80px; margin: 0 auto;"></div>`
+                        : `<div style="text-align: center; margin-top: 50px;"><p>${form.dispatchDate || '2025.00.00.'}</p><p style="font-size: 1.2rem; font-weight: bold; margin-top: 30px;">00고등학교장 (직인생략)</p></div>`;
+                    const newsletterHeader = `
+                        <div style="text-align: center;">
+                            ${logoImg}
+                            <h1 style="font-size: 2rem; font-weight: bold; margin-bottom: 20px;">${form.title || '제목'}</h1>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #000; padding-bottom: 5px; margin-bottom: 20px;">
+                            <span>${form.docNumber || '문서번호'}</span>
+                            <span>${form.department || '담당부서'}</span>
+                        </div>
+                        <div style="min-height: 200px; line-height: 1.8; white-space: pre-wrap; word-break: break-all;">
+                            ${(form.body || '').trim() || '내용을 입력하세요.'}
+                        </div>`;
+
+                    
+                    const studentDocs = studentsToPrint.map(student => {
+                        let studentTableHtml = `<h3 style="margin-top: 40px; font-size: 1.2rem; font-weight: bold;">[최소 성취수준 보장지도 대상자 확인]</h3>`;
+                        studentTableHtml += `<table style="width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem;">
+                            <thead>
+                                <tr style="background-color: #f2f2f2;">
+                                    <th style="border: 1px solid #ddd; padding: 8px;">학번</th>
+                                    <th style="border: 1px solid #ddd; padding: 8px;">이름</th>
+                                    <th style="border: 1px solid #ddd; padding: 8px;">미도달 과목</th>
+                                    <th style="border: 1px solid #ddd; padding: 8px;">미도달 내역</th>
+                                </tr>
+                            </thead>
+                            <tbody>`;
+
+                        const subjectsMap = new Map();
+                        student.gradeSubjects.forEach(s => {
+                            if (!subjectsMap.has(s.name)) subjectsMap.set(s.name, new Set());
+                            subjectsMap.get(s.name).add('학업성취율');
+                        });
+                        student.attendanceSubjects.forEach(s => {
+                            if (!subjectsMap.has(s)) subjectsMap.set(s, new Set());
+                            subjectsMap.get(s).add('과목출석률');
+                        });
+
+                        subjectsMap.forEach((reasons, subjectName) => {
+                            studentTableHtml += `
+                                <tr>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${student.id}</td>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${student.name}</td>
+                                    <td style="border: 1px solid #ddd; padding: 8px;">${subjectName}</td>
+                                    <td style="border: 1px solid #ddd; padding: 8px;">${Array.from(reasons).join(' & ')}</td>
+                                </tr>`;
+                        });
+
+                        studentTableHtml += `</tbody></table>`;
+                        studentTableHtml += `
+                        <div style="margin-top: 40px; line-height: 1.6;">
+                            <p>위 학생은 위와 같은 사유로 최소 성취수준 보장지도 대상자로 선정되었음을 확인하며, 지도 프로그램에 성실히 참여할 것을 서약합니다.</p>
+                            <div style="margin-top: 50px; display: flex; justify-content: space-around; text-align: center;">
+                                <div>
+                                    <p>학생: ________________ (서명)</p>
+                                </div>
+                                <div>
+                                    <p>학부모: ________________ (서명)</p>
+                                </div>
+                            </div>
+                        </div>`;
+                        
+                        return `${newsletterHeader}${studentTableHtml}${sealSection}`;
+                    });
+
+                    allPreviewsHtml = studentDocs.map((doc, index) => {
+                        const style = (index < studentDocs.length - 1) ? 'page-break-after: always;' : '';
+                        return `<div class="page-break" style="padding: 40px; border: 1px solid #ccc; background: white; color: black; font-family: 'Malgun Gothic', sans-serif; ${style}">${doc}</div>`;
+                    }).join('');
+                    
+                    this.previewHtml = `<div id="print-area">${allPreviewsHtml}</div>`;
+                
+                } else { // pledge
+                    let allPreviewsHtml = '';
+                    const form = this.pledgeForm;
+                    const sealSection = form.includeSeal && form.sealUrl
+                        ? `<div style="text-align: center; margin-top: 50px;"><p style="margin-bottom: 20px;">${form.dispatchDate || '2025.00.00.'}</p><img src="${form.sealUrl}" alt="Principal Seal" style="width: 80px; height: 80px; margin: 0 auto;"></div>`
+                        : `<div style="text-align: center; margin-top: 50px;"><p>${form.dispatchDate || '2025.00.00.'}</p><p style="font-size: 1.2rem; font-weight: bold; margin-top: 30px;">00고등학교장 (직인생략)</p></div>`;
+
+                    const pledgeHeader = `
+                        <h1 style="font-size: 2.5rem; font-weight: bold; text-align: center; margin-bottom: 50px;">서 약 서</h1>
+                        <div style="line-height: 1.8; white-space: pre-wrap; word-break: break-all;">
+                           ${(form.content || '').trim() || '서약서 내용을 입력하세요.'}
+                        </div>`;
+
+                    const studentDocs = studentsToPrint.map(student => {
+                        let studentTableHtml = `<h3 style="margin-top: 40px; font-size: 1.2rem; font-weight: bold;">[최소 성취수준 보장지도 대상자 확인]</h3>`;
+                        studentTableHtml += `<table style="width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem;">
+                            <thead>
+                                <tr style="background-color: #f2f2f2;">
+                                    <th style="border: 1px solid #ddd; padding: 8px;">학번</th>
+                                    <th style="border: 1px solid #ddd; padding: 8px;">이름</th>
+                                    <th style="border: 1px solid #ddd; padding: 8px;">미도달 과목</th>
+                                    <th style="border: 1px solid #ddd; padding: 8px;">미도달 내역</th>
+                                </tr>
+                            </thead>
+                            <tbody>`;
+
+                        const subjectsMap = new Map();
+                        student.gradeSubjects.forEach(s => {
+                            if (!subjectsMap.has(s.name)) subjectsMap.set(s.name, new Set());
+                            subjectsMap.get(s.name).add('학업성취율');
+                        });
+                        student.attendanceSubjects.forEach(s => {
+                            if (!subjectsMap.has(s)) subjectsMap.set(s, new Set());
+                            subjectsMap.get(s).add('과목출석률');
+                        });
+
+                        subjectsMap.forEach((reasons, subjectName) => {
+                            studentTableHtml += `
+                                <tr>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${student.id}</td>
+                                    <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${student.name}</td>
+                                    <td style="border: 1px solid #ddd; padding: 8px;">${subjectName}</td>
+                                    <td style="border: 1px solid #ddd; padding: 8px;">${Array.from(reasons).join(' & ')}</td>
+                                </tr>`;
+                        });
+
+                        studentTableHtml += `</tbody></table>`;
+                        studentTableHtml += `
+                        <div style="margin-top: 40px; line-height: 1.6;">
+                            <p>위 학생은 위와 같은 사유로 최소 성취수준 보장지도 대상자로 선정되었음을 확인하며, 지도 프로그램에 성실히 참여할 것을 서약합니다.</p>
+                            <div style="margin-top: 50px; display: flex; justify-content: space-around; text-align: center;">
+                                <div>
+                                    <p>학생: ________________ (서명)</p>
+                                </div>
+                                <div>
+                                    <p>학부모: ________________ (서명)</p>
+                                </div>
+                            </div>
+                        </div>`;
+                        
+                        return `${pledgeHeader}${studentTableHtml}${sealSection}`;
+                    });
+
+                    allPreviewsHtml = studentDocs.map((doc, index) => {
+                        const style = (index < studentDocs.length - 1) ? 'page-break-after: always;' : '';
+                        return `<div class="page-break" style="padding: 40px; border: 1px solid #ccc; background: white; color: black; font-family: 'Malgun Gothic', sans-serif; ${style}">${doc}</div>`;
+                    }).join('');
+
+                    this.previewHtml = `<div id="print-area">${allPreviewsHtml}</div>`;
+                }
+                this.showPreviewModal = true;
+            },
+            closePreviewModal() {
+                this.showPreviewModal = false;
+                this.previewHtml = '';
+                this.teacherPlanError = '';
+            },
+            async printPreview() {
+                // 1. Prepare the content for rendering in a fixed-width, off-screen container.
+                const printContainer = document.getElementById('print-area-container');
+                printContainer.innerHTML = this.previewHtml;
+                printContainer.style.position = 'absolute';
+                printContainer.style.left = '-9999px';
+                printContainer.style.width = '800px'; // A consistent width helps html2canvas render predictably.
+                printContainer.classList.remove('hidden');
+                const printContent = printContainer.querySelector('#print-area');
+                
+                // Cleanup function to ensure the temporary container is removed.
+                const cleanup = () => {
+                    printContainer.innerHTML = '';
+                    printContainer.classList.add('hidden');
+                    printContainer.style.position = '';
+                    printContainer.style.left = '';
+                    printContainer.style.width = '';
+                };
+
+                if (!printContent) {
+                    console.error("Print content element #print-area not found.");
+                    cleanup();
+                    return;
+                }
+
+                this.teacherPlanError = 'PDF 생성 중... 잠시 기다려주세요.';
+
+                try {
+                    // 2. Use html2canvas to render the content to a single, tall image.
+                    const canvas = await html2canvas(printContent, {
+                        scale: 2, // Higher scale for better resolution.
+                        useCORS: true,
+                    });
+                    const imgData = canvas.toDataURL('image/png');
+
+                    // 3. Set up the PDF document. A4 is 210mm wide x 297mm high.
+                    const { jsPDF } = window.jspdf;
+                    const pdf = new jsPDF('p', 'mm', 'a4');
+                    
+                    const pdfPageWidth = pdf.internal.pageSize.getWidth();
+                    const pdfPageHeight = pdf.internal.pageSize.getHeight();
+
+                    // 4. Calculate the dimensions of the image in the PDF, maintaining its aspect ratio.
+                    const canvasWidth = canvas.width;
+                    const canvasHeight = canvas.height;
+                    const imgRatio = canvasHeight / canvasWidth;
+                    const pdfImgWidth = pdfPageWidth; // Let the image take the full width of the page.
+                    const pdfImgHeight = pdfImgWidth * imgRatio;
+
+                    // 5. Paginate through the tall image, adding a new page for each slice.
+                    let position = 0;
+                    let heightLeft = pdfImgHeight;
+
+                    pdf.addImage(imgData, 'PNG', 0, position, pdfImgWidth, pdfImgHeight);
+                    heightLeft -= pdfPageHeight;
+
+                    while (heightLeft > 0) {
+                        pdf.addPage();
+                        position -= pdfPageHeight; // Move the image "up" on the new page.
+                        pdf.addImage(imgData, 'PNG', 0, position, pdfImgWidth, pdfImgHeight);
+                        heightLeft -= pdfPageHeight;
+                    }
+
+                    // 6. Save the PDF.
+                    pdf.save(`가정통신문_서약서_${new Date().toISOString().slice(0, 10)}.pdf`);
+                    this.teacherPlanError = 'PDF 생성이 완료되었습니다.';
+
+                } catch (error) {
+                    console.error("PDF generation error:", error);
+                    this.teacherPlanError = `PDF 생성 중 오류가 발생했습니다: ${error.message}`;
+                } finally {
+                    cleanup();
+                    // Keep the final status message for a few seconds.
+                    setTimeout(() => { if (this.teacherPlanError === 'PDF 생성이 완료되었습니다.') this.teacherPlanError = '' }, 3000);
+                }
+            },
+
+            processGradeFiles(event) {
+                this.fileProcessingError = '';
+                const files = event.target.files;
+                if (!files || files.length === 0) return;
+
+                const resultData = new Map();
+                let filesProcessed = 0;
+
+                Array.from(files).forEach(file => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        try {
+                            const data = new Uint8Array(e.target.result);
+                            const workbook = XLSX.read(data, { type: 'array' });
+                            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                            const sheetData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                            
+                            const classInfo = sheetData[2] ? String(sheetData[2][0]) : '';
+                            if(!classInfo) return;
+
+                            const classGrade = classInfo.substring(24, 25);
+                            const classNumMatch = classInfo.match(/(\d{1,2})반/);
+                            if (!classGrade || !classNumMatch) return;
+                            const classNum = classNumMatch[1];
+                            
+                            for (let r = 5; r < sheetData.length; r += 2) { 
+                                if (!sheetData[r-1] || !sheetData[r]) continue;
+
+                                for (let c = 3; c < sheetData[r].length; c++) {
+                                    if (sheetData[r][c] === "미도달") {
+                                        const num = sheetData[r - 1][0];
+                                        const name = sheetData[r - 1][1];
+                                        const subjectWithCredits = sheetData[3][c];
+                                        if (!num || !name || !subjectWithCredits) continue;
+                                        
+                                        // 과목명에서 학점 정보 (괄호) 제거
+                                        const subject = String(subjectWithCredits).split('(')[0].trim();
+
+                                        const fullId = `${classGrade}${String(classNum).padStart(2, "0")}${String(num).padStart(2, "0")}`;
+                                        if (!resultData.has(fullId)) {
+                                            resultData.set(fullId, { name: name, subjects: new Set() });
+                                        }
+                                        resultData.get(fullId).subjects.add(subject);
+                                    }
+                                }
+                            }
+                        } catch (err) {
+                            console.error(`Error processing file ${file.name}:`, err);
+                            this.fileProcessingError = `${file.name} 파일 처리 중 오류가 발생했습니다. 형식을 확인해주세요.`;
+                        } finally {
+                            filesProcessed++;
+                            if (filesProcessed === files.length) {
+                                this.updateUnderachieversList(resultData);
+                            }
+                        }
+                    };
+                    reader.readAsArrayBuffer(file);
+                });
+            },
+            updateUnderachieversList(gradeResults) {
+                gradeResults.forEach((data, id) => {
+                    let student = this.underachievers.find(s => s.id === id);
+                    if (!student) {
+                        student = { id, name: data.name, gradeSubjects: [], attendanceSubjects: [] };
+                        this.underachievers.push(student);
+                    }
+                    student.gradeSubjects = Array.from(data.subjects).map(subjectName => {
+                        const curriculumInfo = this.curriculumData.find(c => c.과목명 === subjectName);
+                        return { name: subjectName, credits: curriculumInfo ? curriculumInfo.학점 : 'N/A' };
+                    });
+                });
+            },
+            closeAttendanceModal() {
+                this.showAttendanceModal = false;
+                this.newAttendanceStudent = { id: '', subjects: [''] };
+                this.attendanceModalError = '';
+            },
+            addAttendanceSubject() {
+                this.newAttendanceStudent.subjects.push('');
+            },
+            removeAttendanceSubject(index) {
+                this.newAttendanceStudent.subjects.splice(index, 1);
+            },
+            addAttendanceStudent() {
+                this.attendanceModalError = '';
+                const studentIdInput = this.newAttendanceStudent.id ? String(this.newAttendanceStudent.id).trim() : '';
+                const subjects = this.newAttendanceStudent.subjects;
+
+                if (!studentIdInput || subjects.some(s => !s.trim())) {
+                    this.attendanceModalError = '학번과 모든 과목명을 입력해주세요.';
+                    return;
+                }
+
+                const foundStudent = this.studentData.find(student => String(student['학번']) === studentIdInput);
+                if (!foundStudent) {
+                    this.attendanceModalError = '해당 학번을 찾을 수 없습니다. 학적 정보를 먼저 업로드 해주세요.';
+                    return;
+                }
+                
+                const canonicalId = String(foundStudent['학번']);
+                const name = foundStudent['이름'];
+                const studentIndex = this.underachievers.findIndex(s => s.id === canonicalId);
+                
+                const validSubjects = subjects.map(s => s.trim()).filter(s => s);
+
+                if (studentIndex > -1) {
+                    const existingSubjects = new Set(this.underachievers[studentIndex].attendanceSubjects);
+                    validSubjects.forEach(subject => {
+                        if (!existingSubjects.has(subject)) {
+                            this.underachievers[studentIndex].attendanceSubjects.push(subject);
+                        }
+                    });
+                } else {
+                    this.underachievers.push({ 
+                        id: canonicalId, 
+                        name, 
+                        gradeSubjects: [], 
+                        attendanceSubjects: validSubjects
+                    });
+                }
+                
+                this.closeAttendanceModal();
+            },
+            deleteDetailGroup(detailToDelete) {
+                const student = this.underachievers.find(s => s.id === detailToDelete.id);
+                if (!student) return;
+
+                detailToDelete.originalSubjects.forEach(subjectInfo => {
+                    student.gradeSubjects = student.gradeSubjects.filter(gs => gs.name !== subjectInfo.name);
+                    student.attendanceSubjects = student.attendanceSubjects.filter(asName => asName !== subjectInfo.name);
+                });
+
+                if (student.gradeSubjects.length === 0 && student.attendanceSubjects.length === 0) {
+                    this.underachievers = this.underachievers.filter(s => s.id !== student.id);
+                }
+            },
+            exportTable(format) {
+                const data = this.groupedUnderachievers.flatMap(student => 
+                    student.details.map(detail => ({
+                        '학번': student.id,
+                        '이름': student.name,
+                        '특기사항': student.specialNotes,
+                        '미도달내역': detail.reason,
+                        '미도달 과목(학점수)': detail.subjects,
+                        '보충지도(추가학습) 내역': detail.lessonDetails,
+                    }))
+                );
+                
+                const today = new Date().toISOString().slice(0, 10);
+                const filename = `미도달_학생_현황_${today}`;
+
+                if (format === 'xlsx') {
+                    const ws = XLSX.utils.json_to_sheet(data);
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, "현황");
+                    XLSX.writeFile(wb, `${filename}.xlsx`);
+                } else if (format === 'csv') {
+                    const ws = XLSX.utils.json_to_sheet(data);
+                    const csv = XLSX.utils.sheet_to_csv(ws);
+                    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+                    saveAs(blob, `${filename}.csv`);
+                } else if (format === 'pdf') {
+                    const table = document.getElementById('underachievers-table');
+                    if (table) {
+                        // Clone the table to apply specific styles for PDF without affecting the UI
+                        const tableClone = table.cloneNode(true);
+
+                        // Remove the "Actions" column for a cleaner PDF
+                        const rows = tableClone.querySelectorAll('tr');
+                        rows.forEach(row => {
+                            row.querySelector('th:last-child, td:last-child')?.remove();
+                        });
+
+                        // Create a style element to control column widths in the PDF
+                        const style = document.createElement('style');
+                        style.innerHTML = `
+                            .pdf-table { 
+                                width: 100%; 
+                                font-size: 9px; 
+                                border-collapse: collapse; 
+                            }
+                            .pdf-table th, .pdf-table td { 
+                                border: 1px solid #ddd; 
+                                padding: 4px; 
+                                text-align: left; 
+                                vertical-align: top; 
+                                word-break: break-all;
+                            }
+                            .pdf-table th { 
+                                background-color: #f2f2f2; 
+                                text-align: center; 
+                            }
+                            /* Adjusting column widths */
+                            .pdf-table tr > *:nth-child(1) { width: 7%; }  /* 학번 */
+                            .pdf-table tr > *:nth-child(2) { width: 7%; }  /* 이름 */
+                            .pdf-table tr > *:nth-child(3) { width: 8%; } /* 특기사항 */
+                            .pdf-table tr > *:nth-child(4) { width: 12%; } /* 미도달내역 */
+                            /* 미도달 과목 will take up remaining space */
+                            .pdf-table tr > *:nth-child(6) { width: 15%; } /* 보충지도 내역 */
+                        `;
+                        tableClone.classList.add('pdf-table');
+
+                        // Create an off-screen container to render the styled clone
+                        const printContainer = document.createElement('div');
+                        printContainer.style.position = 'absolute';
+                        printContainer.style.left = '-9999px';
+                        printContainer.style.width = '1200px'; // A generous width for landscape A4 rendering
+                        printContainer.appendChild(style);
+                        printContainer.appendChild(tableClone);
+                        document.body.appendChild(printContainer);
+
+                        html2canvas(tableClone, { scale: 2 }).then(canvas => {
+                            const imgData = canvas.toDataURL('image/png');
+                            const { jsPDF } = window.jspdf;
+                            const pdf = new jsPDF('l', 'mm', 'a4'); // 'l' for landscape
+                            const imgProps = pdf.getImageProperties(imgData);
+                            const margin = 10;
+                            const pdfWidth = pdf.internal.pageSize.getWidth() - (margin * 2);
+                            const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+                            const pageHeight = pdf.internal.pageSize.getHeight() - (margin * 2);
+
+                            let heightLeft = pdfHeight;
+                            let position = margin;
+
+                            pdf.addImage(imgData, 'PNG', margin, position, pdfWidth, pdfHeight);
+                            heightLeft -= pageHeight;
+
+                            while (heightLeft > 0) {
+                                position -= pageHeight;
+                                pdf.addPage();
+                                pdf.addImage(imgData, 'PNG', margin, position, pdfWidth, pdfHeight);
+                                heightLeft -= pageHeight;
+                            }
+                            pdf.save(`${filename}.pdf`);
+                        }).finally(() => {
+                            // Clean up by removing the off-screen container
+                            document.body.removeChild(printContainer);
+                        });
+                    }
+                } // Added missing closing brace here
+                this.showExportOptions = false;
+            },
+            // Removed saveUnderachievers as it's no longer needed with Firestore
+            async deployUnderachievers() {
+                this.underachieversStatus = "미도달 학생 명단 배포 중...";
+                try {
+                    const docRef = doc(db, "commonData/shared/underachievers");
+                    await setDoc(docRef, { data: this.underachievers });
+                    this.underachieversStatus = "대상자 명단이 배포되었습니다.";
+                } catch (error) {
+                    console.error("Error deploying underachievers:", error);
+                     this.underachieversStatus = "배포 중 오류 발생.";
+                } finally {
+                     setTimeout(() => this.underachieversStatus = '', 3000);
+                }
+            },
+
+            // Teacher methods
+            initTeacherView(){
+                 this.$nextTick(() => {
+                    flatpickr(".flatpickr-range", { mode: "range", dateFormat: "Y-m-d", locale: "ko"});
+                    flatpickr(".flatpickr-single", { dateFormat: "Y-m-d", locale: "ko"});
+                });
+            },
+            switchTeacherTab(tab) {
+                this.teacherTab = tab;
+                this.loadGuidanceData(); // Load data for the selected tab/subject
+                this.initTeacherView(); 
+            },
+            updateMaxHours() {
+                this.loadGuidanceData(); // Reload guidance data when subject changes
+                const subject = this.curriculumData.find(s => s.과목명 === this.teacherPlan.subjectName);
+                if (subject) {
+                    const credits = Number(subject.학점);
+                    this.teacherPlan.maxSupplementaryHours = credits * this.moduleConfig.hoursPerCredit;
+                } else {
+                    this.teacherPlan.maxSupplementaryHours = 0;
+                }
+            },
+            async saveGuidanceData(){
+                if(!this.teacherPlan.subjectName || !this.user) return;
+                const docPath = `teacherData/${this.user.uid}/${this.teacherPlan.subjectName}`;
+                try {
+                    // Use JSON parse/stringify to save plain object, not Proxy
+                    await setDoc(doc(db, docPath), JSON.parse(JSON.stringify(this.teacherGuidanceData)));
+                    console.log("Guidance data saved for", this.teacherPlan.subjectName);
+                } catch (error) {
+                    console.error("Error saving guidance data:", error);
+                }
+            },
+            async loadGuidanceData(){
+                 if(!this.teacherPlan.subjectName || !this.user) {
+                     // Reset if no subject or user
+                      this.teacherGuidanceData = {
+                          preventive: { students: [], sessions: Array.from({ length: 10 }, () => ({ date: '', time: '', isSaved: false, place: '', content: '', attendance: {} })), error: ''},
+                          supplementary: { students: [], sessions: Array.from({ length: 10 }, () => ({ date: '', time: '', isSaved: false, place: '', content: '', attendance: {} })), error: ''}
+                      };
+                     return;
+                 }
+                const docPath = `teacherData/${this.user.uid}/${this.teacherPlan.subjectName}`;
+                try {
+                    const docSnap = await getDoc(doc(db, docPath));
+                    if (docSnap.exists()) {
+                         // Merge fetched data into reactive object
+                        const fetchedData = docSnap.data();
+                        Object.assign(this.teacherGuidanceData.preventive, fetchedData.preventive || {});
+                        Object.assign(this.teacherGuidanceData.supplementary, fetchedData.supplementary || {});
+                         console.log("Guidance data loaded for", this.teacherPlan.subjectName);
+                    } else {
+                        // Reset to default if no data found in Firestore
+                        this.teacherGuidanceData = {
+                            preventive: { students: [], sessions: Array.from({ length: 10 }, () => ({ date: '', time: '', isSaved: false, place: '', content: '', attendance: {} })), error: ''},
+                            supplementary: { students: [], sessions: Array.from({ length: 10 }, () => ({ date: '', time: '', isSaved: false, place: '', content: '', attendance: {} })), error: ''}
+                        };
+                        console.log("No guidance data found for", this.teacherPlan.subjectName, ", initializing.");
+                    }
+                } catch (error) {
+                    console.error("Error loading guidance data:", error);
+                } finally {
+                     this.initTeacherView(); // Ensure date pickers are re-initialized after data load/reset
+                }
+            },
+            addAchievement() {
+                this.teacherPlan.achievements.push({ text: '', statement: '', loading: false });
+            },
+            removeAchievement(index) {
+                this.teacherPlan.achievements.splice(index, 1);
+            },
+            addPreventionSession() {
+                this.teacherPlan.preventionSessions.push({ plan: '' });
+            },
+            removePreventionSession(index) {
+                this.teacherPlan.preventionSessions.splice(index, 1);
+            },
+            addSupplementarySession() {
+                if (this.teacherPlan.supplementarySessions.length < this.teacherPlan.maxSupplementaryHours) {
+                    this.teacherPlan.supplementarySessions.push({ plan: '' });
+                }
+            },
+            removeSupplementarySession(index) {
+                this.teacherPlan.supplementarySessions.splice(index, 1);
+            },
+            addTeacher() {
+                this.teacherPlan.teacherNames.push('');
+            },
+            removeTeacher(index) {
+                this.teacherPlan.teacherNames.splice(index, 1);
+            },
+            async generateStatement(index) {
+                this.teacherPlanError = '';
+                const achievement = this.teacherPlan.achievements[index];
+                if (!achievement.text) {
+                    this.teacherPlanError = 'AI 진술문을 생성하려면 성취기준을 먼저 입력해주세요.';
+                    return;
+                }
+                if (!this.teacherPlan.apiKey) {
+                    this.teacherPlanError = 'AI API 키를 먼저 입력해주세요.';
+                    return;
+                }
+
+                achievement.loading = true;
+                achievement.statement = '';
+
+                const systemPrompt = "당신은 교육 전문가로서 성취기준을 바탕으로 최소 성취수준과 최소 성취수준 학생들의 행동 특성을 설명하는 역할입니다. 입력한 성취기준에 대한 학습자들의 성취수준을 A~E 5단계로 나누었을 때 최하 수준인 E수준을 한 문장으로 진술하세요. 성취수준이란 입력한 성취기준을 학습한 결과로 나타나는 학습자들의 학습 수준을 의미해. 최소 성취수준이므로 간단하고 기초적인 수준으로 입력하되, 부정적인 진술은 하지 말고, 최소한의 노력을 하고 성취기준에 해당하는 내용을 기초적인 수준에서 찾아보았다는 식으로 진술하세요. '학생들은~',  '최소 성취수준:' 또는 'E수준:~' 이라는 별도의 설명 구문 없이 바로 성취수준 진술문만 제시해야 합니다.      예를 들어 성취기준이 '논증 요소에 따른 분석을 바탕으로 효과적으로 내용을 조직하여 논증하는 글을 쓴다.'인 경우 최소 성취수준은 '논증 요소에 대한 제한적인 분석을 바탕으로 논증하는 글을 쓴다.'로 진술할 수 있습니다. 예시로 든 진술문의 형식을 유지하면서 최소 성취수준 진술문을 제시해주세요. ";                 const userQuery = achievement.text;
+
+                let apiUrl, payload, headers, responseParser;
+                const provider = this.teacherPlan.aiProvider;
+                const apiKey = this.teacherPlan.apiKey;
+
+                if (provider === 'gemini') {
+                    apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+                    headers = { 'Content-Type': 'application/json' };
+                    payload = {
+                        systemInstruction: { parts: [{ text: systemPrompt }] },
+                        contents: [{ parts: [{ text: userQuery }] }],
+                    };
+                    responseParser = (result) => result.candidates?.[0]?.content?.parts?.[0]?.text;
+                } else if (provider === 'openai') {
+                    apiUrl = 'https://api.openai.com/v1/chat/completions';
+                    headers = {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`
+                    };
+                    payload = {
+                        model: "gpt-3.5-turbo",
+                        messages: [
+                            { role: "system", content: systemPrompt },
+                            { role: "user", content: userQuery }
+                        ]
+                    };
+                    responseParser = (result) => result.choices?.[0]?.message?.content;
+                } else if (provider === 'claude') {
+                    apiUrl = 'https://api.anthropic.com/v1/messages';
+                    headers = {
+                        'Content-Type': 'application/json',
+                        'x-api-key': apiKey,
+                        'anthropic-version': '2023-06-01'
+                    };
+                    payload = {
+                        model: "claude-3-sonnet-20240229",
+                        max_tokens: 1024,
+                        system: systemPrompt,
+                        messages: [{ role: "user", content: userQuery }]
+                    };
+                    responseParser = (result) => result.content?.[0]?.text;
+                }
+
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: headers,
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        const errorBody = await response.json().catch(() => ({}));
+                        const errorMessage = errorBody.error?.message || response.statusText;
+                        throw new Error(`API 요청 실패 (${response.status}): ${errorMessage}`);
+                    }
+
+                    const result = await response.json();
+                    const generatedText = responseParser(result);
+
+                    if (generatedText) {
+                        // 프롬프트에도 불구하고 가끔 접두사가 붙는 경우가 있어, 여기서 제거합니다.
+                        let cleanedText = generatedText.trim().replace(/^(E수준:|최소 성취수준:)\s*/, '');
+                        achievement.statement = cleanedText;
+                    } else {
+                        console.log('API Raw Response:', result);
+                        throw new Error('API 응답에서 진술문을 찾을 수 없습니다.');
+                    }
+                } catch (error) {
+                    console.error("AI 진술문 생성 오류:", error);
+                    this.teacherPlanError = `진술문 생성 중 오류 발생: ${error.message}`;
+                } finally {
+                    achievement.loading = false;
+                }
+            },
+            generatePlanPreview() {
+                const plan = this.teacherPlan;
+                const subjectInfo = this.curriculumData.find(s => s.과목명 === plan.subjectName);
+                
+                if (!subjectInfo) {
+                    this.teacherPlanError = '과목명을 찾을 수 없습니다. 편제표에 등록된 과목명을 정확히 입력해주세요.';
+                    return;
+                }
+                this.teacherPlanError = '';
+
+                // Calculations
+                const supplementaryHours = this.teacherPlan.maxSupplementaryHours;
+                const requiredHours = Math.round((supplementaryHours * 2) / 3);
+                const preventionPossibleHours = Math.floor(supplementaryHours * (this.moduleConfig.preventiveRatio / 100));
+                const emotionalSupportHours = Math.floor(supplementaryHours * (this.moduleConfig.emotionalSupportRatio / 100));
+
+                // Helper to create styled tables
+                const createTable = (headers, rows) => {
+                    const ths = headers.map(h => `<th style="border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2;">${h}</th>`).join('');
+                    const trs = rows.map(row => {
+                        const tds = row.map(cell => `<td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${cell}</td>`).join('');
+                        return `<tr>${tds}</tr>`;
+                    }).join('');
+                    return `<table style="width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem;"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table>`;
+                };
+
+                // Section 1: 학점이수 인정 기준
+                let achievementRateHtml = `<p>• 학업 성취율: 학기말 학업 성취율 40% 미만</p>`;
+                if (plan.gradeCalculation === '고정분할점수') {
+                    achievementRateHtml += createTable(
+                        ['성취율', '기준점수'],
+                        [
+                            ['90% 이상', '90'],
+                            ['80% 이상 ~ 90% 미만', '80'],
+                            ['70% 이상 ~ 80% 미만', '70'],
+                            ['60% 이상 ~ 70% 미만', '60'],
+                            ['40% 이상 ~ 60% 미만', '40'],
+                        ]
+                    );
+                } else {
+                    achievementRateHtml += `<p>  - 성취수준 기준점수는 학기말 추정분할점수 산출 결과에 따름</p>`;
+                }
+                
+                // Section 2: 지도 개요
+                const overviewTable = createTable(
+                    ['운영 학년', '운영 학기', '보충지도 시수', '이수 인정 기준 시수', '예방지도 인정 가능 시수', '정서 지원 프로그램 인정 가능 시수'],
+                    [[subjectInfo.학년, subjectInfo.학기, `${supplementaryHours}시수`, `${requiredHours}시수`, `${preventionPossibleHours}시수`, `${emotionalSupportHours}시수`]]
+                );
+
+                // Section 3: 최소 성취수준 진술문
+                const statementsTable = createTable(
+                    ['성취기준', '최소 성취수준 진술문'],
+                    plan.achievements.map(a => [`<div style="text-align: left;">${a.text}</div>`, `<div style="text-align: left;">${a.statement || '미생성'}</div>`])
+                );
+
+                // Section 4: 예방 지도 계획
+                let preventionPlanHtml = '';
+                if(plan.conductPrevention === 'O') {
+                    const preventionSessions = plan.preventionSessions.map((s, i) => [`${i + 1}차시`, `<div style="text-align: left;">${s.plan}</div>`]);
+                    const preventionPeriodFormatted = plan.preventionPeriod.map(d => new Date(d).toLocaleDateString()).join(' ~ ');
+                    preventionPlanHtml = `
+                        <h3 style="margin-top:2rem; font-size:1.1rem; font-weight:bold;">4. 최소 성취수준 미도달 예방 지도 계획</h3>
+                        ${createTable(
+                            ['구분', '내용'],
+                            [
+                                ['대상학생 선정 기준', `<div style="text-align: left;">${plan.preventionTarget}</div>`],
+                                ['지도 방법', plan.preventionMethods.join(', ')],
+                                ['운영 차시', `${plan.preventionSessions.length}차시`],
+                                ['운영 기간', preventionPeriodFormatted]
+                            ]
+                        )}
+                        <h4 style="margin-top:1rem; font-weight:bold;">차시별 지도 계획</h4>
+                        ${createTable(['차시', '지도 계획'], preventionSessions)}
+                    `;
+                } else {
+                    preventionPlanHtml = `
+                        <h3 style="margin-top:2rem; font-size:1.1rem; font-weight:bold;">4. 최소 성취수준 미도달 예방 지도 계획</h3>
+                        <p>- 해당 없음</p>
+                    `;
+                }
+
+                // Section 5 & 6: 보충 및 추가 학습 계획
+                const supplementaryPeriodFormatted = plan.supplementaryPeriod.map(d => new Date(d).toLocaleDateString()).join(' ~ ');
+                const supplementarySessions = plan.supplementarySessions.map((s, i) => [`${i + 1}차시`, `<div style="text-align: left;">${s.plan}</div>`]);
+
+                const supplementaryPlanHtml = `
+                    <h3 style="margin-top:2rem; font-size:1.1rem; font-weight:bold;">5. 보충 지도 운영 계획</h3>
+                    ${createTable(
+                        ['구분', '내용'],
+                        [
+                            ['대상학생 선정 기준', '학업성취율 40% 미만'],
+                            ['지도 방법', plan.supplementaryMethods.join(', ')],
+                            ['운영 차시', `${plan.supplementarySessions.length}차시`],
+                            ['운영 기간', supplementaryPeriodFormatted]
+                        ]
+                    )}
+                    <h4 style="margin-top:1rem; font-weight:bold;">차시별 지도 계획</h4>
+                    ${createTable(['차시', '지도 계획'], supplementarySessions)}
+                `;
+
+                const additionalLearningPlanHtml = `
+                    <h3 style="margin-top:2rem; font-size:1.1rem; font-weight:bold;">6. 추가 학습 운영 계획</h3>
+                    ${createTable(
+                        ['구분', '내용'],
+                        [
+                            ['대상학생 선정 기준', '과목출석률 2/3 미만'],
+                            ['지도 방법', plan.supplementaryMethods.join(', ')],
+                            ['운영 차시', `${plan.supplementarySessions.length}차시`],
+                            ['운영 기간', supplementaryPeriodFormatted]
+                        ]
+                    )}
+                    <h4 style="margin-top:1rem; font-weight:bold;">차시별 지도 계획</h4>
+                    ${createTable(['차시', '지도 계획'], supplementarySessions)}
+                `;
+
+                this.previewHtml = `
+                <div id="print-area" style="padding: 20px; background: white; color: black; font-family: 'Malgun Gothic', sans-serif;">
+                    <h1 style="font-size: 1.8rem; font-weight: bold; text-align: center; margin-bottom: 2rem;">최소 성취수준 보장지도 운영 계획(안)</h1>
+                    <div style="text-align: right; font-size: 1.1rem; line-height: 1.6;">
+                        <p><strong>과목명:</strong> ${plan.subjectName}</p>
+                        <p><strong>교과교사:</strong> ${this.formattedTeacherNames}</p>
+                    </div>
+                    
+                    <h3 style="margin-top:2rem; font-size:1.1rem; font-weight:bold;">1. 학점이수 인정 기준</h3>
+                    <p>• 과목 출석률: 수업 횟수의 2/3 미만</p>
+                    ${achievementRateHtml}
+
+                    <h3 style="margin-top:2rem; font-size:1.1rem; font-weight:bold;">2. 최소 성취수준 보장지도 개요</h3>
+                    ${overviewTable}
+
+                    <h3 style="margin-top:2rem; font-size:1.1rem; font-weight:bold;">3. 최소 성취수준 진술문</h3>
+                    ${statementsTable}
+                    
+                    ${preventionPlanHtml}
+                    ${supplementaryPlanHtml}
+                    ${additionalLearningPlanHtml}
+                </div>`;
+                this.showPreviewModal = true;
+            },
+
+            // --- GUIDANCE LOGBOOK METHODS ---
+            
+            addGuidanceStudent(type) {
+                const data = this.teacherGuidanceData[type];
+                data.error = ''; // Clear previous error
+                const studentId = this.newGuidanceStudentId.trim();
+                if (!studentId) return;
+
+                if (data.students.some(s => s.id === studentId)) {
+                    data.error = '이미 추가된 학생입니다.';
+                    return;
+                }
+                
+                const studentInfo = this.studentData.find(s => String(s['학번']) === studentId);
+                if (studentInfo) {
+                    data.students.push({ id: studentId, name: studentInfo['이름'] });
+                    // Sort students by ID
+                    data.students.sort((a, b) => a.id.localeCompare(b.id));
+                    this.newGuidanceStudentId = '';
+                    this.saveGuidanceData(); // Save after adding student
+                } else {
+                    data.error = '학적 정보에 없는 학생입니다.';
+                }
+            },
+            
+            removeGuidanceStudent(type, index) {
+                this.teacherGuidanceData[type].students.splice(index, 1);
+                this.saveGuidanceData(); // Save after removing student
+            },
+
+            addGuidanceSession(type) {
+                 // Initialize attendance for all current students when adding a new session
+                const initialAttendance = {};
+                this.teacherGuidanceData[type].students.forEach(s => initialAttendance[s.id] = ''); // Default to empty/unselected
+                this.teacherGuidanceData[type].sessions.push({ date: '', time: '', isSaved: false, place: '', content: '', attendance: initialAttendance });
+                this.initTeacherView(); // Re-initialize flatpickr
+                // Note: No need to save here, save happens when session is saved
+            },
+
+            isSessionReadyToSave(session) {
+                if (!session.date || !session.time) return false;
+                // Check if at least one student has an attendance record selected for this session
+                return this.currentGuidanceData.students.some(student => session.attendance[student.id]);
+            },
+
+            toggleSaveSession(session) {
+                session.isSaved = !session.isSaved;
+                // Ensure all students have an entry in attendance, default to '' if missing
+                this.currentGuidanceData.students.forEach(student => {
+                    if(!(student.id in session.attendance)) {
+                        session.attendance[student.id] = '';
+                    }
+                });
+                this.saveGuidanceData(); // Save changes when session save state is toggled
+            },
+            
+            scrollAttendance(direction, event) {
+                const container = event.target.closest('.relative').querySelector('.overflow-x-auto');
+                const scrollAmount = container.clientWidth * 0.8;
+                container.scrollBy({ 
+                    left: direction === 'left' ? -scrollAmount : scrollAmount,
+                    behavior: 'smooth' 
+                });
+            },
+
+            async generatePdfFromHtml(htmlContent, orientation, filename) {
+                const printContainer = document.getElementById('print-area-container');
+                printContainer.innerHTML = htmlContent;
+                printContainer.style.position = 'absolute';
+                printContainer.style.left = '-9999px';
+                printContainer.style.width = orientation === 'p' ? '800px' : '1120px'; // Wider for landscape
+                printContainer.classList.remove('hidden');
+                const printContent = printContainer.children[0];
+
+                const cleanup = () => {
+                    printContainer.innerHTML = '';
+                    printContainer.classList.add('hidden');
+                     printContainer.style.position = '';
+                     printContainer.style.left = '';
+                     printContainer.style.width = '';
+                };
+
+                if (!printContent) {
+                    console.error("Print content element not found.");
+                    cleanup();
+                    return;
+                }
+
+                try {
+                    const canvas = await html2canvas(printContent, { scale: 2, useCORS: true });
+                    const imgData = canvas.toDataURL('image/png');
+                    const { jsPDF } = window.jspdf;
+                    const pdf = new jsPDF(orientation, 'mm', 'a4');
+                    const pdfPageWidth = pdf.internal.pageSize.getWidth();
+                    const pdfPageHeight = pdf.internal.pageSize.getHeight();
+                    const margin = 15; // Adjusted margin for potentially wider landscape content
+                    const contentWidth = pdfPageWidth - margin * 2;
+                    // const contentHeight = pdfPageHeight - margin * 2; // Not needed directly for pagination logic
+
+                    const imgRatio = canvas.height / canvas.width;
+                    const pdfImgWidth = contentWidth;
+                    const pdfImgHeight = pdfImgWidth * imgRatio;
+                    
+                    let position = 0; // Tracks the Y position of the image slice on the PDF page
+                    let heightLeft = pdfImgHeight; // Remaining image height to add
+                    const pageContentHeight = pdfPageHeight - margin * 2; // Usable height per page
+
+
+                    // Add the first page/slice
+                    pdf.addImage(imgData, 'PNG', margin, margin + position, pdfImgWidth, pdfImgHeight);
+                    heightLeft -= pageContentHeight;
+
+
+                    // Add subsequent pages if needed
+                    while (heightLeft > 0) {
+                        position -= pageContentHeight; // Move the image "up" relative to the new page's top margin
+                        pdf.addPage();
+                        pdf.addImage(imgData, 'PNG', margin, margin + position, pdfImgWidth, pdfImgHeight);
+                        heightLeft -= pageContentHeight;
+                    }
+
+
+                    pdf.save(filename);
+                } catch (error) {
+                    console.error("PDF generation error:", error);
+                    alert(`PDF 생성 중 오류가 발생했습니다: ${error.message}`);
+                } finally {
+                    cleanup();
+                }
+            },
+
+            async generateCompletionStatusPdf(type) {
+                const data = this.teacherGuidanceData[type];
+                if (!data) return;
+                const title = type === 'preventive' ? '예방지도' : '보충지도(추가학습)';
+
+                let completionStatusTable = '<table style="width: 100%; border-collapse: collapse; font-size: 9pt;"><thead><tr style="background-color: #f2f2f2;">';
+                completionStatusTable += '<th style="border: 1px solid #ddd; padding: 4px;">학생</th>';
+                 if (type === 'supplementary') {
+                     completionStatusTable += '<th style="border: 1px solid #ddd; padding: 4px;">특기사항</th>';
+                     completionStatusTable += '<th style="border: 1px solid #ddd; padding: 4px;">미도달 항목</th>';
+                     completionStatusTable += '<th style="border: 1px solid #ddd; padding: 4px;">예방지도</th>';
+                     completionStatusTable += '<th style="border: 1px solid #ddd; padding: 4px;">정서지원프로그램</th>';
+                 }
+                this.moduleConfig.recognizedHours.forEach(rh => {
+                    completionStatusTable += `<th style="border: 1px solid #ddd; padding: 4px;">${rh.name}</th>`;
+                });
+                completionStatusTable += '<th style="border: 1px solid #ddd; padding: 4px;">총계</th>';
+                if (type === 'supplementary') {
+                    completionStatusTable += '<th style="border: 1px solid #ddd; padding: 4px;">이수여부</th>';
+                }
+                completionStatusTable += '</tr></thead><tbody>';
+
+                if (data.students.length > 0) {
+                    data.students.forEach(student => {
+                        completionStatusTable += `<tr><td style="border: 1px solid #ddd; padding: 4px;">${student.name} (${student.id})</td>`;
+                        const studentStatus = this.guidanceCompletionStatus[student.id] || {};
+                        if (type === 'supplementary') {
+                            completionStatusTable += `<td style="border: 1px solid #ddd; padding: 4px; text-align: center;">${studentStatus.specialNotes || '일반학생'}</td>`;
+                            completionStatusTable += `<td style="border: 1px solid #ddd; padding: 4px; text-align: center;">${student.reason || ''}</td>`;
+                            completionStatusTable += `<td style="border: 1px solid #ddd; padding: 4px; text-align: center;">${studentStatus.preventiveHours || 0}</td>`;
+                            completionStatusTable += `<td style="border: 1px solid #ddd; padding: 4px; text-align: center;">${studentStatus.emotionalSupportHours || 0}</td>`;
+                        }
+                        this.moduleConfig.recognizedHours.forEach(rh => {
+                            completionStatusTable += `<td style="border: 1px solid #ddd; padding: 4px; text-align: center;">${studentStatus[rh.name] || 0}</td>`;
+                        });
+                        completionStatusTable += `<td style="border: 1px solid #ddd; padding: 4px; text-align: center; font-weight: bold;">${studentStatus.total || 0}</td>`;
+                        
+                        if (type === 'supplementary') {
+                            const status = studentStatus.completionStatus || '미이수';
+                            const color = status === '이수' ? 'green' : 'red';
+                            completionStatusTable += `<td style="border: 1px solid #ddd; padding: 4px; text-align: center; font-weight: bold; color: ${color};">${status}</td>`;
+                        }
+                        completionStatusTable += '</tr>';
+                    });
+                } else {
+                    const colspan = this.moduleConfig.recognizedHours.length + (type === 'supplementary' ? 7 : 2);
+                    completionStatusTable += `<tr><td colspan="${colspan}" style="border: 1px solid #ddd; padding: 8px; text-align: center;">학생 정보가 없습니다.</td></tr>`;
+                }
+                completionStatusTable += '</tbody></table>';
+
+                const pdfHtml = `
+                    <div style="background: white; color: black; font-family: 'Malgun Gothic', sans-serif;">
+                        <h1 style="font-size: 1.5rem; font-weight: bold; text-align: center; margin-bottom: 1rem;">${title} 이수현황표</h1>
+                        <div style="font-size: 0.9rem; line-height: 1.6; border: 1px solid #ccc; padding: 10px; margin-bottom: 1rem;">
+                            <p><strong>과목명:</strong> ${this.teacherPlan.subjectName || '미입력'}</p>
+                            <p><strong>지도교사:</strong> ${this.formattedTeacherNames}</p>
+                        </div>
+                        ${completionStatusTable}
+                    </div>
+                `;
+                
+                await this.generatePdfFromHtml(pdfHtml, 'l', `${title}_이수현황표_${new Date().toISOString().slice(0, 10)}.pdf`);
+            },
+            
+            async generateAttendancePdf(type) {
+                const data = this.teacherGuidanceData[type];
+                if (!data) return;
+                const title = type === 'preventive' ? '예방지도' : '보충지도(추가학습)';
+
+                const savedSessionsForAttendance = data.sessions.filter(s => s.date);
+                let attendanceTable = '<table style="width: 100%; border-collapse: collapse; font-size: 7pt;"><thead><tr style="background-color: #f2f2f2;">';
+                attendanceTable += '<th style="border: 1px solid #ddd; padding: 3px;">학번</th><th style="border: 1px solid #ddd; padding: 3px;">이름</th>';
+                savedSessionsForAttendance.forEach((session, index) => {
+                    attendanceTable += `<th style="border: 1px solid #ddd; padding: 3px;">${index + 1}차시<br/>(${session.date})</th>`;
+                });
+                attendanceTable += '</tr></thead><tbody>';
+                if (data.students.length > 0) {
+                    data.students.forEach(student => {
+                        attendanceTable += `<tr><td style="border: 1px solid #ddd; padding: 3px;">${student.id}</td><td style="border: 1px solid #ddd; padding: 3px;">${student.name}</td>`;
+                        savedSessionsForAttendance.forEach(session => {
+                            attendanceTable += `<td style="border: 1px solid #ddd; padding: 3px; text-align: center;">${session.attendance[student.id] || ''}</td>`;
+                        });
+                        attendanceTable += '</tr>';
+                    });
+                } else {
+                     attendanceTable += `<tr><td colspan="${savedSessionsForAttendance.length + 2}" style="border: 1px solid #ddd; padding: 8px; text-align: center;">학생 정보가 없습니다.</td></tr>`;
+                }
+                attendanceTable += '</tbody></table>';
+
+                const pdfHtml = `
+                    <div style="background: white; color: black; font-family: 'Malgun Gothic', sans-serif;">
+                        <h1 style="font-size: 1.5rem; font-weight: bold; text-align: center; margin-bottom: 1rem;">${title} 출석부</h1>
+                        <div style="font-size: 0.9rem; line-height: 1.6; border: 1px solid #ccc; padding: 10px; margin-bottom: 1rem;">
+                            <p><strong>과목명:</strong> ${this.teacherPlan.subjectName || '미입력'}</p>
+                            <p><strong>지도교사:</strong> ${this.formattedTeacherNames}</p>
+                        </div>
+                        ${attendanceTable}
+                    </div>
+                `;
+
+                await this.generatePdfFromHtml(pdfHtml, 'l', `${title}_출석부_${new Date().toISOString().slice(0, 10)}.pdf`);
+            },
+            
+            async generateLessonLogPdf(type) {
+                const data = this.teacherGuidanceData[type];
+                if (!data) return;
+                const title = type === 'preventive' ? '예방지도' : '보충지도(추가학습)';
+
+                let lessonLogHtml = '';
+                this.savedGuidanceSessions.forEach((session, index) => {
+                    lessonLogHtml += `
+                        <div style="border: 1px solid #ccc; padding: 15px; margin-bottom: 15px; page-break-inside: avoid; font-size: 10pt;">
+                            <h3 style="font-size: 1.1rem; font-weight: bold; margin-bottom: 10px;">${index + 1}차시 수업일지 (${session.date} / ${session.time})</h3>
+                            <p><strong>장소:</strong> ${session.place || ''}</p>
+                            <p><strong>수업방법:</strong> ${[...new Set(Object.values(session.attendance))].filter(Boolean).join(', ')}</p>
+                            <p style="margin-top: 10px;"><strong>지도내용:</strong></p>
+                            <div style="white-space: pre-wrap; word-break: break-all; border: 1px solid #eee; padding: 10px; min-height: 50px; margin-top: 5px;">${session.content || ''}</div>
+                        </div>
+                    `;
+                });
+
+                const pdfHtml = `
+                    <div style="background: white; color: black; font-family: 'Malgun Gothic', sans-serif;">
+                        <h1 style="font-size: 1.8rem; font-weight: bold; text-align: center; margin-bottom: 1rem;">${title} 수업일지</h1>
+                        <div style="font-size: 1rem; line-height: 1.6; border: 1px solid #ccc; padding: 10px; margin-bottom: 2rem;">
+                            <p><strong>과목명:</strong> ${this.teacherPlan.subjectName || '미입력'}</p>
+                            <p><strong>지도교사:</strong> ${this.formattedTeacherNames}</p>
+                            <p><strong>운영기간:</strong> ${this.guidanceOperationPeriod}</p>
+                        </div>
+                        ${lessonLogHtml.length > 0 ? lessonLogHtml : '<p>저장된 수업일지가 없습니다.</p>'}
+                    </div>
+                `;
+
+                await this.generatePdfFromHtml(pdfHtml, 'p', `${title}_수업일지_${new Date().toISOString().slice(0, 10)}.pdf`);
+            },
+
+            closeImportModal() {
+                this.showImportModal = false;
+                this.importSubject = '';
+                this.importClasses = [''];
+                this.importModalError = '';
+            },
+            addImportClassInput() {
+                this.importClasses.push('');
+            },
+            removeImportClassInput(index) {
+                this.importClasses.splice(index, 1);
+            },
+            importUnderachievers() {
+                this.importModalError = '';
+                const subject = this.importSubject.trim();
+                const classes = this.importClasses.map(c => c.trim()).filter(Boolean);
+
+                if (!subject || classes.length === 0) {
+                    this.importModalError = '과목과 학급을 모두 입력해주세요.';
+                    return;
+                }
+
+                // Use the data loaded from Firestore
+                const allUnderachievers = this.underachievers;
+                if (!allUnderachievers || allUnderachievers.length === 0) {
+                     this.importModalError = '관리자가 배포한 미도달 학생 데이터가 없습니다.';
+                    return;
+                }
+                
+                const filteredStudents = allUnderachievers.filter(student => {
+                    const studentClassIdentifier = student.id.substring(0, 3);
+                    const classMatch = classes.includes(studentClassIdentifier);
+                    if (!classMatch) return false;
+
+                    const gradeSubjectMatch = student.gradeSubjects.some(s => s.name === subject);
+                    const attendanceSubjectMatch = student.attendanceSubjects.includes(subject);
+                    return gradeSubjectMatch || attendanceSubjectMatch;
+                });
+
+                if (filteredStudents.length === 0) {
+                    this.importModalError = '해당 조건에 맞는 학생을 찾을 수 없습니다.';
+                    return;
+                }
+
+                const supplementaryStudents = this.teacherGuidanceData.supplementary.students;
+                const existingStudentIds = new Set(supplementaryStudents.map(s => s.id));
+
+                let addedCount = 0;
+                filteredStudents.forEach(newStudent => {
+                    if (!existingStudentIds.has(newStudent.id)) {
+                        const gradeSubjectMatch = newStudent.gradeSubjects.some(s => s.name === subject);
+                        const attendanceSubjectMatch = newStudent.attendanceSubjects.includes(subject);
+                        let reason = '';
+                        if (gradeSubjectMatch && attendanceSubjectMatch) {
+                            reason = '학업성취율&과목출석률';
+                        } else if (gradeSubjectMatch) {
+                            reason = '학업성취율';
+                        } else if (attendanceSubjectMatch) {
+                            reason = '과목출석률';
+                        }
+                        
+                        supplementaryStudents.push({ id: newStudent.id, name: newStudent.name, reason: reason });
+                        addedCount++;
+                    }
+                });
+
+                if (addedCount > 0) {
+                    supplementaryStudents.sort((a, b) => a.id.localeCompare(b.id));
+                    this.saveGuidanceData(); // Save after importing
+                } else {
+                    this.importModalError = '모든 대상자가 이미 목록에 있습니다.';
+                    return; 
+                }
+
+                this.closeImportModal();
+            },
+            resetSupplementaryStudents() {
+                this.teacherGuidanceData.supplementary.students = [];
+                this.saveGuidanceData(); // Save after resetting
+            },
+
+            // Homeroom Teacher Methods
+            searchHomeroomClass(){
+                this.homeroomMessage = '';
+                const classInput = this.homeroomClassInput.trim();
+                if(!classInput){
+                    this.homeroomMessage = '학급 번호를 입력해주세요.';
+                    this.searchedStudents = [];
+                    return;
+                }
+                // Use data loaded from Firestore
+                const allStudents = this.underachievers;
+                 if (!allStudents || allStudents.length === 0) {
+                    this.homeroomMessage = '관리자가 배포한 학생 데이터가 없습니다.';
+                    this.searchedStudents = [];
+                    return;
+                }
+
+                const filtered = allStudents.filter(s => s.id.startsWith(classInput));
+                
+                if(filtered.length > 0){
+                    this.searchedStudents = filtered;
+                    this.homeroomMessage = `${classInput}반 미도달 학생 ${filtered.length}명을 조회했습니다.`;
+                } else {
+                    this.searchedStudents = [];
+                    this.homeroomMessage = `해당 학급에 미도달 학생이 없습니다.`;
+                }
+            },
+            // Note: getSubjectCompletionStatus now needs to load data potentially from other teachers
+            // This is complex and might require restructuring how guidance data is stored or accessed.
+            // For now, it will look for data saved by the *current* user if they are also a teacher,
+            // or return '정보 없음'. A more robust solution would involve Firestore rules
+            // allowing homeroom teachers to read specific subject data or storing summary data.
+            getSubjectCompletionStatus(studentId, subjectName){
+                 // Attempt to load guidance data for the specific subject (might not be the current user's)
+                 // This requires knowing WHICH teacher teaches that subject or having broader read access.
+                 // Simplified: Check if data exists locally (assuming homeroom teacher might also teach)
+                 // TODO: Replace localStorage check with Firestore query if possible/needed
+                 const guidanceDataStr = localStorage.getItem(`guidanceData_${subjectName}`); // Check localStorage temporarily for existing logic structure
+                 let guidanceData;
+                 if(guidanceDataStr) {
+                     guidanceData = JSON.parse(guidanceDataStr);
+                 } else {
+                     // In a full Firestore implementation, we'd query Firestore here based on subject/teacher
+                     // For now, return '정보 없음' if not found locally (simulating lack of cross-teacher access)
+                     return { status: '정보 없음', color: 'text-gray-500'};
+                 }
+
+                 const subjectInfo = this.curriculumData.find(s => s.과목명 === subjectName);
+                 if(!subjectInfo) return { status: '정보 없음', color: 'text-gray-500'};
+
+                 const supplementaryHours = Number(subjectInfo.학점) * this.moduleConfig.hoursPerCredit;
+                 const requiredHoursForCompletion = (supplementaryHours * 2) / 3;
+
+                 let totalHours = 0;
+                 
+                 // 1. Calculate supplementary hours from subject teacher's data
+                 if(guidanceData?.supplementary?.sessions){
+                     guidanceData.supplementary.sessions.forEach(session => {
+                         if(session.isSaved && session.attendance[studentId]){
+                             const methodName = session.attendance[studentId];
+                             const methodConfig = this.moduleConfig.recognizedHours.find(m => m.name === methodName);
+                             if(methodConfig) totalHours += methodConfig.hours;
+                         }
+                     });
+                 }
+
+                 // 2. Calculate credited preventive hours from subject teacher's data
+                 let totalPreventiveHours = 0;
+                  if(guidanceData?.preventive?.sessions){
+                     guidanceData.preventive.sessions.forEach(session => {
+                         if(session.isSaved && session.attendance[studentId]){
+                             const methodName = session.attendance[studentId];
+                             const methodConfig = this.moduleConfig.recognizedHours.find(m => m.name === methodName);
+                             if(methodConfig) totalPreventiveHours += methodConfig.hours;
+                         }
+                     });
+                 }
+
+                const studentInfo = this.studentData.find(s => String(s['학번']) === studentId);
+                const isSpecialSupport = studentInfo && studentInfo['특기사항'] === '학습지원대상';
+                let maxAllowedPreventive = 0;
+                if (isSpecialSupport) {
+                    maxAllowedPreventive = supplementaryHours * (this.moduleConfig.specialPreventiveRatio / 100);
+                } else {
+                    maxAllowedPreventive = supplementaryHours * (this.moduleConfig.preventiveRatio / 100);
+                }
+                totalHours += Math.min(totalPreventiveHours, maxAllowedPreventive);
+
+                 // 3. Calculate credited emotional support hours (from common data)
+                 const emotionalData = this.emotionalSupportData.find(e => String(e['학번']) === studentId);
+                 const uploadedEmotionalHours = emotionalData ? Number(emotionalData['정서지원프로그램 참여시간']) : 0;
+                 const maxEmotionalSupportHours = supplementaryHours * (this.moduleConfig.emotionalSupportRatio / 100);
+                 totalHours += Math.min(uploadedEmotionalHours, maxEmotionalSupportHours);
+                 
+                 if(totalHours >= requiredHoursForCompletion){
+                     return { status: '이수', color: 'text-green-600' };
+                 } else {
+                     return { status: '미이수', color: 'text-red-600' };
+                 }
+            },
+            printHomeroomStudentForm(student, type) {
+                // Ensure form templates are loaded before printing
+                 if (!this.newsletterForm.title || !this.pledgeForm.content) {
+                     alert("가정통신문/서약서 양식이 로드되지 않았습니다. 관리자가 양식을 저장했는지 확인해주세요.");
+                     return;
+                 }
+                this.previewForm(type, [student]);
+            }
+
+        }); // End of createApp
+
+        appInstance.mount('#app'); // Mount the app first
+        appInstance.initApp(); // Then call initApp on the instance
+
+    </script>
+</body>
+</html>
+
