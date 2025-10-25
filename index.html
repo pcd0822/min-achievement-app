@@ -124,7 +124,7 @@
 </head>
 <body class="bg-gray-100">
 
-    <div id="app" v-cloak @mount="initApp()" class="min-h-screen flex flex-col">
+    <div id="app" v-cloak class="min-h-screen flex flex-col">
         <!-- Header -->
         <header class="bg-white shadow-md">
             <div class="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -778,7 +778,7 @@
 
     <script type="module">
         // Vue 3 CDN (petite-vue for simplicity)
-        import { createApp } from 'https://unpkg.com/petite-vue?module'
+        import { createApp } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js'
         
         // Import Firebase modules
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -2749,14 +2749,17 @@
                      return;
                  }
                 this.previewForm(type, [student]);
+            },
+
+            // Mounted hook
+            mounted() {
+                this.initApp();
             }
-            
-            // Removed the explicit mounted hook
-            // initApp() is now called by @mount in the HTML
 
         }).mount('#app'); // Mount the app
         
-        // Removed the problematic DOMContentLoaded listener
+        // Removed the faulty DOMContentLoaded listener
+        // The 'mounted' hook inside createApp will now handle initialization.
 
     </script>
 </body>
