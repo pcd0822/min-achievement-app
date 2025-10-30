@@ -1962,7 +1962,8 @@
                                  const classInfo = String(classInfoRow[0]);
 
                                  // **FIX 2: Changed regex to (\d+) to capture multi-digit grades**
-                                 const gradeMatch = classInfo.match(/(\d+)\s*학년/);
+                                 // **FIX 3: Modified regex to exclude '학년도' using negative lookahead (?!도)**
+                                 const gradeMatch = classInfo.match(/(\d+)\s*학년(?!도)/);
                                  const classNumMatch = classInfo.match(/(\d{1,2})\s*반/);
 
                                  if (!gradeMatch || !classNumMatch) throw new Error(`'${file.name}' 파일의 학급 정보 형식("${classInfo}")이 예상과 다릅니다. (예: '1학년 3반')`);
@@ -2657,4 +2658,5 @@
     </script>
 </body>
 </html>
+
 
