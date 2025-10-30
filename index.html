@@ -168,16 +168,27 @@
         .scroll-arrow.right { right: -1.25rem; }
 
         /* 인쇄 전용 스타일 (안정적인 버전으로 수정) */
-            /* 인쇄 전용 스타일 (안정화 버전) */
         @media print {
-            #app > header, #app > main,
+            /* 1. 기본 인쇄 설정 */
+            body {
+                margin: 0;
+                padding: 0;
+                background-color: white;
+            }
+            
+            /* 2. 인쇄 불필요 UI 요소 명시적 숨기기 */
+            body > header, 
+            body > main,
             div[v-if="showAttendanceModal"],
             div[v-if="showImportModal"],
+            div[v-if="showSchoolIdModal"], /* 학교 ID 모달 숨기기 */
             #print-area-container, /* html2canvas용 컨테이너 숨기기 */
-            .modal-overlay .modal-content > div:not(#print-area-container-in-modal),
+            .modal-overlay .modal-content > div:not(#print-area-container-in-modal), /* 모달 내 버튼, 상태메시지 숨기기 */
             .scroll-arrow {
                 display: none !important;
             }
+
+            /* 3. 모달 관련 스타일 리셋 (인쇄 시 화면을 가리지 않도록) */
             .modal-overlay {
                 position: static !important;
                 background: none !important;
@@ -191,25 +202,42 @@
                 max-width: 100% !important; max-height: none !important;
                 overflow: visible !important; display: block !important;
             }
-            #print-area-container-in-modal {
-                visibility: visible !important;
-                display: block !important;
-            }
+            
+            /* 4. 인쇄할 컨테이너 및 내용 보이기 */
+            #print-area-container-in-modal,
             #print-area-container-in-modal * {
-                visibility: visible !important;
-                /* display: block !important;  <-- 이 줄을 제거하거나 주석 처리합니다. */
+                visibility: visible !important; /* visibility: visible로 되돌림 */
             }
+            /* (Fix) 자식 요소들의 display 속성을 강제로 block으로 바꾸지 않도록 수정 */
+            #print-area-container-in-modal {
+                 display: block !important;
+            }
+
+            /* 5. 인쇄할 영역(#print-area) 스타일 리셋 */
             #print-area {
-                padding: 0 !important; margin: 0 !important;
+                padding: 0 !important; margin: 0 !important; /* @page 여백이 적용됨 */
                 border: none !important; box-shadow: none !important;
                 width: 100% !important; font-size: 10pt !important;
                 color: black !important; background: white !important;
             }
+            
+            /* 6. 인쇄용 테이블/폰트 미세 조정 */
             #print-area table { font-size: 9pt !important; }
             #print-area th, #print-area td { padding: 5px !important; }
-            @page { size: A4 portrait; margin: 20mm; }
-            .page-break { page-break-after: always !important; }
-            img { max-width: 100% !important; height: auto !important; visibility: visible !important; }
+
+            /* 7. @page 설정 (A4 여백) */
+            @page {
+                size: A4 portrait;
+                margin: 20mm;
+            }
+            .page-break {
+                page-break-after: always !important;
+            }
+            img {
+                 max-width: 100% !important;
+                 height: auto !important;
+                 visibility: visible !important;
+             }
         }
     </style>
 </head>
@@ -230,6 +258,7 @@
                     <div v-if="isLoggedIn" class="flex items-center space-x-4">
                          <span class="text-gray-600 text-sm"> {{ user?.email }}</span>
                          <span v-if="role" class="text-gray-600 font-semibold">[{{ role }}] 모드</span>
+                         <span v-if="schoolId" class="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">ID: {{ schoolId }}</span>
                          <button @click="logout" class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition text-sm">로그아웃</button>
                          <button v-if="role" @click="resetRole" class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition text-sm">역할 재선택</button>
                     </div>
@@ -257,7 +286,7 @@
 
 
             <!-- Role Selection Modal (Show if logged in but no role) -->
-            <div v-if="isLoggedIn && !role && !isLoading" class="modal-overlay">
+            <div v-if="isLoggedIn && !role && !schoolId && !isLoading" class="modal-overlay">
                 <div class="modal-content">
                     <h3 class="text-2xl font-bold mb-6 text-center">역할 선택</h3>
                     <div class="space-y-4">
@@ -276,11 +305,36 @@
                 </div>
             </div>
 
-             <!-- Main Dashboard (Show only if logged in and role is selected) -->
-             <div v-if="isLoggedIn && role && !isLoading">
+            <!-- NEW: School ID Modal (Show if role selected, but no schoolId) -->
+            <div v-if="isLoggedIn && role && !schoolId && !isLoading" class="modal-overlay">
+                <div class="modal-content">
+                    <h3 v-if="schoolIdMode === 'create'" class="text-2xl font-bold mb-4 text-center">학교 고유 ID 생성</h3>
+                    <h3 v-else class="text-2xl font-bold mb-4 text-center">학교 고유 ID 입력</h3>
+
+                    <p v-if="schoolIdMode === 'create'" class="text-sm text-gray-600 mb-4">
+                        관리자 인증이 완료되었습니다. 이 학교에서 사용할 고유 ID를 생성하세요. 이 ID는 교사들에게 공유해야 합니다. (예: `korea_high_2025`)
+                    </p>
+                    <p v-else class="text-sm text-gray-600 mb-4">
+                        학교 관리자에게 공유받은 '학교 고유 ID'를 입력하세요.
+                    </p>
+                    
+                    <form @submit.prevent="handleSchoolIdSubmit">
+                        <input type="text" v-model="newSchoolId" placeholder="학교 고유 ID 입력" class="w-full p-2 border rounded-md" required>
+                        <p class="text-xs text-gray-500 mt-1">참고: 공백, 특수문자(/, ., *, # 등) 없이 영문, 숫자, _ 만 사용 가능합니다.</p>
+                        <p v-if="schoolIdError" class="text-red-500 text-sm mt-2">{{ schoolIdError }}</p>
+                        <button type="submit" class="w-full mt-4 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition">
+                            <span v-if="schoolIdMode === 'create'">생성 및 시작</span>
+                            <span v-else>참여하기</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+             <!-- Main Dashboard (Show only if logged in, role, AND schoolId are selected) -->
+             <div v-if="isLoggedIn && role && schoolId && !isLoading">
                 <!-- Admin View -->
                  <div v-if="role === '관리자'">
-                      <h2 class="text-3xl font-bold text-gray-800 mb-6">관리자 대시보드 (학교: {{ schoolId }})</h2>
+                      <h2 class="text-3xl font-bold text-gray-800 mb-6">관리자 대시보드 (학교 ID: {{ schoolId }})</h2>
                        <div class="space-y-8">
                            <!-- 1. 교육과정 편제표 업로드 -->
                            <div class="bg-white p-6 rounded-lg shadow-md">
@@ -432,7 +486,6 @@
                                         <img v-if="newsletterForm.sealUrl" :src="newsletterForm.sealUrl" alt="날인 미리보기" class="mt-2 h-16 object-contain">
                                    </div>
                                    <div class="flex space-x-2">
-                                       <!-- BUG FIX: Changed previewForm to previewFormAdmin -->
                                        <button @click="previewFormAdmin('newsletter')" class="mt-4 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">미리보기 및 출력</button>
                                         <button @click="saveFormTemplates" class="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">양식 저장</button>
                                    </div>
@@ -452,7 +505,6 @@
                                          <img v-if="pledgeForm.sealUrl" :src="pledgeForm.sealUrl" alt="날인 미리보기" class="mt-2 h-16 object-contain">
                                     </div>
                                     <div class="flex space-x-2">
-                                       <!-- BUG FIX: Changed previewForm to previewFormAdmin -->
                                        <button @click="previewFormAdmin('pledge')" class="mt-4 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">미리보기 및 출력</button>
                                         <button @click="saveFormTemplates" class="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">양식 저장</button>
                                     </div>
@@ -463,7 +515,7 @@
 
                 <!-- Teacher View -->
                  <div v-if="role === '교과교사'">
-                       <h2 class="text-3xl font-bold text-gray-800 mb-6">교과교사 대시보드 (학교: {{ schoolId }})</h2>
+                       <h2 class="text-3xl font-bold text-gray-800 mb-6">교과교사 대시보드 (학교 ID: {{ schoolId }})</h2>
                        <div class="flex border-b mb-6">
                            <button class="tab-button" :class="{ 'active': teacherTab === 'plan' }" @click="switchTeacherTab('plan')">계획서 작성</button>
                            <button class="tab-button" :class="{ 'active': teacherTab === 'preventive' }" @click="switchTeacherTab('preventive')">예방지도 출석부 & 수업일지</button>
@@ -763,7 +815,7 @@
 
                  <!-- Homeroom Teacher View -->
                   <div v-if="role === '담임교사'" class="space-y-6">
-                      <h2 class="text-3xl font-bold text-gray-800">담임교사 대시보드 (학교: {{ schoolId }})</h2>
+                      <h2 class="text-3xl font-bold text-gray-800">담임교사 대시보드 (학교 ID: {{ schoolId }})</h2>
                       <div class="bg-white p-6 rounded-lg shadow-md">
                           <div class="flex items-end space-x-2">
                               <div class="flex-grow">
@@ -862,7 +914,9 @@
                  <h3 class="text-xl font-bold mb-4">보충지도 대상자 가져오기</h3>
                  <form @submit.prevent="importUnderachievers">
                      <div class="space-y-4">
-                         <input v-model="importSubject" placeholder="과목명 (현재 과목과 일치)" required class="w-full p-2 border rounded-md" :disabled="!teacherPlan.subjectName">
+                        <!-- MODIFIED: Input is now disabled and bound to teacherPlan.subjectName -->
+                         <label class="block text-sm font-medium text-gray-700">과목명</label>
+                         <input :value="teacherPlan.subjectName" placeholder="먼저 '계획서 작성' 탭에서 과목명을 입력하세요" required class="w-full p-2 border rounded-md bg-gray-100" disabled>
                          <div>
                              <label class="block text-sm font-medium text-gray-700">학급</label>
                              <p class="text-xs text-gray-500 mb-2">한 칸에 하나의 학급만 입력해주세요. (예: 101)</p>
@@ -935,6 +989,11 @@
                     showAdminCodeInput: false,
                     adminCode: '',
                     adminCodeError: '',
+                    // NEW: School ID Modal State
+                    showSchoolIdModal: false,
+                    schoolIdMode: 'join', // 'join' or 'create'
+                    newSchoolId: '',
+                    schoolIdError: '',
 
                     // --- UI State ---
                     teacherTab: 'plan',
@@ -980,7 +1039,7 @@
 
                     // --- Teacher Specific State ---
                     showImportModal: false,
-                    importSubject: '',
+                    importSubject: '', // This is now auto-filled from teacherPlan.subjectName
                     importClasses: [''],
                     importModalError: '',
                     teacherPlan: this.getInitialTeacherPlan(), // Use helper function
@@ -1324,22 +1383,8 @@
                                      // Load deployed data into local admin list on init
                                      this.underachievers = JSON.parse(JSON.stringify(this.deployedUnderachievers));
                                  }
-                             } else if (this.schoolId && !this.role) {
-                                 // Logged in, schoolId is known, but no role selected
-                                 // This is the normal state before role selection
-                             } else if (!this.schoolId) {
-                                 // Logged in but somehow schoolId is missing (e.g. email domain issue?)
-                                 console.warn("User is logged in but schoolId could not be determined. Role selection may fail.");
-                                 // We can attempt to set it here if it's missing from userData
-                                 const emailDomain = this.user.email.split('@')[1];
-                                 if (emailDomain) {
-                                     this.schoolId = emailDomain;
-                                     await this.saveUserRole(null); // Save the schoolId, keep role null
-                                 } else {
-                                     alert("유효한 이메일 도메인이 없어 학교 ID를 설정할 수 없습니다. 로그아웃됩니다.");
-                                     await this.logout();
-                                 }
                              }
+                             // Handled: If role or schoolId is missing, modals will show.
                         } else {
                             this.user = null;
                             this.isLoggedIn = false;
@@ -1375,68 +1420,131 @@
 
                 // --- Role Management ---
                 async selectRole(selectedRole) {
-                     if (!this.user || !this.schoolId) {
-                         alert("사용자 정보 또는 학교 정보가 없습니다. 다시 로그인해주세요.");
+                     if (!this.user) {
+                         alert("사용자 정보가 없습니다. 다시 로그인해주세요.");
                          return;
                      }
+                     this.role = selectedRole; // Set role first
+                     
                      if (selectedRole === '관리자') {
                          this.showAdminCodeInput = true;
                      } else {
-                         this.isLoading = true; // Show loading
-                         await this.saveUserRole(selectedRole); // Saves both role and schoolId
-                         this.role = selectedRole;
-                         this.showAdminCodeInput = false; this.adminCodeError = ''; this.statusMessage = '';
-                         await this.loadCommonData();
-                          if(selectedRole === '교과교사') {
-                               await this.loadTeacherPlan();
-                               if(this.teacherPlan.subjectName){
-                                   await this.loadGuidanceData();
-                                   this.filterSupplementaryStudents();
-                               }
-                          } else if (selectedRole === '관리자') {
-                               this.underachievers = JSON.parse(JSON.stringify(this.deployedUnderachievers));
-                          }
-                         this.isLoading = false;
-                         this.$nextTick(() => { this.initFlatpickr(); });
+                         this.showAdminCodeInput = false;
+                         // Now check if schoolId exists. If not, modal will show.
+                         if (!this.schoolId) {
+                             this.schoolIdMode = 'join';
+                             this.showSchoolIdModal = true;
+                         } else {
+                            // Already have schoolId, proceed
+                            this.isLoading = true;
+                            await this.saveUserRole(this.role); // Save updated role
+                            await this.loadCommonData();
+                            if(this.role === '교과교사') {
+                                 await this.loadTeacherPlan();
+                                 if(this.teacherPlan.subjectName){
+                                     await this.loadGuidanceData();
+                                     this.filterSupplementaryStudents();
+                                 }
+                            }
+                            this.isLoading = false;
+                            this.$nextTick(() => { this.initFlatpickr(); });
+                         }
                      }
                 },
                 async submitAdminCode() {
                      if (this.adminCode === '0822') {
-                         this.isLoading = true; // Show loading
-                         await this.saveUserRole('관리자'); // Saves both role and schoolId
-                         this.role = '관리자';
-                         this.adminCodeError = ''; this.showAdminCodeInput = false; this.statusMessage = '';
-                         await this.loadCommonData();
-                         this.underachievers = JSON.parse(JSON.stringify(this.deployedUnderachievers));
-                         this.isLoading = false;
-                         this.$nextTick(() => { this.initFlatpickr(); });
+                         this.adminCodeError = '';
+                         this.showAdminCodeInput = false;
+                         // Admin is verified, now check for schoolId
+                         if (!this.schoolId) {
+                             this.schoolIdMode = 'create';
+                             this.showSchoolIdModal = true;
+                         } else {
+                             // Admin verified and already has schoolId, proceed
+                             this.isLoading = true;
+                             await this.saveUserRole('관리자'); // Save updated role
+                             await this.loadCommonData();
+                             this.underachievers = JSON.parse(JSON.stringify(this.deployedUnderachievers));
+                             this.isLoading = false;
+                             this.$nextTick(() => { this.initFlatpickr(); });
+                         }
                      } else {
                          this.adminCodeError = '코드가 올바르지 않습니다.';
                      }
                      this.adminCode = '';
                 },
+                // NEW: Handle School ID creation/joining
+                async handleSchoolIdSubmit() {
+                    const id = this.newSchoolId.trim();
+                    const invalidChars = /[\s./*#$[\]]/; // Basic check for invalid Firestore path chars
+                    
+                    this.schoolIdError = '';
+                    if (!id) {
+                        this.schoolIdError = "학교 고유 ID를 입력해주세요."; return;
+                    }
+                    if (invalidChars.test(id)) {
+                        this.schoolIdError = "공백이나 특수문자 (/, ., *, # 등)는 사용할 수 없습니다."; return;
+                    }
+
+                    // For 'join' mode, we could check if the schoolId exists
+                    // For simplicity, we just save it. Security rules will prevent access if it's wrong.
+                    
+                    this.schoolId = id; // Set the schoolId
+                    this.isLoading = true;
+                    this.showSchoolIdModal = false;
+                    
+                    await this.saveUserRole(this.role); // Save both role and new schoolId
+                    await this.loadCommonData(); // Load data for this school
+                    
+                    // Load role-specific data
+                    if(this.role === '교과교사') {
+                         await this.loadTeacherPlan();
+                         if(this.teacherPlan.subjectName){
+                             await this.loadGuidanceData();
+                             this.filterSupplementaryStudents();
+                         }
+                    } else if (this.role === '관리자') {
+                        // Admin just created ID, list will be empty, load defaults
+                         this.underachievers = JSON.parse(JSON.stringify(this.deployedUnderachievers));
+                    }
+                    
+                    this.isLoading = false;
+                    this.newSchoolId = '';
+                    this.$nextTick(() => { this.initFlatpickr(); });
+                },
                 async resetRole() {
                      await this.saveUserRole(null); // Save role as null, keep schoolId
                      this.role = null; // Set local role to null
                      this.showAdminCodeInput = false; this.adminCode = ''; this.adminCodeError = ''; this.statusMessage = '';
+                     this.showSchoolIdModal = false; this.newSchoolId = ''; this.schoolIdError = '';
                      this.resetAllLocalData(false); // Reset local data but keep user/schoolId
                 },
                 async saveUserRole(roleToSave) {
                      if (!this.user || !db) return;
-                     // Ensure schoolId is set from user email if not already present
-                     if (!this.schoolId && this.user.email) {
-                         this.schoolId = this.user.email.split('@')[1];
-                     }
+                     // schoolId is now set either by loadUserRole or handleSchoolIdSubmit
                      if (!this.schoolId) {
-                         console.error("Cannot save role, schoolId is missing.");
-                         this.statusMessage = '오류: 학교 ID를 확인할 수 없습니다.';
-                         return;
+                         // This might happen if user logs in w/o email domain AND hasn't set ID yet
+                         // Try to get it from email one last time
+                         if (this.user.email && this.user.email.includes('@')) {
+                             this.schoolId = this.user.email.split('@')[1];
+                         } else if (this.role) { 
+                             // Role is set, but schoolId is missing. This happens before schoolId modal.
+                             // We just save the role. schoolId will be saved by handleSchoolIdSubmit.
+                             // This logic is getting complex. Let's simplify.
+                             // saveUserRole will *only* save what it knows.
+                         }
                      }
-                     this.statusMessage = '역할 저장 중...';
+                     
+                     // Simplified: saveUserRole saves role AND whatever schoolId is currently in state
                      const userDocRef = doc(db, `userData/${this.user.uid}`);
+                     const dataToSave = { 
+                         role: roleToSave, 
+                         schoolId: this.schoolId // Save current schoolId (which might be null or set)
+                     };
+                     
+                     this.statusMessage = '역할 저장 중...';
                      try {
-                         // Save both role and schoolId
-                         await setDoc(userDocRef, { role: roleToSave, schoolId: this.schoolId });
+                         await setDoc(userDocRef, dataToSave);
                          this.statusMessage = roleToSave ? '역할이 저장되었습니다.' : '역할이 초기화되었습니다.';
                      } catch (error) { console.error("Error saving role:", error); this.statusMessage = '역할 저장/초기화 실패.'; }
                      setTimeout(() => this.statusMessage = '', 2000);
@@ -1449,26 +1557,11 @@
                          if (userDocSnap.exists()) {
                              const data = userDocSnap.data();
                              this.role = data.role || null;
-                             this.schoolId = data.schoolId || null;
-                             
-                             // If schoolId is missing in DB, get it from email and save it
-                             if (!this.schoolId && this.user.email) {
-                                 this.schoolId = this.user.email.split('@')[1];
-                                 if (this.schoolId) {
-                                     await this.saveUserRole(this.role); // Save updated doc
-                                 }
-                             }
+                             this.schoolId = data.schoolId || null; // Load the saved schoolId
                          } else {
-                             // No userData doc, create one with schoolId and null role
+                             // No userData doc, so both are null
                              this.role = null;
-                             if (this.user.email) {
-                                 this.schoolId = this.user.email.split('@')[1];
-                                 if (this.schoolId) {
-                                    await this.saveUserRole(null); // Create the doc
-                                 } else {
-                                     console.error("User email has no domain.");
-                                 }
-                             }
+                             this.schoolId = null;
                          }
                      } catch (error) { console.error("Error loading user role:", error); this.role = null; this.schoolId = null; }
                  },
@@ -1544,6 +1637,7 @@
                             const worksheet = workbook.Sheets[sheetName];
                             const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
+                            // Use schoolId in path
                             const docRef = doc(db, `schools/${this.schoolId}/commonData`, type);
                             await setDoc(docRef, { data: jsonData });
 
@@ -1899,7 +1993,6 @@
                      window.print();
                  },
 
-                  // --- 여기부터 추가 ---
                  closePreviewModal() {
                      this.showPreviewModal = false;
                      this.previewHtml = '';
@@ -1908,7 +2001,6 @@
                      this.teacherPlanError = '';
                      this.teacherPlanStatus = '';
                  },
-                 // --- 여기까지 추가 ---
                 
                 // This function is kept as a fallback, but window.print() is preferred
                 async printPreview() {
@@ -2545,7 +2637,7 @@
                      this.importModalError = '';
                      const subject = this.teacherPlan.subjectName.trim();
                      if (!subject) { this.importModalError = '먼저 과목명을 입력하고 저장해주세요.'; return; }
-                     this.importSubject = subject;
+                     // this.importSubject = subject; // This line is not needed
                      
                      const classes = this.importClasses.map(c => c.trim()).filter(Boolean);
                      if (classes.length === 0) { this.importModalError = '학급을 입력해주세요.'; return; }
