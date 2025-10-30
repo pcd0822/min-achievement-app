@@ -309,7 +309,8 @@
             </div>
 
             <!-- NEW: School ID Modal (Show if role selected, but no schoolId) -->
-            <div v-if="isLoggedIn && role && !schoolId && !isLoading" class="modal-overlay">
+            <!-- FIX: v-if 조건을 !schoolId 에서 showSchoolIdModal로 변경 -->
+            <div v-if="showSchoolIdModal && !isLoading" class="modal-overlay">
                 <div class="modal-content">
                     <h3 v-if="schoolIdMode === 'create'" class="text-2xl font-bold mb-4 text-center">학교 고유 ID 생성</h3>
                     <h3 v-else class="text-2xl font-bold mb-4 text-center">학교 고유 ID 입력</h3>
@@ -2770,6 +2771,7 @@
     </script>
 </body>
 </html>
+
 
 
 
