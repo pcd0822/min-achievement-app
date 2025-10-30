@@ -177,8 +177,9 @@
             }
             
             /* 2. 인쇄 불필요 UI 요소 명시적 숨기기 */
-            body > header, 
-            body > main,
+            /* FIX: body > 를 #app > 로 수정 */
+            #app > header, 
+            #app > main,
             div[v-if="showAttendanceModal"],
             div[v-if="showImportModal"],
             div[v-if="showSchoolIdModal"], /* 학교 ID 모달 숨기기 */
@@ -2769,6 +2770,7 @@
     </script>
 </body>
 </html>
+
 
 
 
