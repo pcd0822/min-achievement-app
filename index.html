@@ -261,6 +261,8 @@
                          <span v-if="schoolId" class="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">ID: {{ schoolId }}</span>
                          <button @click="logout" class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition text-sm">로그아웃</button>
                          <button v-if="role" @click="resetRole" class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition text-sm">역할 재선택</button>
+                         <!-- 1) 학교 ID 수정 버튼 추가 -->
+                         <button v-if="role" @click="openSchoolIdModal" class="ml-2 px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition text-sm">학교 ID 수정</button>
                     </div>
                     <div v-else>
                          <button @click="login" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition text-sm">Google 로그인</button>
@@ -318,12 +320,12 @@
                         학교 관리자에게 공유받은 '학교 고유 ID'를 입력하세요.
                     </p>
                     
-                    <form @submit.prevent="handleSchoolIdSubmit">
-                        <input type="text" v-model="newSchoolId" placeholder="학교 고유 ID 입력" class="w-full p-2 border rounded-md" required>
-                        <p class="text-xs text-gray-500 mt-1">참고: 공백, 특수문자(/, ., *, # 등) 없이 영문, 숫자, _ 만 사용 가능합니다.</p>
-                        <p v-if="schoolIdError" class="text-red-500 text-sm mt-2">{{ schoolIdError }}</p>
-                        <button type="submit" class="w-full mt-4 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition">
-                            <span v-if="schoolIdMode === 'create'">생성 및 시작</span>
+            /* 2. 인쇄 불필요 UI 요소 명시적 숨기기 */
+            /* 3) FIX: 'body >'를 '#app >'로 수정하여 앱의 헤더와 메인을 숨깁니다. */
+            #app > header, 
+            #app > main,
+            div[v-if="showAttendanceModal"],
+            div[v-if="showImportModal"],
                             <span v-else>참여하기</span>
                         </button>
                     </form>
@@ -1518,6 +1520,13 @@
                      this.showAdminCodeInput = false; this.adminCode = ''; this.adminCodeError = ''; this.statusMessage = '';
                      this.showSchoolIdModal = false; this.newSchoolId = ''; this.schoolIdError = '';
                      this.resetAllLocalData(false); // Reset local data but keep user/schoolId
+                },
+                // 1) 학교 ID 수정 모달을 여는 함수 추가
+                openSchoolIdModal() {
+                    this.schoolIdMode = this.role === '관리자' ? 'create' : 'join';
+                    this.newSchoolId = this.schoolId; // 현재 ID로 미리 채우기
+                    this.schoolIdError = '';
+                    this.showSchoolIdModal = true;
                 },
                 async saveUserRole(roleToSave) {
                      if (!this.user || !db) return;
@@ -2760,5 +2769,7 @@
     </script>
 </body>
 </html>
+
+
 
 
