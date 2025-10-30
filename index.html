@@ -188,9 +188,13 @@
                 max-width: 100% !important; max-height: none !important;
                 overflow: visible !important; display: block !important;
             }
-            #print-area-container-in-modal,
+            #print-area-container-in-modal {
+                visibility: visible !important;
+                display: block !important;
+            }
             #print-area-container-in-modal * {
-                visibility: visible !important; display: block !important;
+                visibility: visible !important;
+                /* display: block !important;  <-- 이 줄을 제거하거나 주석 처리합니다. */
             }
             #print-area {
                 padding: 0 !important; margin: 0 !important;
@@ -201,7 +205,7 @@
             #print-area table { font-size: 9pt !important; }
             #print-area th, #print-area td { padding: 5px !important; }
             @page { size: A4 portrait; margin: 20mm; }
-            .page-break { page-break-after: always !important; }
+            .page-break:not(:last-child) { page-break-after: always !important; }
             img { max-width: 100% !important; height: auto !important; visibility: visible !important; }
         }
     </style>
@@ -1851,7 +1855,6 @@
                      });
 
                      allPreviewsHtml = studentDocs.map((doc, index) => {
-                         const style = (index < studentDocs.length - 1) ? 'page-break-after: always;' : '';
                          return `<div class="page-break" style="${style}">${doc}</div>`;
                      }).join('');
                      
