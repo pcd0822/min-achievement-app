@@ -998,18 +998,7 @@
 
             // --- Computed Properties ---
             computed: {
-                // Combined status message for preview modal
-                statusText() {
-                    return this.teacherPlanError || this.adminActionStatus || this.moduleConfigStatus || this.underachieversStatus || this.teacherPlanStatus || '';
-                },
-                // Dynamic class for preview modal status
-                statusClass() {
-                    const text = this.statusText;
-                    if (text.includes('오류') || text.includes('실패')) return 'text-red-500';
-                    if (text.includes('완료') || text.includes('성공') || text.includes('저장됨') || text.includes('배포됨')) return 'text-green-600';
-                    if (text.includes('중')) return 'text-blue-600';
-                    return 'text-gray-600';
-                },
+                // ... (statusText, statusClass, formattedTeacherNames computed properties) ...
                 formattedTeacherNames() {
                     if (!this.teacherPlan || !this.teacherPlan.teacherNames) return '';
                     return this.teacherPlan.teacherNames
@@ -1037,6 +1026,689 @@
                             } else { allSubjects.get(subject.name).grade = true; }
                         });
  
+                        (student.attendanceSubjects || []).forEach(subject => {
+                            if (!subject) return;
+                            if (!allSubjects.has(subject)) {
+                                allSubjects.set(subject, { grade: false, attendance: true, credits: 'N/A' });
+                            } else { allSubjects.get(subject.name).attendance = true; }
+                        });
+
+                        allSubjects.forEach((info, subjectName) => {
+                            let reason = '';
+                            if (info.grade && info.attendance) reason = '학업성취율 & 과목출석률';
+                            else if (info.grade) reason = '학업성취율';
+                            else if (info.attendance) reason = '과목출석률';
+                            
+                            if (reason) {
+                                if (!subjectsByReason.has(reason)) subjectsByReason.set(reason, []);
+                                subjectsByReason.get(reason).push({ name: subjectName, credits: info.credits });
+                            }
+                        });
+
+                        subjectsByReason.forEach((subjects, reason) => {
+                            const subjectsFmt = subjects.map(s => `${s.name}(${s.credits})`).join(', ');
+                            const totalCredits = subjects.reduce((acc, s) => { const num = parseFloat(s.credits); return isNaN(num) ? acc : acc + num; }, 0);
+                            const lessonDetails = `총 ${totalCredits}학점 (보충지도 ${this.teacherPlan.maxSupplementaryHours || '?'}시간 필요)`;
+                            
+                            studentEntry.details.push({
+                                id: student.id,
+                                reason: reason,
+                                subjects: subjectsFmt,
+                                lessonDetails: lessonDetails,
+                                originalSubjects: subjects
+                            });
+                        });
+                        
+                        if (studentEntry.details.length > 0) result.push(studentEntry);
+                    });
+                    
+                    result.sort((a,b) => a.id.localeCompare(b.id));
+                    return result; // <-- FIX: Added return statement
+                },
+            }, // <-- FIX: Closed computed object
+
+            // --- Methods ---
+            // FIX: Re-added missing methods: { ... } wrapper
+            methods: {
+                // --- Authentication & Role Methods (Restored) ---
+                initApp() {
+                    if (!auth) {
+                        console.error("Firebase Auth is not initialized.");
+                        this.isLoading = false; // Stop loading even if auth fails
+                        return;
+                    }
+                    console.log("initApp started, setting up auth listener...");
+                    this.isLoading = true; // Set loading to true at the start
+
+                    onAuthStateChanged(auth, async (user) => {
+                        console.log("onAuthStateChanged triggered. User:", user ? user.uid : 'null');
+                        if (user) {
+                            this.user = { uid: user.uid, email: user.email, displayName: user.displayName };
+                            this.isLoggedIn = true;
+                            
+                            // User is logged in, now determine role and school
+                            const schoolIdGuess = this.extractSchoolIdFromEmail(user.email);
+                            if (!schoolIdGuess) {
+                                 console.error("Could not determine school ID from email:", user.email);
+                                 this.statusMessage = "학교 ID를 이메일에서 추출할 수 없습니다. (예: user@schoolid.es.kr)";
+                                 this.isLoggedIn = false; // Log them out conceptually
+                                 this.user = null;
+                                 this.isLoading = false;
+                                 await this.logout(); // Force logout
+                                 return;
+                            }
+                            this.schoolId = schoolIdGuess;
+                            console.log("School ID set:", this.schoolId);
+
+                            // Try to load user's role
+                            try {
+                                const userRoleDoc = await this.loadUserRole();
+                                if (userRoleDoc) {
+                                    this.role = userRoleDoc.role;
+                                    console.log("Role loaded from Firestore:", this.role);
+                                    // Role loaded, now load school-specific data
+                                    await this.loadSchoolData();
+                                } else {
+                                    this.role = null; // No role saved, modal should appear
+                                    console.log("No role found in Firestore, role set to null.");
+                                }
+                            } catch (error) {
+                                console.error("Error loading user role:", error);
+                                this.statusMessage = "사용자 역할 로딩 중 오류 발생";
+                                this.role = null; // Ensure modal appears even on error
+                            }
+                            
+                        } else {
+                            // User is logged out
+                            this.user = null;
+                            this.isLoggedIn = false;
+                            this.role = null;
+                            this.schoolId = null;
+                            this.resetAllLocalData(true); // Reset all data
+                            console.log("User is logged out.");
+                        }
+                        
+                        // CRITICAL: Set isLoading to false *after* all auth logic is done
+                        this.isLoading = false;
+                        console.log("initApp: isLoading set to false.");
+                    });
+                },
+                extractSchoolIdFromEmail(email) {
+                    if (!email) return null;
+                    const parts = email.split('@');
+                    if (parts.length !== 2) return null;
+                    const domain = parts[1];
+                    // Standard: user@schoolid.hs.kr, user@schoolid.es.kr etc.
+                    const match = domain.match(/^([a-zA-Z0-9-]+)\.(hs|ms|es|go)\.kr$/);
+                    if (match && match[1]) {
+                        return match[1];
+                    }
+                    // Fallback for domains like schoolid.kr
+                    const fallbackMatch = domain.match(/^([a-zA-Z0-9-]+)\.kr$/);
+                    if(fallbackMatch && fallbackMatch[1]) {
+                         return fallbackMatch[1];
+                    }
+                    // Fallback for non-.kr domains (e.g. gmail.com) - less reliable
+                    // This is a placeholder, might need better logic
+                    if (domain.includes('gmail.com') || domain.includes('naver.com')) {
+                        // In a real app, we'd block this or have a different flow
+                        // For this demo, maybe use a default or part of the email name
+                        return null; // Block public domains
+                    }
+                    return domain.split('.')[0]; // Best guess
+                },
+                async login() {
+                    if (!auth) { console.error("Auth not ready"); return; }
+                    this.statusMessage = '';
+                    const provider = new GoogleAuthProvider();
+                    try {
+                        await signInWithPopup(auth, provider);
+                        // onAuthStateChanged will handle the rest
+                        console.log("Login popup initiated...");
+                    } catch (error) {
+                        console.error("Google Login Error:", error);
+                        this.statusMessage = `로그인 실패: ${error.message}`;
+                    }
+                },
+                async logout() {
+                    if (!auth) { console.error("Auth not ready"); return; }
+                    try {
+                        await signOut(auth);
+                        // onAuthStateChanged will handle reset
+                        console.log("Logout successful.");
+                    } catch (error) {
+                        console.error("Logout Error:", error);
+                    }
+                },
+                async selectRole(selectedRole) {
+                    if (!this.user || !this.schoolId) { console.error("No user or school ID"); return; }
+                    this.statusMessage = '';
+
+                    if (selectedRole === '관리자') {
+                        this.showAdminCodeInput = true;
+                        return;
+                    }
+                    
+                    try {
+                        await this.saveUserRole(selectedRole);
+                        this.role = selectedRole;
+                        await this.loadSchoolData(); // Load data after role is set
+                    } catch (error) {
+                        console.error("Error setting role:", error);
+                        this.statusMessage = `역할 저장 실패: ${error.message}`;
+                    }
+                },
+                async submitAdminCode() {
+                    if (this.adminCode === '0822') {
+                        this.adminCodeError = '';
+                        this.showAdminCodeInput = false;
+                        await this.selectRole('관리자'); // Call selectRole again, this time to save it
+                    } else {
+                        this.adminCodeError = '코드가 올바르지 않습니다.';
+                    }
+                },
+                async resetRole() {
+                    if (!this.user || !this.schoolId) return;
+                    this.statusMessage = '역할 재설정 중...';
+                    try {
+                        // Delete role doc
+                        const userRoleDocRef = doc(db, 'schools', this.schoolId, 'users', this.user.uid);
+                        await setDoc(userRoleDocRef, { role: null }); // Set to null instead of deleting
+                        
+                        // Reset local state
+                        this.role = null;
+                        this.resetAllLocalData(false); // Reset data but keep auth
+                        this.statusMessage = '역할이 초기화되었습니다. 다시 선택해주세요.';
+                    } catch (error) {
+                        console.error("Error resetting role:", error);
+                        this.statusMessage = `역할 초기화 실패: ${error.message}`;
+                    }
+                },
+                async saveUserRole(roleToSave) {
+                    if (!this.user || !this.schoolId) throw new Error("User or School ID is missing.");
+                    console.log(`Saving role '${roleToSave}' for user ${this.user.uid} at school ${this.schoolId}`);
+                    const userRoleDocRef = doc(db, 'schools', this.schoolId, 'users', this.user.uid);
+                    await setDoc(userRoleDocRef, { 
+                        role: roleToSave,
+                        email: this.user.email,
+                        lastLogin: new Date().toISOString()
+                    });
+                    console.log("Role saved successfully.");
+                },
+                async loadUserRole() {
+                    if (!this.user || !this.schoolId) {
+                        console.log("loadUserRole: No user or schoolId, returning null.");
+                        return null;
+                    }
+                    console.log(`loadUserRole: Loading role for user ${this.user.uid} at school ${this.schoolId}`);
+                    try {
+                        const userRoleDocRef = doc(db, 'schools', this.schoolId, 'users', this.user.uid);
+                        const docSnap = await getDoc(userRoleDocRef);
+                        if (docSnap.exists()) {
+                            console.log("loadUserRole: Document found:", docSnap.data());
+                            return docSnap.data(); // e.g., { role: '교과교사' }
+                        } else {
+                            console.log("loadUserRole: No role document found.");
+                            return null;
+                        }
+                    } catch (error) {
+                        console.error("Error fetching user role:", error);
+                        throw error; // Re-throw to be caught by initApp
+                    }
+                },
+                
+                // --- Data Loading Methods (Restored) ---
+                async loadSchoolData() {
+                    if (!this.schoolId) {
+                        console.error("loadSchoolData: No schoolId.");
+                        this.isLoading = false;
+                        return;
+                    }
+                    console.log(`loadSchoolData: Loading data for school ${this.schoolId}`);
+                    this.isLoading = true;
+                    try {
+                        const dataTypes = ['curriculum', 'student', 'emotionalSupport', 'moduleConfig', 'newsletterForm', 'pledgeForm', 'underachievers'];
+                        const dataPromises = dataTypes.map(type => {
+                            const docRef = doc(db, 'schools', this.schoolId, 'commonData', type);
+                            return getDoc(docRef);
+                        });
+                        
+                        const docSnaps = await Promise.all(dataPromises);
+                        
+                        docSnaps.forEach((docSnap, index) => {
+                            const type = dataTypes[index];
+                            if (docSnap.exists()) {
+                                const data = docSnap.data();
+                                if (type === 'curriculum') this.curriculumData = data.data || [];
+                                else if (type === 'student') this.studentData = data.data || [];
+                                else if (type === 'emotionalSupport') this.emotionalSupportData = data.data || [];
+                                else if (type === 'moduleConfig') Object.assign(this.moduleConfig, data);
+                                else if (type === 'newsletterForm') Object.assign(this.newsletterForm, data);
+                                else if (type === 'pledgeForm') Object.assign(this.pledgeForm, data);
+                                else if (type === 'underachievers') this.deployedUnderachievers = data.list || [];
+                                console.log(`Loaded data for ${type}`);
+                            } else {
+                                console.log(`No data found for ${type}, using defaults.`);
+                            }
+                        });
+
+                        // After loading common data, load teacher-specific data if applicable
+                        if (this.role === '교과교사' && this.teacherPlan.subjectName) {
+                            await this.loadTeacherPlan();
+                            await this.loadGuidanceData();
+                        }
+                        
+                        this.statusMessage = '학교 데이터를 성공적으로 불러왔습니다.';
+                    } catch (error) {
+                        console.error("Error loading school data:", error);
+                        this.statusMessage = `학교 데이터 로딩 실패: ${error.message}`;
+                    } finally {
+                        this.isLoading = false;
+                        console.log("loadSchoolData: Finished.");
+                    }
+                },
+                
+                // --- Helper Functions (Restored) ---
+                getInitialTeacherPlan() {
+                     return {
+                         subjectName: '', maxSupplementaryHours: 0, teacherNames: [''], aiProvider: 'gemini', apiKey: '',
+                         achievements: [{ text: '', statement: '', loading: false }],
+                         gradeCalculation: '추정분할점수', conductPrevention: 'O',
+                         preventionTarget: '1차 지필평가 및 수행평가 합산 결과 성취율 40% 미만이 예상되는 학생',
+                         preventionMethods: [], preventionPeriod: [], preventionSessions: [{ plan: '' }],
+                         supplementaryMethods: [], supplementaryPeriod: [], supplementarySessions: [{ plan: '' }],
+                     };
+                },
+                getInitialGuidanceData() {
+                     return {
+                         preventive: { students: [], sessions: [], error: '' },
+                         supplementary: { students: [], sessions: [], error: '' }
+                     };
+                },
+                initFlatpickr() {
+                    const now = new Date();
+                    const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+                     // Range pickers
+                     document.querySelectorAll('.flatpickr-range').forEach(el => {
+                         const isPrevention = el.closest('.space-y-4')?.innerHTML.includes('예방지도 운영 기간');
+                         const periodKey = isPrevention ? 'preventionPeriod' : 'supplementaryPeriod';
+                         
+                         flatpickr(el, {
+                             mode: "range",
+                             dateFormat: "Y-m-d",
+                             locale: "ko",
+                             defaultDate: this.teacherPlan[periodKey] && this.teacherPlan[periodKey].length > 0 ? this.teacherPlan[periodKey] : [now, nextWeek],
+                             onChange: (selectedDates) => {
+                                 this.teacherPlan[periodKey] = selectedDates;
+                                 this.saveTeacherPlan();
+                             }
+                         });
+                     });
+
+                     // Single date pickers (in attendance tables)
+                     document.querySelectorAll('.flatpickr-single').forEach(el => {
+                         // Find session index
+                         const th = el.closest('th');
+                         if (!th) return;
+                         const sessionIndex = Array.from(th.parentNode.children).indexOf(th) - 2; // -2 for 학번, 이름
+                         const type = this.teacherTab;
+                         
+                         if (sessionIndex < 0 || !this.teacherGuidanceData[type] || !this.teacherGuidanceData[type].sessions[sessionIndex]) return;
+                         
+                         const session = this.teacherGuidanceData[type].sessions[sessionIndex];
+                         
+                         flatpickr(el, {
+                             dateFormat: "Y-m-d",
+                             locale: "ko",
+                             defaultDate: session.date || new Date(),
+                             disable: [session.isSaved ? (date) => true : (date) => false], // Disable if saved
+                             onChange: (selectedDates) => {
+                                 if (selectedDates[0]) {
+                                     session.date = selectedDates[0].toISOString().split('T')[0];
+                                     this.saveGuidanceData(); // Save on change
+                                 }
+                             }
+                         });
+                     });
+                },
+                handleSubjectChange() {
+                    this.teacherPlanStatus = '과목명 변경 감지...';
+                    this.updateMaxHours();
+                    this.resetTeacherData(true); // Reset guidance data
+                    this.saveTeacherPlan(); // Save new plan structure
+                    this.loadTeacherPlan(); // Load existing plan for this subject
+                    this.loadGuidanceData(); // Load existing guidance data
+                    this.teacherPlanStatus = '과목 정보가 갱신되었습니다.';
+                },
+                
+                // --- Teacher Plan Save/Load (Restored) ---
+                async saveTeacherPlan() {
+                     if (this.role !== '교과교사' || !this.schoolId || !this.teacherPlan.subjectName) return;
+                     this.teacherPlanStatus = '저장 중...';
+                     try {
+                         const subjectPlanDocRef = doc(db, 'schools', this.schoolId, 'teacherPlans', this.teacherPlan.subjectName);
+                         // Convert Date objects to ISO strings for Firestore
+                         const planToSave = JSON.parse(JSON.stringify(this.teacherPlan));
+                         if(planToSave.preventionPeriod) planToSave.preventionPeriod = planToSave.preventionPeriod.map(d => d ? new Date(d).toISOString() : null);
+                         if(planToSave.supplementaryPeriod) planToSave.supplementaryPeriod = planToSave.supplementaryPeriod.map(d => d ? new Date(d).toISOString() : null);
+                         
+                         await setDoc(subjectPlanDocRef, planToSave);
+                         this.teacherPlanStatus = '계획안이 저장되었습니다.';
+                     } catch (error) {
+                         console.error("Error saving teacher plan:", error);
+                         this.teacherPlanStatus = `저장 오류: ${error.message}`;
+                     }
+                },
+                async loadTeacherPlan() {
+                    if (this.role !== '교과교사' || !this.schoolId || !this.teacherPlan.subjectName) return;
+                    this.teacherPlanStatus = '계획안 로딩 중...';
+                    try {
+                        const subjectPlanDocRef = doc(db, 'schools', this.schoolId, 'teacherPlans', this.teacherPlan.subjectName);
+                        const docSnap = await getDoc(subjectPlanDocRef);
+                        if (docSnap.exists()) {
+                            const loadedPlan = docSnap.data();
+                            // Convert ISO strings back to Date objects
+                            if (loadedPlan.preventionPeriod) loadedPlan.preventionPeriod = loadedPlan.preventionPeriod.map(d => d ? new Date(d) : null);
+                            if (loadedPlan.supplementaryPeriod) loadedPlan.supplementaryPeriod = loadedPlan.supplementaryPeriod.map(d => d ? new Date(d) : null);
+                            
+                            Object.assign(this.teacherPlan, loadedPlan);
+                            this.updateMaxHours(); // Ensure max hours is correct
+                            this.teacherPlanStatus = '저장된 계획안을 불러왔습니다.';
+                        } else {
+                            this.teacherPlanStatus = '저장된 계획안이 없습니다. 새로 작성합니다.';
+                            this.updateMaxHours(); // Set max hours for new plan
+                        }
+                    } catch (error) {
+                        console.error("Error loading teacher plan:", error);
+                        this.teacherPlanStatus = `로딩 오류: ${error.message}`;
+                    } finally {
+                        this.$nextTick(() => this.initFlatpickr());
+                    }
+                },
+
+                // --- Guidance Data Save/Load (Restored) ---
+                async saveGuidanceData() {
+                    if (this.role !== '교과교사' || !this.schoolId || !this.teacherPlan.subjectName) return;
+                    console.log("Saving guidance data...");
+                    try {
+                        const guidanceDocRef = doc(db, 'schools', this.schoolId, 'guidanceData', this.teacherPlan.subjectName);
+                        const dataToSave = JSON.parse(JSON.stringify(this.teacherGuidanceData));
+                        await setDoc(guidanceDocRef, dataToSave);
+                        console.log("Guidance data saved successfully.");
+                    } catch (error) {
+                        console.error("Error saving guidance data:", error);
+                    }
+                },
+                async loadGuidanceData() {
+                    if (this.role !== '교과교사' || !this.schoolId || !this.teacherPlan.subjectName) return;
+                    console.log("Loading guidance data...");
+                    try {
+                        const guidanceDocRef = doc(db, 'schools', this.schoolId, 'guidanceData', this.teacherPlan.subjectName);
+                        const docSnap = await getDoc(guidanceDocRef);
+                        if (docSnap.exists()) {
+                            const loadedData = docSnap.data();
+                            // Merge carefully to avoid overwriting defaults if data is partial
+                            if(loadedData.preventive) Object.assign(this.teacherGuidanceData.preventive, loadedData.preventive);
+                            if(loadedData.supplementary) Object.assign(this.teacherGuidanceData.supplementary, loadedData.supplementary);
+                            console.log("Loaded guidance data.");
+                        } else {
+                            console.log("No existing guidance data, using defaults.");
+                        }
+                    } catch (error) {
+                        console.error("Error loading guidance data:", error);
+                    } finally {
+                        this.filterSupplementaryStudents(); // Ensure list is correct
+                        this.$nextTick(() => this.initFlatpickr());
+                    }
+                },
+                
+                // --- Admin Methods (Restored) ---
+                downloadTemplate(type) {
+                     let data, filename;
+                     if (type === 'curriculum') {
+                         data = [['학년', '학기', '과목명', '학점']];
+                         filename = 'curriculum_template.xlsx';
+                     } else if (type === 'student') {
+                         data = [['학번', '이름', '특기사항']];
+                         filename = 'student_template.xlsx';
+                     } else if (type === 'emotionalSupport') {
+                         data = [['학번', '이름', '이수시간']];
+                         filename = 'emotional_support_template.xlsx';
+                     } else return;
+                     const ws = XLSX.utils.aoa_to_sheet(data);
+                     const wb = XLSX.utils.book_new();
+                     XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+                     XLSX.writeFile(wb, filename);
+                },
+                uploadFile(event, type) {
+                     if (this.role !== '관리자' || !this.schoolId) return;
+                     this.uploadStatus[type] = '파일 처리 중...';
+                     const file = event.target.files[0];
+                     if (!file) { this.uploadStatus[type] = ''; return; }
+                     const reader = new FileReader();
+                     reader.onload = async (e) => {
+                         try {
+                             const data = new Uint8Array(e.target.result);
+                             const workbook = XLSX.read(data, { type: 'array' });
+                             const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                             const jsonData = XLSX.utils.sheet_to_json(sheet);
+                             
+                             if (jsonData.length === 0) throw new Error("파일에 데이터가 없습니다.");
+                             
+                             // Save to Firestore
+                             const docRef = doc(db, 'schools', this.schoolId, 'commonData', type);
+                             await setDoc(docRef, { data: jsonData, lastUpdated: new Date().toISOString() });
+                             
+                             // Update local state
+                             if (type === 'curriculum') this.curriculumData = jsonData;
+                             else if (type === 'student') this.studentData = jsonData;
+                             else if (type === 'emotionalSupport') this.emotionalSupportData = jsonData;
+                             
+                             this.uploadStatus[type] = '업로드 및 저장 완료.';
+                         } catch (error) {
+                             console.error(`Error uploading ${type}:`, error);
+                             this.uploadStatus[type] = `오류: ${error.message}`;
+                         } finally {
+                             if(event.target) event.target.value = null; // Clear file input
+                         }
+                     };
+                     reader.readAsArrayBuffer(file);
+                },
+                handleImageUpload(event, formType, field) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        this[formType + 'Form'][field] = e.target.result;
+                        // Do not auto-save here, wait for user to click save button
+                    };
+                    reader.readAsDataURL(file);
+                },
+                async saveModuleConfig() {
+                    if (this.role !== '관리자' || !this.schoolId) return;
+                    this.moduleConfigStatus = '저장 중...';
+                    try {
+                        const docRef = doc(db, 'schools', this.schoolId, 'commonData', 'moduleConfig');
+                        await setDoc(docRef, this.moduleConfig);
+                        this.moduleConfigStatus = '운영 모듈이 저장되었습니다.';
+                    } catch (error) {
+                        console.error("Error saving module config:", error);
+                        this.moduleConfigStatus = `저장 오류: ${error.message}`;
+                    }
+                },
+                async saveFormTemplates() {
+                    if (this.role !== '관리자' || !this.schoolId) return;
+                    this.adminActionStatus = '양식 저장 중...';
+                    try {
+                        const batch = writeBatch(db);
+                        const newsletterRef = doc(db, 'schools', this.schoolId, 'commonData', 'newsletterForm');
+                        batch.set(newsletterRef, this.newsletterForm);
+                        const pledgeRef = doc(db, 'schools', this.schoolId, 'commonData', 'pledgeForm');
+                        batch.set(pledgeRef, this.pledgeForm);
+                        await batch.commit();
+                        this.adminActionStatus = '가정통신문 및 서약서 양식이 저장되었습니다.';
+                    } catch (error) {
+                        console.error("Error saving form templates:", error);
+                        this.adminActionStatus = `양식 저장 오류: ${error.message}`;
+                    }
+                },
+                async deployUnderachievers() {
+                    if (this.role !== '관리자' || !this.schoolId) return;
+                    this.underachieversStatus = '명단 배포 중...';
+                    try {
+                        const docRef = doc(db, 'schools', this.schoolId, 'commonData', 'underachievers');
+                        await setDoc(docRef, { list: this.underachievers, lastUpdated: new Date().toISOString() });
+                        this.deployedUnderachievers = this.underachievers; // Update local deployed list
+                        this.underachieversStatus = '명단이 확정 및 배포되었습니다.';
+                    } catch (error) {
+                        console.error("Error deploying underachievers:", error);
+                        this.underachieversStatus = `배포 오류: ${error.message}`;
+                    }
+                },
+                
+                // --- PDF & Preview Methods (Restored & Fixed) ---
+                async generatePdfFromHtml(html, orientation = 'p', filename = 'document.pdf') {
+                    const printContainer = document.getElementById('print-area-container');
+                    if (!printContainer) {
+                         alert("인쇄용 컨테이너(#print-area-container)를 찾을 수 없습니다.");
+                         return;
+                    }
+                    printContainer.innerHTML = html;
+                    printContainer.style.position = 'absolute';
+                    printContainer.style.left = '-9999px';
+                    printContainer.style.width = orientation === 'p' ? '800px' : '1120px'; // A4 width approximation
+                    printContainer.classList.remove('hidden');
+                    
+                    const printContent = printContainer.querySelector('#print-area');
+                    if (!printContent) {
+                        alert("인쇄할 영역(#print-area)을 찾을 수 없습니다.");
+                        cleanup();
+                        return;
+                    }
+                    
+                    const statusVar = this.role === '교과교사' ? 'teacherPlanStatus' : 'adminActionStatus';
+                    this[statusVar] = 'PDF 생성 중...';
+                    
+                    const cleanup = () => {
+                        printContainer.innerHTML = '';
+                        printContainer.classList.add('hidden');
+                        printContainer.style = '';
+                    };
+
+                    try {
+                        const canvas = await html2canvas(printContent, { scale: 2, useCORS: true });
+                        const imgData = canvas.toDataURL('image/png');
+                        const { jsPDF } = window.jspdf;
+                        const pdf = new jsPDF(orientation, 'mm', 'a4');
+                        const margin = 15;
+                        const pdfWidth = pdf.internal.pageSize.getWidth() - (margin * 2);
+                        const pdfHeight = pdf.internal.pageSize.getHeight() - (margin * 2);
+                        const imgProps = pdf.getImageProperties(imgData);
+                        const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
+                        
+                        let heightLeft = imgHeight;
+                        let position = 0;
+
+                        pdf.addImage(imgData, 'PNG', margin, margin, pdfWidth, imgHeight);
+                        heightLeft -= pdfHeight;
+
+                        while (heightLeft > 0) {
+                            position -= pdfHeight;
+                            pdf.addPage();
+                            pdf.addImage(imgData, 'PNG', margin, margin + position, pdfWidth, imgHeight); // Use margin + position
+                            heightLeft -= pdfHeight;
+                        }
+                        
+                        pdf.save(filename);
+                        this[statusVar] = 'PDF 생성 완료.';
+                    } catch (error) {
+                        console.error("PDF generation error:", error);
+                        this[statusVar] = `PDF 생성 오류: ${error.message}`;
+                    } finally {
+                        cleanup();
+                        setTimeout(() => { if (this[statusVar] === 'PDF 생성 완료.') this[statusVar] = '' }, 3000);
+                    }
+                },
+                previewForm(type, studentsToPrint) {
+                     this.adminActionStatus = '';
+                     if (!studentsToPrint || studentsToPrint.length === 0) {
+                         this.adminActionStatus = '미리보기: 대상 학생이 없습니다. (관리자 탭에서 먼저 대상자를 선정하세요.)';
+                         studentsToPrint = [{ id: '10101', name: '홍길동', gradeSubjects: [{ name: '예시 과목', credits: 3 }], attendanceSubjects: [] }];
+                     }
+
+                     const formTemplate = (type === 'newsletter') ? this.newsletterForm : this.pledgeForm;
+                     const schoolInfo = this.studentData.length > 0 ? this.studentData[0]['학교명'] : (this.schoolId ? `${this.schoolId}고등학교` : 'OO고등학교'); // Guess school name
+                     const schoolName = schoolInfo.replace(/ /g, ''); // 교명 띄어쓰기 제거
+                     
+                     const studentDocs = studentsToPrint.map(student => {
+                         const studentInfo = this.studentData.find(s => String(s.학번) === student.id) || { 학번: student.id, 이름: student.name };
+                         const grade = String(studentInfo.학번).substring(0, 1);
+                         const classNum = String(studentInfo.학번).substring(1, 3);
+                         const num = String(studentInfo.학번).substring(3, 5);
+
+                         let subjects = [];
+                         if (student.gradeSubjects) subjects.push(...student.gradeSubjects.map(s => `${s.name}(학업성취율)`));
+                         if (student.attendanceSubjects) subjects.push(...student.attendanceSubjects.map(s => `${s.name}(과목출석률)`));
+                         
+                         const subjectList = subjects.length > 0 ? subjects.join(', ') : '해당 없음';
+                         
+                         let bodyContent = '';
+                         if (type === 'newsletter') {
+                             bodyContent = `
+                                 ${formTemplate.logoUrl ? `<img src="${formTemplate.logoUrl}" alt="학교 로고" style="max-height: 80px; margin-bottom: 20px;">` : ''}
+                                 <p style="text-align: right; margin-bottom: 10px;">${formTemplate.docNumber}</p>
+                                 <p style="text-align: right;">${formTemplate.department}</p>
+                                 <h1 style="margin-bottom: 30px;">${formTemplate.title}</h1>
+                                 <div class="whitespace-pre-wrap" style="min-height: 150px;">${formTemplate.body}</div>
+                                 <h3 style="text-align: center; margin-top: 30px;">- 대상 학생 정보 -</h3>
+                                 <table>
+                                     <thead>
+                                         <tr><th>학년</th><th>반</th><th>번호</th><th>성명</th><th>미도달 사유(과목)</th></tr>
+                                     </thead>
+                                     <tbody>
+                                         <tr><td>${grade}</td><td>${classNum}</td><td>${num}</td><td>${studentInfo.이름}</td><td class="text-left">${subjectList}</td></tr>
+                                     </tbody>
+                                 </table>
+                                 <h4 style="text-align: center; margin-top: 50px;">${formTemplate.dispatchDate}</h4>
+                             `;
+                         } else { // pledge
+                             bodyContent = `
+                                 <h1 style="margin-bottom: 50px;">서 약 서</h1>
+                                 <div class="whitespace-pre-wrap" style="min-height: 100px; font-size: 1.1rem; line-height: 1.8;">${formTemplate.content}</div>
+                                 <h3 style="text-align: center; margin-top: 40px;">- 대상 학생 정보 -</h3>
+                                 <table>
+                                     <thead>
+                                         <tr><th>학년</th><th>반</th><th>번호</th><th>성명</th><th>미도달 사유(과목)</th></tr>
+                                     </thead>
+                                     <tbody>
+                                         <tr><td>${grade}</td><td>${classNum}</td><td>${num}</td><td>${studentInfo.이름}</td><td class="text-left">${subjectList}</td></tr>
+                                     </tbody>
+                                 </table>
+                                 <h4 style="text-align: center; margin-top: 50px;">${formTemplate.dispatchDate}</h4>
+                                 <div class="signature-section">
+                                     <span>학 생: ${studentInfo.이름} (서명)</span>
+                                     <span>학부모: (서명)</span>
+                                 </div>
+                             `;
+                         }
+                         
+                         if (formTemplate.includeSeal && formTemplate.sealUrl) {
+                             bodyContent += `
+                                 <div class="seal-section">
+                                     <div class="school-name">${schoolName}장</div>
+                                     <img src="${formTemplate.sealUrl}" alt="학교장 날인">
+                                 </div>
+                             `;
+                         } else if (formTemplate.includeSeal) {
+                            bodyContent += `<h3 class="seal-section school-name">${schoolName}장</h3>`;
+                         }
+                         
+                         return bodyContent;
+                     });
+
+                     let allPreviewsHtml = '';
+                     // FIX: Apply the correct fix here
                      allPreviewsHtml = studentDocs.map((doc, index) => {
                          return `<div class="page-break">${doc}</div>`;
                      }).join('');
@@ -1044,6 +1716,9 @@
                      this.previewHtml = `<div id="print-area">${allPreviewsHtml}</div>`;
                      this.showPreviewModal = true;
                 },
+
+                // --- (All other methods from 'previewFormAdmin' to 'resetTeacherData' are now correctly inside the 'methods' object) ---
+                
                  // Admin-specific preview function
                  previewFormAdmin(type) {
                      this.previewForm(type, this.underachievers.length > 0 ? this.underachievers : []);
@@ -1819,7 +2494,7 @@
                      this.teacherPlanError = ''; this.teacherPlanStatus = ''; this.newGuidanceStudentId = '';
                      console.log("Teacher data reset.");
                 },
-            },
+            }, // <-- FIX: Closed the new methods object
 
             // --- Mounted Hook ---
             mounted() {
@@ -1833,5 +2508,6 @@
     </script>
 </body>
 </html>
+
 
 
