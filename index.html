@@ -129,114 +129,85 @@
 
         [v-cloak] { display: none; }
 
-        .table-cell-content {
-            padding: 0.5rem 0;
-            min-height: 2.5rem;
-            display: flex;
-            align-items: center;
-        }
+        .scroll-arrow.left { left: -1.25rem; }
+        .scroll-arrow.right { right: -1.25rem; }
 
-        .table-cell-content:not(:last-child) {
-            border-bottom: 1px solid #e5e7eb;
-        }
+        /* 인쇄 전용 스타일 (안정적인 버전으로 수정) */
+        @media print {
+            /* 1. 기본 인쇄 설정 */
+            body {
+                margin: 0;
+                padding: 0;
+                background-color: white;
+            }
+            
+            /* 2. 인쇄 불필요 UI 요소 명시적 숨기기 */
+            body > header, 
+            body > main,
+            .modal-overlay .modal-content > div:not(#print-area-container-in-modal), /* 모달 내 버튼, 상태메시지 숨기기 */
+            .scroll-arrow {
+                display: none !important;
+            }
 
-        .scroll-arrow {
-            position: absolute;
-            top: 50%;
-            transform: translateY(-50%);
-            z-index: 30;
-            width: 2.5rem;
-            height: 2.5rem;
-            border-radius: 9999px;
-            background-color: rgba(255, 255, 255, 0.7);
-            backdrop-filter: blur(4px);
-            border: 1px solid rgba(0, 0, 0, 0.1);
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-            color: #4a5568;
-            transition: all 0.2s ease-in-out;
-        }
-        .scroll-arrow:hover {
-            background-color: rgba(255, 255, 255, 0.9);
-            transform: translateY(-50%) scale(1.1);
-        }
-        .scroll-arrow.left { left: -1.25rem; }
-        .scroll-arrow.right { right: -1.25rem; }
+            /* 3. 모달 관련 스타일 리셋 (인쇄 시 화면을 가리지 않도록) */
+            .modal-overlay {
+                position: static !important;
+                background: none !important;
+                overflow: visible !important;
+                display: block !important;
+                width: 100%;
+                height: 100%;
+                z-index: auto;
+            }
+            .modal-content {
+                border: none !important;
+                box-shadow: none !important;
+                padding: 0 !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                max-height: none !important;
+                overflow: visible !important;
+                display: block !important;
+            }
+            
+            /* 4. 인쇄할 컨테이너 및 내용 보이기 */
+            #print-area-container-in-modal,
+            #print-area-container-in-modal * {
+                visibility: visible !important; /* visibility: visible로 되돌림 */
+                display: block !important; /* display도 block으로 보장 */
+            }
 
-        /* 인쇄 전용 스타일 */
-        @media print {
-            body {
-                margin: 0;
-                padding: 0;
-                background-color: white;
-            }
-            /* 인쇄 시 모든 요소 숨기기 */
-            body * {
-                visibility: hidden;
-            }
-            /* 인쇄할 영역(#print-area)과 그 자식 요소만 보이게 설정 */
-            /* 모달창 내부의 #print-area를 타겟팅 */
-            .modal-overlay #print-area, .modal-overlay #print-area * {
-                visibility: visible;
-            }
-            /* 인쇄할 영역을 페이지 최상단으로 이동 */
-            .modal-overlay #print-area {
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 100%;
-                margin: 0;
-                padding: 0;
-                border: none;
-                box-shadow: none;
-                font-size: 10pt;
-                color: black !important;
-                background: white !important;
-            }
-            /* 모달 오버레이 자체는 인쇄되지 않도록 함 */
-            .modal-overlay {
-                 background: transparent;
-                 overflow: visible;
-                 position: static;
-            }
-            /* 모달 컨텐츠 박스도 인쇄되지 않도록 함 */
-             .modal-content {
-                 border: none;
-                 box-shadow: none;
-                 padding: 0;
-                 width: 100%;
-                 max-width: 100%;
-                 max-height: none;
-                 overflow: visible;
-             }
-             /* 헤더, 메인 UI 등 인쇄 불필요 요소 숨기기 */
-            header, main > div[v-if="role"], .modal-content button, .modal-content p {
-                display: none !important;
-            }
+            /* 5. 인쇄할 영역(#print-area) 스타일 리셋 */
+            #print-area {
+                padding: 0 !important;
+                margin: 0 !important; /* @page 여백이 적용됨 */
+                border: none !important;
+                box-shadow: none !important;
+                width: 100% !important;
+                font-size: 10pt !important;
+                color: black !important;
+                background: white !important;
+            }
+            
+            /* 6. 인쇄용 테이블/폰트 미세 조정 */
+            #print-area table { font-size: 9pt !important; }
+            #print-area th, #print-area td { padding: 5px !important; }
 
-             /* 인쇄용 테이블 폰트 크기 조정 */
-             #print-area table { font-size: 9pt; }
-             #print-area th, #print-area td { padding: 5px; }
-
-            @page {
-                size: A4 portrait;
-                margin: 20mm; /* A4 인쇄 여백 */
-            }
-            .page-break {
-                page-break-after: always;
-                visibility: visible !important;
-            }
-             img {
-                 visibility: visible;
-                 max-width: 100% !important; /* 이미지 크기 조절 */
-                 height: auto;
-             }
-        }
-    </style>
+            /* 7. @page 설정 (A4 여백) */
+            @page {
+                size: A4 portrait;
+                margin: 20mm;
+            }
+            .page-break {
+                page-break-after: always !important;
+            }
+            img {
+                 max-width: 100% !important;
+                 height: auto !important;
+                 visibility: visible !important;
+             }
+        }
+    </style>
 </head>
 <body class="bg-gray-100">
 
@@ -1967,7 +1938,7 @@
                                  if (!classInfoRow || !classInfoRow[0]) throw new Error(`'${file.name}' 파일의 3행 A열에서 학급 정보를 찾을 수 없습니다.`);
                                  const classInfo = String(classInfoRow[0]);
 
-                                 // FIX: Regex updated to ignore '학년도'
+                                 // FIX: Regex updated to ignore '학년도' using negative lookahead (?!도)
                                  const gradeMatch = classInfo.match(/(\d+)\s*학년(?!도)/);
                                  const classNumMatch = classInfo.match(/(\d{1,2})\s*반/);
 
@@ -2673,4 +2644,7 @@
     </script>
 </body>
 </html>
+
+
+
 
