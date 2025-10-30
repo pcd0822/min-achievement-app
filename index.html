@@ -322,15 +322,21 @@
                         학교 관리자에게 공유받은 '학교 고유 ID'를 입력하세요.
                     </p>
                     
-            /* 2. 인쇄 불필요 UI 요소 명시적 숨기기 */
-            /* 3) FIX: 'body >'를 '#app >'로 수정하여 앱의 헤더와 메인을 숨깁니다. */
-            #app > header, 
-            #app > main,
-            div[v-if="showAttendanceModal"],
-            div[v-if="showImportModal"],
+                    <!-- FIX: Broken HTML and CSS code removed and replaced with the correct form -->
+                    <form @submit.prevent="handleSchoolIdSubmit" class="space-y-4">
+                        <div>
+                            <label for="school-id-input" class="sr-only">학교 고유 ID</label>
+                            <input id="school-id-input" type="text" v-model="newSchoolId" placeholder="ID (예: korea_high_2025)" required class="w-full p-3 border border-gray-300 rounded-md">
+                        </div>
+                        <p v-if="schoolIdError" class="text-red-500 text-sm mt-1">{{ schoolIdError }}</p>
+                        
+                        <button type="submit" class="w-full px-6 py-3 bg-indigo-600 text-white font-bold rounded-md hover:bg-indigo-700 transition">
+                            <span v-if="schoolIdMode === 'create'">ID 생성하고 시작하기</span>
                             <span v-else>참여하기</span>
                         </button>
                     </form>
+                    <!-- End of FIX -->
+
                 </div>
             </div>
 
@@ -2771,6 +2777,7 @@
     </script>
 </body>
 </html>
+
 
 
 
