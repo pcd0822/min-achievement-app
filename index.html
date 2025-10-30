@@ -170,7 +170,10 @@
         /* 인쇄 전용 스타일 (안정적인 버전으로 수정) */
             /* 인쇄 전용 스타일 (안정화 버전) */
         @media print {
-            body > header, body > main,
+            #app > header, #app > main,
+            div[v-if="showAttendanceModal"],
+            div[v-if="showImportModal"],
+            #print-area-container, /* html2canvas용 컨테이너 숨기기 */
             .modal-overlay .modal-content > div:not(#print-area-container-in-modal),
             .scroll-arrow {
                 display: none !important;
@@ -205,7 +208,7 @@
             #print-area table { font-size: 9pt !important; }
             #print-area th, #print-area td { padding: 5px !important; }
             @page { size: A4 portrait; margin: 20mm; }
-            .page-break:not(:last-child) { page-break-after: always !important; }
+            .page-break { page-break-after: always !important; }
             img { max-width: 100% !important; height: auto !important; visibility: visible !important; }
         }
     </style>
@@ -1830,14 +1833,28 @@
                              if (sName) { if (!subjectsMap.has(sName)) subjectsMap.set(sName, new Set()); subjectsMap.get(sName).add('과목출석률'); }
                          });
 
-                         if (subjectsMap.size > 0) {
-                             subjectsMap.forEach((reasons, subjectName) => {
+                      if (subjectsMap.size > 0) {
+                         let subjectIndex = 0;
+                         const subjectCount = subjectsMap.size;
+                         subjectsMap.forEach((reasons, subjectName) => {
+                             if (subjectIndex === 0) {
+                                 // 첫 번째 행: 학번과 이름에 rowspan 적용
                                  studentTableHtml += `<tr>
-                                     <td>${fullStudent.id}</td><td>${fullStudent.name}</td>
-                                     <td class="text-left">${subjectName}</td><td>${Array.from(reasons).join(' & ')}</td>
+                                     <td rowspan="${subjectCount}" style="vertical-align: top;">${fullStudent.id}</td>
+                                     <td rowspan="${subjectCount}" style="vertical-align: top;">${fullStudent.name}</td>
+                                     <td class="text-left">${subjectName}</td>
+                                     <td>${Array.from(reasons).join(' & ')}</td>
                                  </tr>`;
-                             });
-                         } else {
+                             } else {
+                                 // 두 번째 행부터: 과목과 내역만
+                                 studentTableHtml += `<tr>
+                                     <td class="text-left">${subjectName}</td>
+                                     <td>${Array.from(reasons).join(' & ')}</td>
+                                 </tr>`;
+                             }
+                             subjectIndex++;
+                         });
+                     } else {
                              studentTableHtml += `<tr><td>${fullStudent.id}</td><td>${fullStudent.name}</td><td colspan="2">미도달 내역 없음 (샘플)</td></tr>`;
                          }
 
