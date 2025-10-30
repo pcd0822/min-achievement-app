@@ -713,122 +713,116 @@
 
                 </div>
             </div>
-
-            <!-- (수정) 학교 ID 모달 (로그인O, 로딩X, 역할 선택 직후 또는 ID 수정 시) -->
-            <!-- v-if 조건 수정: !role -> showSchoolIdModal -->
-            <!-- 위치 수정: main 태그 밖으로 이동 (헤더 버튼에서도 열 수 있도록) -->
-            
-
         </main>
+        
+        <!-- (수정) 모든 모달을 #app 내부, </main> 태그 뒤로 이동 -->
+        
+        <!-- 학교 ID 설정 모달 -->
+        <div v-if="showSchoolIdModal && !isLoading" class="modal-overlay">
+            <div class="modal-content max-w-lg">
+                <h2 class="text-2xl font-bold mb-4">학교 고유 ID {{ schoolId ? '확인' : '생성' }}</h2>
+                <p v-if="selectedRole === '관리자'" class="mb-6 text-gray-600">
+                    관리자 인증이 완료되었습니다. 이 학교에서 사용할 고유 ID를 생성하세요. 이 ID는 교사들에게 공유해야 합니다. (예: `korea_high_2025`)
+                </p>
+                <p v-else class="mb-6 text-gray-600">
+                    관리자로부터 전달받은 학교 고유 ID를 입력하세요.
+                </p>
+                <form @submit.prevent="handleSchoolIdSubmit">
+                    <input type="text" v-model.trim="inputSchoolId" class="w-full p-3 border rounded-md text-lg" placeholder="학교 ID 입력 (예: korea_high_2025)">
+                    <p v-if="schoolIdError" class="mt-3 text-red-500 font-semibold">{{ schoolIdError }}</p>
+                    <div class="flex justify-end space-x-3 mt-8">
+                        <button type="button" @click="cancelSchoolId" class="px-6 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition">취소</button>
+                        <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">
+                            {{ (selectedRole === '관리자' || schoolId) ? '확인' : '참여하기' }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 관리자 코드 입력 모달 -->
+        <div v-if="showAdminCodeModal" class="modal-overlay">
+            <div class="modal-content max-w-sm">
+                <h2 class="text-2xl font-bold mb-4">관리자 인증</h2>
+                <p class="mb-6 text-gray-600">관리자 인증 코드를 입력하세요.</p>
+                <form @submit.prevent="submitAdminCode">
+                    <input type="password" v-model="adminCodeInput" class="w-full p-3 border rounded-md text-lg text-center" placeholder="****">
+                    <p v-if="adminCodeError" class="mt-3 text-red-500 font-semibold">{{ adminCodeError }}</p>
+                    <div class="flex justify-end space-x-3 mt-8">
+                        <button type="button" @click="cancelAdminCode" class="px-6 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition">취소</button>
+                        <button type="submit" class="px-6 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition">인증</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- (수정) 관리자 코드 수정 모달 추가 -->
+        <div v-if="showAdminCodeEditModal" class="modal-overlay">
+            <div class="modal-content max-w-sm">
+                <h2 class="text-2xl font-bold mb-4">관리자 코드 수정</h2>
+                <p class="mb-6 text-gray-600">새로운 관리자 코드를 입력하세요.</p>
+                <form @submit.prevent="updateAdminCode">
+                    <div class="space-y-3">
+                        <input type="password" v-model="adminCodeEdit.current" class="w-full p-3 border rounded-md" placeholder="현재 코드 (0822)">
+                        <input type="password" v-model="adminCodeEdit.new" class="w-full p-3 border rounded-md" placeholder="새 코드 (4자리 이상)">
+                        <input type="password" v-model="adminCodeEdit.confirm" class="w-full p-3 border rounded-md" placeholder="새 코드 확인">
+                    </div>
+                    <p v-if="adminCodeEditError" class="mt-3 text-red-500 font-semibold">{{ adminCodeEditError }}</p>
+                    <p v-if="adminCodeEditStatus" class="mt-3 text-green-600 font-semibold">{{ adminCodeEditStatus }}</p>
+                    <div class="flex justify-end space-x-3 mt-8">
+                        <button type="button" @click="showAdminCodeEditModal = false" class="px-6 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition">닫기</button>
+                        <button type="submit" class="px-6 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition">수정</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 인쇄 미리보기 모달 -->
+        <div v-if="showPreviewModal" class="modal-overlay">
+            <div class="modal-content max-w-4xl max-h-[95vh]">
+                <!-- 모달 상단 컨트롤 (인쇄 시 숨김) -->
+                <div class="flex justify-between items-center mb-6 pb-4 border-b">
+                    <h2 class="text-2xl font-bold">인쇄 미리보기</h2>
+                    <div class_="space-x-2">
+                        <span v-if="previewStatus" class="text-sm text-gray-500 mr-4">{{ previewStatus }}</span>
+                        <button @click="printPreviewModalContent" class="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">인쇄 / PDF 저장</button>
+                        <button @click="closePreviewModal" class="px-6 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition">닫기</button>
+                    </div>
+                </div>
+                
+                <!-- 인쇄될 영역 (모달 스크롤 내부) -->
+                <div id="print-area-container-in-modal" class="max-h-[75vh] overflow-y-auto bg-gray-100 p-4 border rounded-md">
+                    <!-- 여기에 previewHtml이 렌더링됨 -->
+                    <div v-html="previewHtml"></div>
+                </div>
+                
+                 <p v-if="adminActionStatus" class="mt-4 text-center text-sm font-semibold" :class="adminActionStatus.includes('성공') ? 'text-green-600' : 'text-red-600'">{{ adminActionStatus }}</p>
+            </div>
+        </div>
+        
+        <!-- 파일 삭제 확인 모달 -->
+        <div v-if="showDeleteModal" class="modal-overlay">
+            <div class="modal-content max-w-md text-center">
+                <svg class="w-16 h-16 text-red-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                <h2 class="text-2xl font-bold mb-4">정말 삭제하시겠습니까?</h2>
+                <p class="mb-8 text-gray-600">
+                    '<span class="font-semibold text-red-600">{{ deleteTargetName }}</span>' 데이터를 삭제합니다.<br>이 작업은 되돌릴 수 없습니다.
+                </p>
+                <p v-if="deleteStatus" class="mb-4 text-sm font-semibold" :class="deleteStatus.includes('성공') ? 'text-green-600' : 'text-red-600'">{{ deleteStatus }}</p>
+                <div class="flex justify-center space-x-4">
+                    <button @click="closeDeleteModal" class="px-8 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition">취소</button>
+                    <button @click="confirmDeleteFile" class="px-8 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition">삭제</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- html2canvas 인쇄용 숨겨진 컨테이너 -->
+        <div id="print-area-container" style="position: absolute; left: -9999px; top: -9999px; background: white; padding: 20px;"></div>
+
+        
     </div> <!-- #app end -->
     
-    <!-- 모달들을 #app 외부에 배치 (z-index 및 포지셔닝 문제 방지) -->
-
-    <!-- 학교 ID 설정 모달 -->
-    <!-- (수정) 위치를 #app 내부 main 밖으로 이동 -->
-    <div v-if="showSchoolIdModal && !isLoading" class="modal-overlay">
-        <div class="modal-content max-w-lg">
-            <h2 class="text-2xl font-bold mb-4">학교 고유 ID {{ schoolId ? '확인' : '생성' }}</h2>
-            <p v-if="selectedRole === '관리자'" class="mb-6 text-gray-600">
-                관리자 인증이 완료되었습니다. 이 학교에서 사용할 고유 ID를 생성하세요. 이 ID는 교사들에게 공유해야 합니다. (예: `korea_high_2025`)
-            </p>
-            <p v-else class="mb-6 text-gray-600">
-                관리자로부터 전달받은 학교 고유 ID를 입력하세요.
-            </p>
-            <!-- (수정) 잘못된 HTML 주석 및 코드 조각 삭제 -->
-            <form @submit.prevent="handleSchoolIdSubmit">
-                <input type="text" v-model.trim="inputSchoolId" class="w-full p-3 border rounded-md text-lg" placeholder="학교 ID 입력 (예: korea_high_2025)">
-                <p v-if="schoolIdError" class="mt-3 text-red-500 font-semibold">{{ schoolIdError }}</p>
-                <div class="flex justify-end space-x-3 mt-8">
-                    <button type="button" @click="cancelSchoolId" class="px-6 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition">취소</button>
-                    <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">
-                        {{ (selectedRole === '관리자' || schoolId) ? '확인' : '참여하기' }}
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- 관리자 코드 입력 모달 -->
-    <div v-if="showAdminCodeModal" class="modal-overlay">
-        <div class="modal-content max-w-sm">
-            <h2 class="text-2xl font-bold mb-4">관리자 인증</h2>
-            <p class="mb-6 text-gray-600">관리자 인증 코드를 입력하세요.</p>
-            <form @submit.prevent="submitAdminCode">
-                <input type="password" v-model="adminCodeInput" class="w-full p-3 border rounded-md text-lg text-center" placeholder="****">
-                <p v-if="adminCodeError" class="mt-3 text-red-500 font-semibold">{{ adminCodeError }}</p>
-                <div class="flex justify-end space-x-3 mt-8">
-                    <button type="button" @click="cancelAdminCode" class="px-6 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition">취소</button>
-                    <button type="submit" class="px-6 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition">인증</button>
-                </div>
-            </form>
-        </div>
-    </div>
-    
-    <!-- (수정) 관리자 코드 수정 모달 추가 -->
-    <div v-if="showAdminCodeEditModal" class="modal-overlay">
-        <div class="modal-content max-w-sm">
-            <h2 class="text-2xl font-bold mb-4">관리자 코드 수정</h2>
-            <p class="mb-6 text-gray-600">새로운 관리자 코드를 입력하세요.</p>
-            <form @submit.prevent="updateAdminCode">
-                <div class="space-y-3">
-                    <input type="password" v-model="adminCodeEdit.current" class="w-full p-3 border rounded-md" placeholder="현재 코드 (0822)">
-                    <input type="password" v-model="adminCodeEdit.new" class="w-full p-3 border rounded-md" placeholder="새 코드 (4자리 이상)">
-                    <input type="password" v-model="adminCodeEdit.confirm" class="w-full p-3 border rounded-md" placeholder="새 코드 확인">
-                </div>
-                <p v-if="adminCodeEditError" class="mt-3 text-red-500 font-semibold">{{ adminCodeEditError }}</p>
-                <p v-if="adminCodeEditStatus" class="mt-3 text-green-600 font-semibold">{{ adminCodeEditStatus }}</p>
-                <div class="flex justify-end space-x-3 mt-8">
-                    <button type="button" @click="showAdminCodeEditModal = false" class="px-6 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition">닫기</button>
-                    <button type="submit" class="px-6 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition">수정</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- (수정) 출결 이력 가져오기 모달 제거됨 -->
-
-    <!-- 인쇄 미리보기 모달 -->
-    <div v-if="showPreviewModal" class="modal-overlay">
-        <div class="modal-content max-w-4xl max-h-[95vh]">
-            <!-- 모달 상단 컨트롤 (인쇄 시 숨김) -->
-            <div class="flex justify-between items-center mb-6 pb-4 border-b">
-                <h2 class="text-2xl font-bold">인쇄 미리보기</h2>
-                <div class_="space-x-2">
-                    <span v-if="previewStatus" class="text-sm text-gray-500 mr-4">{{ previewStatus }}</span>
-                    <button @click="printPreviewModalContent" class="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">인쇄 / PDF 저장</button>
-                    <button @click="closePreviewModal" class="px-6 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition">닫기</button>
-                </div>
-            </div>
-            
-            <!-- 인쇄될 영역 (모달 스크롤 내부) -->
-            <div id="print-area-container-in-modal" class="max-h-[75vh] overflow-y-auto bg-gray-100 p-4 border rounded-md">
-                <!-- 여기에 previewHtml이 렌더링됨 -->
-                <div v-html="previewHtml"></div>
-            </div>
-            
-             <p v-if="adminActionStatus" class="mt-4 text-center text-sm font-semibold" :class="adminActionStatus.includes('성공') ? 'text-green-600' : 'text-red-600'">{{ adminActionStatus }}</p>
-        </div>
-    </div>
-    
-    <!-- 파일 삭제 확인 모달 -->
-    <div v-if="showDeleteModal" class="modal-overlay">
-        <div class="modal-content max-w-md text-center">
-            <svg class="w-16 h-16 text-red-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-            <h2 class="text-2xl font-bold mb-4">정말 삭제하시겠습니까?</h2>
-            <p class="mb-8 text-gray-600">
-                '<span class="font-semibold text-red-600">{{ deleteTargetName }}</span>' 데이터를 삭제합니다.<br>이 작업은 되돌릴 수 없습니다.
-            </p>
-            <p v-if="deleteStatus" class="mb-4 text-sm font-semibold" :class="deleteStatus.includes('성공') ? 'text-green-600' : 'text-red-600'">{{ deleteStatus }}</p>
-            <div class="flex justify-center space-x-4">
-                <button @click="closeDeleteModal" class="px-8 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition">취소</button>
-                <button @click="confirmDeleteFile" class="px-8 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition">삭제</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- html2canvas 인쇄용 숨겨진 컨테이너 -->
-    <div id="print-area-container" style="position: absolute; left: -9999px; top: -9999px; background: white; padding: 20px;"></div>
+    <!-- (수정) 모달들이 #app 외부에서 -> #app 내부의 끝으로 이동됨 -->
 
 
     <!-- Vue.js Application Script -->
@@ -1315,11 +1309,14 @@
                     this.selectedRole = role; // 임시 저장
                     
                     if (role === '관리자') {
+                        // (수정) 관리자: 항상 코드 입력
+                        this.adminCodeInput = '';
+                        this.adminCodeError = '';
                         this.showAdminCodeModal = true;
                     } else {
-                        // (수정) 교과교사, 담임교사 선택 시
-                        // (수정) 기존 schoolId가 있어도 항상 모달창 표시 (확인용)
+                        // (수정) 교과교사, 담임교사: 항상 ID 확인
                         this.inputSchoolId = this.schoolId || ''; // 기존 ID 채우기
+                        this.schoolIdError = '';
                         this.showSchoolIdModal = true;
                     }
                 },
@@ -1331,9 +1328,9 @@
                         this.showAdminCodeModal = false;
                         this.adminCodeInput = '';
                         
-                        // (수정) 관리자 인증 성공 시
-                        // (수정) 기존 schoolId가 있어도 항상 모달창 표시 (생성/확인용)
+                        // (수정) 관리자: 인증 성공 시, 항상 ID 확인
                         this.inputSchoolId = this.schoolId || ''; // 기존 ID 채우기
+                        this.schoolIdError = '';
                         this.showSchoolIdModal = true;
                         
                     } else {
