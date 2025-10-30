@@ -1878,6 +1878,17 @@
                      window.print();
                  },
 
+                  // --- 여기부터 추가 ---
+                 closePreviewModal() {
+                     this.showPreviewModal = false;
+                     this.previewHtml = '';
+                     // 관련 상태 메시지도 함께 초기화합니다.
+                     this.adminActionStatus = '';
+                     this.teacherPlanError = '';
+                     this.teacherPlanStatus = '';
+                 },
+                 // --- 여기까지 추가 ---
+                
                 // This function is kept as a fallback, but window.print() is preferred
                 async printPreview() {
                      const modalPrintContent = document.getElementById('print-area-container-in-modal');
@@ -2636,3 +2647,4 @@
     </script>
 </body>
 </html>
+
