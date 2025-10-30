@@ -129,85 +129,120 @@
 
         [v-cloak] { display: none; }
 
-        .scroll-arrow.left { left: -1.25rem; }
-        .scroll-arrow.right { right: -1.25rem; }
+        .table-cell-content {
+            padding: 0.5rem 0;
+            min-height: 2.5rem;
+            display: flex;
+            align-items: center;
+        }
 
-        /* 인쇄 전용 스타일 (안정적인 버전으로 수정) */
-        @media print {
-            /* 1. 기본 인쇄 설정 */
-            body {
-                margin: 0;
-                padding: 0;
-                background-color: white;
-            }
-            
-            /* 2. 인쇄 불필요 UI 요소 명시적 숨기기 */
-            body > header, 
-            body > main,
-            .modal-overlay .modal-content > div:not(#print-area-container-in-modal), /* 모달 내 버튼, 상태메시지 숨기기 */
-            .scroll-arrow {
-                display: none !important;
-            }
+        .table-cell-content:not(:last-child) {
+            border-bottom: 1px solid #e5e7eb;
+        }
 
-            /* 3. 모달 관련 스타일 리셋 (인쇄 시 화면을 가리지 않도록) */
-            .modal-overlay {
-                position: static !important;
-                background: none !important;
-                overflow: visible !important;
-                display: block !important;
-                width: 100%;
-                height: 100%;
-                z-index: auto;
-            }
-            .modal-content {
-                border: none !important;
-                box-shadow: none !important;
-                padding: 0 !important;
-                width: 100% !important;
-                max-width: 100% !important;
-                max-height: none !important;
-                overflow: visible !important;
-                display: block !important;
-            }
-            
-            /* 4. 인쇄할 컨테이너 및 내용 보이기 */
-            #print-area-container-in-modal,
-            #print-area-container-in-modal * {
-                visibility: visible !important; /* visibility: visible로 되돌림 */
-                display: block !important; /* display도 block으로 보장 */
-            }
+        .scroll-arrow {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 30;
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 9999px;
+            background-color: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: #4a5568;
+            transition: all 0.2s ease-in-out;
+        }
+        .scroll-arrow:hover {
+            background-color: rgba(255, 255, 255, 0.9);
+            transform: translateY(-50%) scale(1.1);
+        }
+        .scroll-arrow.left { left: -1.25rem; }
+        .scroll-arrow.right { right: -1.25rem; }
 
-            /* 5. 인쇄할 영역(#print-area) 스타일 리셋 */
-            #print-area {
-                padding: 0 !important;
-                margin: 0 !important; /* @page 여백이 적용됨 */
-                border: none !important;
-                box-shadow: none !important;
-                width: 100% !important;
-                font-size: 10pt !important;
-                color: black !important;
-                background: white !important;
-            }
-            
-            /* 6. 인쇄용 테이블/폰트 미세 조정 */
-            #print-area table { font-size: 9pt !important; }
-            #print-area th, #print-area td { padding: 5px !important; }
+        /* 인쇄 전용 스타일 (안정적인 버전으로 수정) */
+        @media print {
+            /* 1. 기본 인쇄 설정 */
+            body {
+                margin: 0;
+                padding: 0;
+                background-color: white;
+            }
+            
+            /* 2. 인쇄 불필요 UI 요소 명시적 숨기기 */
+            body > header, 
+            body > main,
+            .modal-overlay .modal-content > div:not(#print-area-container-in-modal), /* 모달 내 버튼, 상태메시지 숨기기 */
+            .scroll-arrow {
+                display: none !important;
+            }
 
-            /* 7. @page 설정 (A4 여백) */
-            @page {
-                size: A4 portrait;
-                margin: 20mm;
-            }
-            .page-break {
-                page-break-after: always !important;
-            }
-            img {
-                 max-width: 100% !important;
-                 height: auto !important;
-                 visibility: visible !important;
-             }
-        }
-    </style>
+            /* 3. 모달 관련 스타일 리셋 (인쇄 시 화면을 가리지 않도록) */
+            .modal-overlay {
+                position: static !important;
+                background: none !important;
+                overflow: visible !important;
+                display: block !important;
+                width: 100%;
+                height: 100%;
+                z-index: auto;
+            }
+            .modal-content {
+                border: none !important;
+                box-shadow: none !important;
+                padding: 0 !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                max-height: none !important;
+                overflow: visible !important;
+                display: block !important;
+            }
+            
+            /* 4. 인쇄할 컨테이너 및 내용 보이기 */
+            #print-area-container-in-modal,
+            #print-area-container-in-modal * {
+                visibility: visible !important; /* visibility: visible로 되돌림 */
+                display: block !important; /* display도 block으로 보장 */
+            }
+
+            /* 5. 인쇄할 영역(#print-area) 스타일 리셋 */
+            #print-area {
+                padding: 0 !important;
+                margin: 0 !important; /* @page 여백이 적용됨 */
+                border: none !important;
+                box-shadow: none !important;
+                width: 100% !important;
+                font-size: 10pt !important;
+                color: black !important;
+                background: white !important;
+            }
+            
+            /* 6. 인쇄용 테이블/폰트 미세 조정 */
+            #print-area table { font-size: 9pt !important; }
+            #print-area th, #print-area td { padding: 5px !important; }
+
+            /* 7. @page 설정 (A4 여백) */
+            @page {
+                size: A4 portrait;
+                margin: 20mm;
+            }
+            .page-break {
+                page-break-after: always !important;
+            }
+            img {
+                 max-width: 100% !important;
+                 height: auto !important;
+                 visibility: visible !important;
+             }
+        }
+    </style>
 </head>
 <body class="bg-gray-100">
 
@@ -243,7 +278,7 @@
                  <p class="text-gray-600">데이터 로딩 중...</p>
              </div>
 
-              <!-- Login Button -->
+             <!-- Login Button -->
               <div v-if="!isLoggedIn && !isLoading" class="text-center mt-10">
                   <button @click="login" class="px-8 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition text-lg shadow-md">
                       Google 계정으로 로그인
@@ -276,84 +311,84 @@
              <div v-if="isLoggedIn && role && !isLoading">
                 <!-- Admin View -->
                  <div v-if="role === '관리자'">
-                     <h2 class="text-3xl font-bold text-gray-800 mb-6">관리자 대시보드 (학교: {{ schoolId }})</h2>
-                      <div class="space-y-8">
-                          <!-- 1. 교육과정 편제표 업로드 -->
-                          <div class="bg-white p-6 rounded-lg shadow-md">
-                              <h3 class="text-xl font-semibold mb-4">1. 교육과정 편제표 업로드</h3>
-                              <div class="flex space-x-4">
-                                  <button @click="downloadTemplate('curriculum')" class="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition">양식 다운로드</button>
-                                  <input type="file" @change="uploadFile($event, 'curriculum')" class="hidden" id="curriculum-upload-admin">
-                                  <label for="curriculum-upload-admin" class="cursor-pointer px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition">엑셀 파일 업로드</label>
-                              </div>
-                              <p v-if="uploadStatus.curriculum" class="mt-2 text-sm font-medium">{{ uploadStatus.curriculum }}</p>
-                          </div>
+                      <h2 class="text-3xl font-bold text-gray-800 mb-6">관리자 대시보드 (학교: {{ schoolId }})</h2>
+                       <div class="space-y-8">
+                           <!-- 1. 교육과정 편제표 업로드 -->
+                           <div class="bg-white p-6 rounded-lg shadow-md">
+                               <h3 class="text-xl font-semibold mb-4">1. 교육과정 편제표 업로드</h3>
+                               <div class="flex space-x-4">
+                                   <button @click="downloadTemplate('curriculum')" class="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition">양식 다운로드</button>
+                                   <input type="file" @change="uploadFile($event, 'curriculum')" class="hidden" id="curriculum-upload-admin">
+                                   <label for="curriculum-upload-admin" class="cursor-pointer px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition">엑셀 파일 업로드</label>
+                               </div>
+                               <p v-if="uploadStatus.curriculum" class="mt-2 text-sm font-medium">{{ uploadStatus.curriculum }}</p>
+                           </div>
 
-                          <!-- 2. 학적 정보 업로드 -->
-                          <div class="bg-white p-6 rounded-lg shadow-md">
-                              <h3 class="text-xl font-semibold mb-4">2. 학적 정보 업로드</h3>
-                              <div class="flex space-x-4">
-                                  <button @click="downloadTemplate('student')" class="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition">양식 다운로드</button>
-                                  <input type="file" @change="uploadFile($event, 'student')" class="hidden" id="student-upload-admin">
-                                  <label for="student-upload-admin" class="cursor-pointer px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition">엑셀 파일 업로드</label>
-                              </div>
-                               <p v-if="uploadStatus.student" class="mt-2 text-sm font-medium">{{ uploadStatus.student }}</p>
-                          </div>
+                           <!-- 2. 학적 정보 업로드 -->
+                           <div class="bg-white p-6 rounded-lg shadow-md">
+                               <h3 class="text-xl font-semibold mb-4">2. 학적 정보 업로드</h3>
+                               <div class="flex space-x-4">
+                                   <button @click="downloadTemplate('student')" class="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition">양식 다운로드</button>
+                                   <input type="file" @change="uploadFile($event, 'student')" class="hidden" id="student-upload-admin">
+                                   <label for="student-upload-admin" class="cursor-pointer px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition">엑셀 파일 업로드</label>
+                               </div>
+                                <p v-if="uploadStatus.student" class="mt-2 text-sm font-medium">{{ uploadStatus.student }}</p>
+                           </div>
 
-                           <!-- 2-1. 정서지원프로그램 이수시간 업로드 -->
-                          <div class="bg-white p-6 rounded-lg shadow-md">
-                              <h3 class="text-xl font-semibold mb-4">2-1. 정서지원프로그램 이수시간 업로드</h3>
-                              <div class="flex space-x-4">
-                                  <button @click="downloadTemplate('emotionalSupport')" class="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition">양식 다운로드</button>
-                                  <input type="file" @change="uploadFile($event, 'emotionalSupport')" class="hidden" id="emotional-support-upload-admin">
-                                  <label for="emotional-support-upload-admin" class="cursor-pointer px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition">엑셀 파일 업로드</label>
-                              </div>
-                              <p v-if="uploadStatus.emotionalSupport" class="mt-2 text-sm font-medium">{{ uploadStatus.emotionalSupport }}</p>
-                          </div>
+                            <!-- 2-1. 정서지원프로그램 이수시간 업로드 -->
+                           <div class="bg-white p-6 rounded-lg shadow-md">
+                               <h3 class="text-xl font-semibold mb-4">2-1. 정서지원프로그램 이수시간 업로드</h3>
+                               <div class="flex space-x-4">
+                                   <button @click="downloadTemplate('emotionalSupport')" class="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition">양식 다운로드</button>
+                                   <input type="file" @change="uploadFile($event, 'emotionalSupport')" class="hidden" id="emotional-support-upload-admin">
+                                   <label for="emotional-support-upload-admin" class="cursor-pointer px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition">엑셀 파일 업로드</label>
+                               </div>
+                               <p v-if="uploadStatus.emotionalSupport" class="mt-2 text-sm font-medium">{{ uploadStatus.emotionalSupport }}</p>
+                           </div>
 
-                          <!-- 3. 운영 모듈 설계 -->
-                          <div class="bg-white p-6 rounded-lg shadow-md">
-                              <h3 class="text-xl font-semibold mb-4">3. 운영 모듈 설계</h3>
-                              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                  <div>
-                                      <label class="block text-sm font-medium text-gray-700">학점당 시수</label>
-                                      <input type="number" v-model.number="moduleConfig.hoursPerCredit" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
-                                  </div>
-                                  <div>
-                                      <label class="block text-sm font-medium text-gray-700">예방지도 연계 비율 (%)</label>
-                                      <input type="number" v-model.number="moduleConfig.preventiveRatio" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
-                                  </div>
-                                  <div>
-                                      <label class="block text-sm font-medium text-gray-700">정서지원 프로그램 연계 비율 (%)</label>
-                                      <input type="number" v-model.number="moduleConfig.emotionalSupportRatio" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
-                                  </div>
-                                  <div>
-                                      <label class="block text-sm font-medium text-gray-700">학습지원대상자 예방지도 인정비율 (%)</label>
-                                      <input type="number" v-model.number="moduleConfig.specialPreventiveRatio" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
-                                  </div>
-                              </div>
-                              <h4 class="text-lg font-semibold mt-6 mb-2">항목별 인정시수 (1회 기준)</h4>
-                              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                  <div v-for="(item, index) in moduleConfig.recognizedHours" :key="index">
-                                      <label class="block text-sm font-medium text-gray-700">{{ item.name }}</label>
-                                      <input type="number" step="0.1" v-model.number="item.hours" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
-                                  </div>
-                              </div>
-                              <button @click="saveModuleConfig" class="mt-6 px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition">운영 모듈 저장</button>
-                               <p v-if="moduleConfigStatus" class="mt-2 text-sm font-medium text-green-600">{{ moduleConfigStatus }}</p>
-                          </div>
+                           <!-- 3. 운영 모듈 설계 -->
+                           <div class="bg-white p-6 rounded-lg shadow-md">
+                               <h3 class="text-xl font-semibold mb-4">3. 운영 모듈 설계</h3>
+                               <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                   <div>
+                                       <label class="block text-sm font-medium text-gray-700">학점당 시수</label>
+                                       <input type="number" v-model.number="moduleConfig.hoursPerCredit" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                                   </div>
+                                   <div>
+                                       <label class="block text-sm font-medium text-gray-700">예방지도 연계 비율 (%)</label>
+                                       <input type="number" v-model.number="moduleConfig.preventiveRatio" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                                   </div>
+                                   <div>
+                                       <label class="block text-sm font-medium text-gray-700">정서지원 프로그램 연계 비율 (%)</label>
+                                       <input type="number" v-model.number="moduleConfig.emotionalSupportRatio" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                                   </div>
+                                   <div>
+                                       <label class="block text-sm font-medium text-gray-700">학습지원대상자 예방지도 인정비율 (%)</label>
+                                       <input type="number" v-model.number="moduleConfig.specialPreventiveRatio" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                                   </div>
+                               </div>
+                               <h4 class="text-lg font-semibold mt-6 mb-2">항목별 인정시수 (1회 기준)</h4>
+                               <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                   <div v-for="(item, index) in moduleConfig.recognizedHours" :key="index">
+                                       <label class="block text-sm font-medium text-gray-700">{{ item.name }}</label>
+                                       <input type="number" step="0.1" v-model.number="item.hours" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                                   </div>
+                               </div>
+                               <button @click="saveModuleConfig" class="mt-6 px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition">운영 모듈 저장</button>
+                                <p v-if="moduleConfigStatus" class="mt-2 text-sm font-medium text-green-600">{{ moduleConfigStatus }}</p>
+                           </div>
 
-                          <!-- 4. 대상자 선정 -->
-                          <div class="bg-white p-6 rounded-lg shadow-md">
-                              <h3 class="text-xl font-semibold mb-4">4. 대상자 선정</h3>
-                              <div class="flex space-x-4">
-                                  <input type="file" @change="processGradeFiles" multiple class="hidden" id="grade-upload">
-                                  <label for="grade-upload" class="cursor-pointer px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition">성적 파일 업로드 (복수 선택 가능)</label>
-                                  <button @click="showAttendanceModal = true" class="px-4 py-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 transition">출석률 미도달 학생 입력</button>
-                              </div>
-                              <p v-if="fileProcessingError" class="mt-2 text-sm font-medium text-red-500">{{ fileProcessingError }}</p>
+                           <!-- 4. 대상자 선정 -->
+                           <div class="bg-white p-6 rounded-lg shadow-md">
+                               <h3 class="text-xl font-semibold mb-4">4. 대상자 선정</h3>
+                               <div class="flex space-x-4">
+                                   <input type="file" @change="processGradeFiles" multiple class="hidden" id="grade-upload">
+                                   <label for="grade-upload" class="cursor-pointer px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition">성적 파일 업로드 (복수 선택 가능)</label>
+                                   <button @click="showAttendanceModal = true" class="px-4 py-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 transition">출석률 미도달 학생 입력</button>
+                               </div>
+                               <p v-if="fileProcessingError" class="mt-2 text-sm font-medium text-red-500">{{ fileProcessingError }}</p>
 
-                              <div v-if="underachievers.length > 0" class="mt-6">
+                               <div v-if="underachievers.length > 0" class="mt-6">
                                    <h4 class="text-lg font-semibold mb-2">학업성취율/출석률 미도달 학생 현황 (처리 결과)</h4>
                                    <div class="overflow-x-auto">
                                        <table class="min-w-full" id="underachievers-table">
@@ -396,365 +431,365 @@
                                    </div>
                                    <p v-if="underachieversStatus" class="mt-2 text-right text-sm font-medium text-green-600">{{ underachieversStatus }}</p>
                                </div>
-                          </div>
+                           </div>
 
-                          <!-- 5. 가정통신문 및 서약서 양식 관리 -->
-                          <div class="bg-white p-6 rounded-lg shadow-md">
-                              <h3 class="text-xl font-semibold mb-4">5. 가정통신문 및 서약서 양식 관리</h3>
-                              <div class="flex border-b">
-                                  <button class="tab-button" :class="{ 'active': adminFormTab === 'newsletter' }" @click="adminFormTab = 'newsletter'">가정통신문</button>
-                                  <button class="tab-button" :class="{ 'active': adminFormTab === 'pledge' }" @click="adminFormTab = 'pledge'">서약서</button>
-                              </div>
+                           <!-- 5. 가정통신문 및 서약서 양식 관리 -->
+                           <div class="bg-white p-6 rounded-lg shadow-md">
+                               <h3 class="text-xl font-semibold mb-4">5. 가정통신문 및 서약서 양식 관리</h3>
+                               <div class="flex border-b">
+                                   <button class="tab-button" :class="{ 'active': adminFormTab === 'newsletter' }" @click="adminFormTab = 'newsletter'">가정통신문</button>
+                                   <button class="tab-button" :class="{ 'active': adminFormTab === 'pledge' }" @click="adminFormTab = 'pledge'">서약서</button>
+                               </div>
 
-                              <!-- 가정통신문 폼 -->
-                              <div v-if="adminFormTab === 'newsletter'" class="mt-6 space-y-4">
-                                  <input type="text" v-model="newsletterForm.title" placeholder="제목" class="w-full p-2 border rounded">
-                                  <input type="text" v-model="newsletterForm.docNumber" placeholder="문서 번호 (예: 한국고 2025-00호)" class="w-full p-2 border rounded">
-                                  <input type="text" v-model="newsletterForm.department" placeholder="담당 부서 및 연락처" class="w-full p-2 border rounded">
-                                  <div>
-                                      <label class="block text-sm font-medium text-gray-700">학교 로고 이미지</label>
-                                      <input type="file" @change="handleImageUpload($event, 'newsletter', 'logoUrl')" accept="image/*" class="w-full">
-                                       <img v-if="newsletterForm.logoUrl" :src="newsletterForm.logoUrl" alt="로고 미리보기" class="mt-2 h-16 object-contain">
-                                  </div>
-                                  <textarea v-model="newsletterForm.body" placeholder="본문 내용" rows="10" class="w-full p-2 border rounded"></textarea>
-                                  <input type="text" v-model="newsletterForm.dispatchDate" placeholder="발송일 (예: 2025.7.14.)" class="w-full p-2 border rounded">
-                                  <div class="flex items-center space-x-2">
-                                      <input type="checkbox" v-model="newsletterForm.includeSeal" id="newsletterSealCheck">
-                                      <label for="newsletterSealCheck">학교장 날인 포함</label>
-                                  </div>
-                                  <div v-if="newsletterForm.includeSeal">
-                                      <label class="block text-sm font-medium text-gray-700">학교장 날인 이미지</label>
-                                      <input type="file" @change="handleImageUpload($event, 'newsletter', 'sealUrl')" accept="image/*" class="w-full">
-                                       <img v-if="newsletterForm.sealUrl" :src="newsletterForm.sealUrl" alt="날인 미리보기" class="mt-2 h-16 object-contain">
-                                  </div>
-                                  <div class="flex space-x-2">
-                                      <!-- BUG FIX: Changed previewForm to previewFormAdmin -->
-                                      <button @click="previewFormAdmin('newsletter')" class="mt-4 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">미리보기 및 출력</button>
-                                       <button @click="saveFormTemplates" class="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">양식 저장</button>
-                                  </div>
-                              </div>
-
-                              <!-- 서약서 폼 -->
-                               <div v-if="adminFormTab === 'pledge'" class="mt-6 space-y-4">
-                                   <textarea v-model="pledgeForm.content" placeholder="서약서 동의 내용" rows="10" class="w-full p-2 border rounded"></textarea>
-                                   <input type="text" v-model="pledgeForm.dispatchDate" placeholder="서약일 (예: 2025.7.14.)" class="w-full p-2 border rounded">
-                                   <div class="flex items-center space-x-2">
-                                       <input type="checkbox" v-model="pledgeForm.includeSeal" id="pledgeSealCheck">
-                                       <label for="pledgeSealCheck">학교장 날인 포함</label>
+                               <!-- 가정통신문 폼 -->
+                               <div v-if="adminFormTab === 'newsletter'" class="mt-6 space-y-4">
+                                   <input type="text" v-model="newsletterForm.title" placeholder="제목" class="w-full p-2 border rounded">
+                                   <input type="text" v-model="newsletterForm.docNumber" placeholder="문서 번호 (예: 한국고 2025-00호)" class="w-full p-2 border rounded">
+                                   <input type="text" v-model="newsletterForm.department" placeholder="담당 부서 및 연락처" class="w-full p-2 border rounded">
+                                   <div>
+                                       <label class="block text-sm font-medium text-gray-700">학교 로고 이미지</label>
+                                       <input type="file" @change="handleImageUpload($event, 'newsletter', 'logoUrl')" accept="image/*" class="w-full">
+                                        <img v-if="newsletterForm.logoUrl" :src="newsletterForm.logoUrl" alt="로고 미리보기" class="mt-2 h-16 object-contain">
                                    </div>
-                                   <div v-if="pledgeForm.includeSeal">
+                                   <textarea v-model="newsletterForm.body" placeholder="본문 내용" rows="10" class="w-full p-2 border rounded"></textarea>
+                                   <input type="text" v-model="newsletterForm.dispatchDate" placeholder="발송일 (예: 2025.7.14.)" class="w-full p-2 border rounded">
+                                   <div class="flex items-center space-x-2">
+                                       <input type="checkbox" v-model="newsletterForm.includeSeal" id="newsletterSealCheck">
+                                       <label for="newsletterSealCheck">학교장 날인 포함</label>
+                                   </div>
+                                   <div v-if="newsletterForm.includeSeal">
                                        <label class="block text-sm font-medium text-gray-700">학교장 날인 이미지</label>
-                                       <input type="file" @change="handleImageUpload($event, 'pledge', 'sealUrl')" accept="image/*" class="w-full">
-                                        <img v-if="pledgeForm.sealUrl" :src="pledgeForm.sealUrl" alt="날인 미리보기" class="mt-2 h-16 object-contain">
+                                       <input type="file" @change="handleImageUpload($event, 'newsletter', 'sealUrl')" accept="image/*" class="w-full">
+                                        <img v-if="newsletterForm.sealUrl" :src="newsletterForm.sealUrl" alt="날인 미리보기" class="mt-2 h-16 object-contain">
                                    </div>
                                    <div class="flex space-x-2">
-                                      <!-- BUG FIX: Changed previewForm to previewFormAdmin -->
-                                      <button @click="previewFormAdmin('pledge')" class="mt-4 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">미리보기 및 출력</button>
-                                       <button @click="saveFormTemplates" class="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">양식 저장</button>
+                                       <!-- BUG FIX: Changed previewForm to previewFormAdmin -->
+                                       <button @click="previewFormAdmin('newsletter')" class="mt-4 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">미리보기 및 출력</button>
+                                        <button @click="saveFormTemplates" class="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">양식 저장</button>
                                    </div>
                                </div>
-                          </div>
-                      </div>
+
+                               <!-- 서약서 폼 -->
+                                <div v-if="adminFormTab === 'pledge'" class="mt-6 space-y-4">
+                                    <textarea v-model="pledgeForm.content" placeholder="서약서 동의 내용" rows="10" class="w-full p-2 border rounded"></textarea>
+                                    <input type="text" v-model="pledgeForm.dispatchDate" placeholder="서약일 (예: 2025.7.14.)" class="w-full p-2 border rounded">
+                                    <div class="flex items-center space-x-2">
+                                        <input type="checkbox" v-model="pledgeForm.includeSeal" id="pledgeSealCheck">
+                                        <label for="pledgeSealCheck">학교장 날인 포함</label>
+                                    </div>
+                                    <div v-if="pledgeForm.includeSeal">
+                                        <label class="block text-sm font-medium text-gray-700">학교장 날인 이미지</label>
+                                        <input type="file" @change="handleImageUpload($event, 'pledge', 'sealUrl')" accept="image/*" class="w-full">
+                                         <img v-if="pledgeForm.sealUrl" :src="pledgeForm.sealUrl" alt="날인 미리보기" class="mt-2 h-16 object-contain">
+                                    </div>
+                                    <div class="flex space-x-2">
+                                       <!-- BUG FIX: Changed previewForm to previewFormAdmin -->
+                                       <button @click="previewFormAdmin('pledge')" class="mt-4 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">미리보기 및 출력</button>
+                                        <button @click="saveFormTemplates" class="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">양식 저장</button>
+                                    </div>
+                                </div>
+                           </div>
+                       </div>
                  </div>
 
                 <!-- Teacher View -->
                  <div v-if="role === '교과교사'">
-                     <h2 class="text-3xl font-bold text-gray-800 mb-6">교과교사 대시보드 (학교: {{ schoolId }})</h2>
-                     <div class="flex border-b mb-6">
-                         <button class="tab-button" :class="{ 'active': teacherTab === 'plan' }" @click="switchTeacherTab('plan')">계획서 작성</button>
-                         <button class="tab-button" :class="{ 'active': teacherTab === 'preventive' }" @click="switchTeacherTab('preventive')">예방지도 출석부 & 수업일지</button>
-                         <button class="tab-button" :class="{ 'active': teacherTab === 'supplementary' }" @click="switchTeacherTab('supplementary')">보충지도(추가학습) 출석부&수업일지</button>
-                     </div>
+                       <h2 class="text-3xl font-bold text-gray-800 mb-6">교과교사 대시보드 (학교: {{ schoolId }})</h2>
+                       <div class="flex border-b mb-6">
+                           <button class="tab-button" :class="{ 'active': teacherTab === 'plan' }" @click="switchTeacherTab('plan')">계획서 작성</button>
+                           <button class="tab-button" :class="{ 'active': teacherTab === 'preventive' }" @click="switchTeacherTab('preventive')">예방지도 출석부 & 수업일지</button>
+                           <button class="tab-button" :class="{ 'active': teacherTab === 'supplementary' }" @click="switchTeacherTab('supplementary')">보충지도(추가학습) 출석부&수업일지</button>
+                       </div>
 
-                     <!-- 계획서 작성 탭 -->
-                     <div v-if="teacherTab === 'plan'" class="space-y-6">
-                         <div class="bg-white p-6 rounded-lg shadow-md space-y-4">
-                             <div>
-                                 <label for="aiProvider" class="block text-sm font-medium text-gray-700">AI 모델 선택</label>
-                                 <select id="aiProvider" v-model="teacherPlan.aiProvider" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
-                                     <option value="gemini">Gemini</option>
-                                     <option value="openai">OpenAI</option>
-                                     <option value="claude">Claude</option>
-                                 </select>
-                             </div>
-                             <div v-if="teacherPlan.aiProvider !== 'openai'">
-                                 <label for="apiKey" class="block text-sm font-medium text-gray-700">{{ teacherPlan.aiProvider.toUpperCase() }} API Key</label>
-                                 <input type="password" id="apiKey" v-model="teacherPlan.apiKey" placeholder="선택한 AI 모델의 API 키를 입력하세요" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
-                             </div>
-                             <div>
-                                 <label for="subjectName" class="block text-sm font-medium text-gray-700">과목명</label>
-                                 <input type="text" id="subjectName" v-model="teacherPlan.subjectName" @change="handleSubjectChange" placeholder="편제표에 등록된 과목명을 정확히 입력하세요" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
-                             </div>
-                             <div>
-                                 <label class="block text-sm font-medium text-gray-700">교과교사명</label>
-                                 <div v-for="(name, index) in teacherPlan.teacherNames" :key="index" class="flex items-center space-x-2 mt-2">
-                                     <input type="text" v-model="teacherPlan.teacherNames[index]" placeholder="교과교사 이름을 입력하세요" class="w-full p-2 border border-gray-300 rounded-md">
-                                     <button @click="removeTeacher(index)" v-if="teacherPlan.teacherNames.length > 1" class="px-3 py-1 bg-red-500 text-white rounded-md hover:bg-red-600">&times;</button>
-                                 </div>
-                                 <button @click="addTeacher" class="mt-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">+ 교과교사 추가</button>
-                             </div>
-                         </div>
+                       <!-- 계획서 작성 탭 -->
+                       <div v-if="teacherTab === 'plan'" class="space-y-6">
+                           <div class="bg-white p-6 rounded-lg shadow-md space-y-4">
+                               <div>
+                                   <label for="aiProvider" class="block text-sm font-medium text-gray-700">AI 모델 선택</label>
+                                   <select id="aiProvider" v-model="teacherPlan.aiProvider" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                                       <option value="gemini">Gemini</option>
+                                       <option value="openai">OpenAI</option>
+                                       <option value="claude">Claude</option>
+                                   </select>
+                               </div>
+                               <div v-if="teacherPlan.aiProvider !== 'openai'">
+                                   <label for="apiKey" class="block text-sm font-medium text-gray-700">{{ teacherPlan.aiProvider.toUpperCase() }} API Key</label>
+                                   <input type="password" id="apiKey" v-model="teacherPlan.apiKey" placeholder="선택한 AI 모델의 API 키를 입력하세요" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                               </div>
+                               <div>
+                                   <label for="subjectName" class="block text-sm font-medium text-gray-700">과목명</label>
+                                   <input type="text" id="subjectName" v-model="teacherPlan.subjectName" @change="handleSubjectChange" placeholder="편제표에 등록된 과목명을 정확히 입력하세요" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                               </div>
+                               <div>
+                                   <label class="block text-sm font-medium text-gray-700">교과교사명</label>
+                                   <div v-for="(name, index) in teacherPlan.teacherNames" :key="index" class="flex items-center space-x-2 mt-2">
+                                       <input type="text" v-model="teacherPlan.teacherNames[index]" placeholder="교과교사 이름을 입력하세요" class="w-full p-2 border border-gray-300 rounded-md">
+                                       <button @click="removeTeacher(index)" v-if="teacherPlan.teacherNames.length > 1" class="px-3 py-1 bg-red-500 text-white rounded-md hover:bg-red-600">&times;</button>
+                                   </div>
+                                   <button @click="addTeacher" class="mt-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">+ 교과교사 추가</button>
+                               </div>
+                           </div>
 
-                         <div class="bg-white p-6 rounded-lg shadow-md space-y-4">
-                             <h3 class="text-lg font-semibold">성취기준 및 최소 성취수준 진술문</h3>
-                             <div v-for="(achievement, index) in teacherPlan.achievements" :key="index" class="p-4 border rounded-md space-y-2">
-                                 <label class="block text-sm font-medium text-gray-700">성취기준 {{ index + 1 }}</label>
-                                 <textarea v-model="achievement.text" class="w-full p-2 border border-gray-300 rounded-md" rows="2"></textarea>
-                                 <div class="flex items-center justify-between">
-                                     <button @click="generateStatement(index)" class="px-3 py-1.5 bg-blue-500 text-white text-sm rounded-md hover:bg-blue-600 disabled:bg-gray-400" :disabled="(teacherPlan.aiProvider !== 'openai' && !teacherPlan.apiKey) || achievement.loading">
-                                         <span v-if="!achievement.loading">최소 성취수준 진술문 생성</span>
-                                         <span v-else>생성 중...</span>
-                                     </button>
-                                     <button @click="removeAchievement(index)" class="px-3 py-1.5 bg-red-500 text-white text-sm rounded-md hover:bg-red-600">&times; 삭제</button>
-                                 </div>
-                                 <div v-if="achievement.statement" class="mt-2 p-2 bg-gray-100 rounded-md">
-                                     <p class="text-sm font-semibold">최소 성취수준 진술문:</p>
-                                     <p class="text-sm text-gray-800">{{ achievement.statement }}</p>
-                                 </div>
-                             </div>
-                             <button @click="addAchievement" class="mt-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">+ 성취기준 추가</button>
-                             <p v-if="teacherPlanError" class="text-red-500 text-sm mt-2">{{ teacherPlanError }}</p>
-                         </div>
+                           <div class="bg-white p-6 rounded-lg shadow-md space-y-4">
+                               <h3 class="text-lg font-semibold">성취기준 및 최소 성취수준 진술문</h3>
+                               <div v-for="(achievement, index) in teacherPlan.achievements" :key="index" class="p-4 border rounded-md space-y-2">
+                                   <label class="block text-sm font-medium text-gray-700">성취기준 {{ index + 1 }}</label>
+                                   <textarea v-model="achievement.text" class="w-full p-2 border border-gray-300 rounded-md" rows="2"></textarea>
+                                   <div class="flex items-center justify-between">
+                                       <button @click="generateStatement(index)" class="px-3 py-1.5 bg-blue-500 text-white text-sm rounded-md hover:bg-blue-600 disabled:bg-gray-400" :disabled="(teacherPlan.aiProvider !== 'openai' && !teacherPlan.apiKey) || achievement.loading">
+                                           <span v-if="!achievement.loading">최소 성취수준 진술문 생성</span>
+                                           <span v-else>생성 중...</span>
+                                       </button>
+                                       <button @click="removeAchievement(index)" class="px-3 py-1.5 bg-red-500 text-white text-sm rounded-md hover:bg-red-600">&times; 삭제</button>
+                                   </div>
+                                   <div v-if="achievement.statement" class="mt-2 p-2 bg-gray-100 rounded-md">
+                                       <p class="text-sm font-semibold">최소 성취수준 진술문:</p>
+                                       <p class="text-sm text-gray-800">{{ achievement.statement }}</p>
+                                   </div>
+                               </div>
+                               <button @click="addAchievement" class="mt-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">+ 성취기준 추가</button>
+                               <p v-if="teacherPlanError" class="text-red-500 text-sm mt-2">{{ teacherPlanError }}</p>
+                           </div>
 
-                         <div class="bg-white p-6 rounded-lg shadow-md space-y-4">
-                             <h3 class="text-lg font-semibold">학기말 성적 산출 방법</h3>
-                             <div class="flex space-x-4">
-                                 <label><input type="radio" v-model="teacherPlan.gradeCalculation" value="추정분할점수"> 추정분할점수</label>
-                                 <label><input type="radio" v-model="teacherPlan.gradeCalculation" value="고정분할점수"> 고정분할점수</label>
-                             </div>
-                         </div>
+                           <div class="bg-white p-6 rounded-lg shadow-md space-y-4">
+                               <h3 class="text-lg font-semibold">학기말 성적 산출 방법</h3>
+                               <div class="flex space-x-4">
+                                   <label><input type="radio" v-model="teacherPlan.gradeCalculation" value="추정분할점수"> 추정분할점수</label>
+                                   <label><input type="radio" v-model="teacherPlan.gradeCalculation" value="고정분할점수"> 고정분할점수</label>
+                               </div>
+                           </div>
 
-                         <div class="bg-white p-6 rounded-lg shadow-md space-y-4">
-                             <h3 class="text-lg font-semibold">최소 성취수준 미도달 예방 지도 계획</h3>
-                             <div class="flex space-x-4">
-                                 <label><input type="radio" v-model="teacherPlan.conductPrevention" value="O"> 진행함</label>
-                                 <label><input type="radio" v-model="teacherPlan.conductPrevention" value="X"> 진행하지 않음</label>
-                             </div>
-                             <div v-if="teacherPlan.conductPrevention === 'O'" class="space-y-4 pt-4 border-t">
-                                 <div>
-                                     <label class="block text-sm font-medium text-gray-700">예방지도 대상자 선정기준</label>
-                                     <textarea v-model="teacherPlan.preventionTarget" rows="3" class="mt-1 block w-full p-2 border rounded-md"></textarea>
-                                 </div>
-                                 <div>
-                                     <label class="block text-sm font-medium text-gray-700">예방지도 방법 (복수선택 가능)</label>
-                                     <div class="mt-2 grid grid-cols-2 md:grid-cols-3 gap-2">
-                                         <label v-for="method in moduleConfig.recognizedHours" :key="method.name" class="flex items-center space-x-2">
-                                             <input type="checkbox" :value="method.name" v-model="teacherPlan.preventionMethods">
-                                             <span>{{ method.name }}</span>
-                                         </label>
-                                     </div>
-                                 </div>
-                                 <div>
-                                     <label class="block text-sm font-medium text-gray-700">예방지도 운영 기간</label>
-                                     <input type="text" class="flatpickr-range mt-1 block w-full p-2 border rounded-md">
-                                 </div>
-                                 <div>
-                                     <label class="block text-sm font-medium text-gray-700">차시별 지도 계획</label>
-                                     <div v-for="(session, index) in teacherPlan.preventionSessions" :key="index" class="flex items-center space-x-2 mt-2">
-                                         <span class="font-semibold">{{ index + 1 }}차시:</span>
-                                         <input type="text" v-model="session.plan" class="w-full p-2 border rounded-md" placeholder="지도 계획을 입력하세요">
-                                         <button @click="removePreventionSession(index)" class="px-2 py-1 bg-red-500 text-white rounded-md">&times;</button>
-                                     </div>
-                                     <button @click="addPreventionSession" class="mt-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">+ 차시 추가</button>
-                                 </div>
-                             </div>
-                         </div>
+                           <div class="bg-white p-6 rounded-lg shadow-md space-y-4">
+                               <h3 class="text-lg font-semibold">최소 성취수준 미도달 예방 지도 계획</h3>
+                               <div class="flex space-x-4">
+                                   <label><input type="radio" v-model="teacherPlan.conductPrevention" value="O"> 진행함</label>
+                                   <label><input type="radio" v-model="teacherPlan.conductPrevention" value="X"> 진행하지 않음</label>
+                               </div>
+                               <div v-if="teacherPlan.conductPrevention === 'O'" class="space-y-4 pt-4 border-t">
+                                   <div>
+                                       <label class="block text-sm font-medium text-gray-700">예방지도 대상자 선정기준</label>
+                                       <textarea v-model="teacherPlan.preventionTarget" rows="3" class="mt-1 block w-full p-2 border rounded-md"></textarea>
+                                   </div>
+                                   <div>
+                                       <label class="block text-sm font-medium text-gray-700">예방지도 방법 (복수선택 가능)</label>
+                                       <div class="mt-2 grid grid-cols-2 md:grid-cols-3 gap-2">
+                                           <label v-for="method in moduleConfig.recognizedHours" :key="method.name" class="flex items-center space-x-2">
+                                               <input type="checkbox" :value="method.name" v-model="teacherPlan.preventionMethods">
+                                               <span>{{ method.name }}</span>
+                                           </label>
+                                       </div>
+                                   </div>
+                                   <div>
+                                       <label class="block text-sm font-medium text-gray-700">예방지도 운영 기간</label>
+                                       <input type="text" class="flatpickr-range mt-1 block w-full p-2 border rounded-md" :value="teacherPlan.preventionPeriod | formatRangeDate">
+                                   </div>
+                                   <div>
+                                       <label class="block text-sm font-medium text-gray-700">차시별 지도 계획</label>
+                                       <div v-for="(session, index) in teacherPlan.preventionSessions" :key="index" class="flex items-center space-x-2 mt-2">
+                                           <span class="font-semibold">{{ index + 1 }}차시:</span>
+                                           <input type="text" v-model="session.plan" class="w-full p-2 border rounded-md" placeholder="지도 계획을 입력하세요">
+                                           <button @click="removePreventionSession(index)" class="px-2 py-1 bg-red-500 text-white rounded-md">&times;</button>
+                                       </div>
+                                       <button @click="addPreventionSession" class="mt-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">+ 차시 추가</button>
+                                   </div>
+                               </div>
+                           </div>
 
-                         <div class="bg-white p-6 rounded-lg shadow-md space-y-4">
-                             <h3 class="text-lg font-semibold">보충 지도 및 추가 학습 운영 계획</h3>
-                             <div>
-                                 <label class="block text-sm font-medium text-gray-700">보충지도/추가학습 방법 (복수선택 가능)</label>
-                                 <div class="mt-2 grid grid-cols-2 md:grid-cols-3 gap-2">
-                                     <label v-for="method in moduleConfig.recognizedHours" :key="method.name" class="flex items-center space-x-2">
-                                         <input type="checkbox" :value="method.name" v-model="teacherPlan.supplementaryMethods">
-                                         <span>{{ method.name }}</span>
-                                     </label>
-                                 </div>
-                             </div>
-                             <div>
-                                 <label class="block text-sm font-medium text-gray-700">보충지도/추가학습 운영 기간</label>
-                                 <input type="text" class="flatpickr-range mt-1 block w-full p-2 border rounded-md">
-                             </div>
-                             <div>
-                                 <label class="block text-sm font-medium text-gray-700">차시별 지도 계획 (최대 {{ teacherPlan.maxSupplementaryHours }}차시)</label>
-                                 <div v-for="(session, index) in teacherPlan.supplementarySessions" :key="index" class="flex items-center space-x-2 mt-2">
-                                     <span class="font-semibold">{{ index + 1 }}차시:</span>
-                                     <input type="text" v-model="session.plan" class="w-full p-2 border rounded-md" placeholder="지도 계획을 입력하세요">
-                                     <button @click="removeSupplementarySession(index)" class="px-2 py-1 bg-red-500 text-white rounded-md">&times;</button>
-                                 </div>
-                                 <button @click="addSupplementarySession" :disabled="teacherPlan.supplementarySessions.length >= teacherPlan.maxSupplementaryHours" class="mt-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 disabled:bg-gray-400">+ 차시 추가</button>
-                             </div>
-                         </div>
+                           <div class="bg-white p-6 rounded-lg shadow-md space-y-4">
+                               <h3 class="text-lg font-semibold">보충 지도 및 추가 학습 운영 계획</h3>
+                               <div>
+                                   <label class="block text-sm font-medium text-gray-700">보충지도/추가학습 방법 (복수선택 가능)</label>
+                                   <div class="mt-2 grid grid-cols-2 md:grid-cols-3 gap-2">
+                                       <label v-for="method in moduleConfig.recognizedHours" :key="method.name" class="flex items-center space-x-2">
+                                           <input type="checkbox" :value="method.name" v-model="teacherPlan.supplementaryMethods">
+                                           <span>{{ method.name }}</span>
+                                       </label>
+                                   </div>
+                               </div>
+                               <div>
+                                   <label class="block text-sm font-medium text-gray-700">보충지도/추가학습 운영 기간</label>
+                                   <input type="text" class="flatpickr-range mt-1 block w-full p-2 border rounded-md" :value="teacherPlan.supplementaryPeriod | formatRangeDate">
+                               </div>
+                               <div>
+                                   <label class="block text-sm font-medium text-gray-700">차시별 지도 계획 (최대 {{ teacherPlan.maxSupplementaryHours }}차시)</label>
+                                   <div v-for="(session, index) in teacherPlan.supplementarySessions" :key="index" class="flex items-center space-x-2 mt-2">
+                                       <span class="font-semibold">{{ index + 1 }}차시:</span>
+                                       <input type="text" v-model="session.plan" class="w-full p-2 border rounded-md" placeholder="지도 계획을 입력하세요">
+                                       <button @click="removeSupplementarySession(index)" class="px-2 py-1 bg-red-500 text-white rounded-md">&times;</button>
+                                   </div>
+                                   <button @click="addSupplementarySession" :disabled="!teacherPlan.maxSupplementaryHours || teacherPlan.supplementarySessions.length >= teacherPlan.maxSupplementaryHours" class="mt-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 disabled:bg-gray-400">+ 차시 추가</button>
+                               </div>
+                           </div>
 
-                         <div class="text-center">
-                              <button @click="saveTeacherPlan" class="mt-6 px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition">계획안 저장</button>
-                             <button @click="generatePlanPreview" class="mt-6 ml-4 px-8 py-3 bg-indigo-600 text-white font-bold rounded-md hover:bg-indigo-700 transition text-lg">계획안 미리보기</button>
-                              <p v-if="teacherPlanStatus" class="mt-2 text-sm text-green-600">{{ teacherPlanStatus }}</p>
-                         </div>
-                     </div>
+                           <div class="text-center">
+                                <button @click="saveTeacherPlan" class="mt-6 px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition">계획안 저장</button>
+                               <button @click="generatePlanPreview" class="mt-6 ml-4 px-8 py-3 bg-indigo-600 text-white font-bold rounded-md hover:bg-indigo-700 transition text-lg">계획안 미리보기</button>
+                                <p v-if="teacherPlanStatus" class="mt-2 text-sm text-green-600">{{ teacherPlanStatus }}</p>
+                           </div>
+                       </div>
 
-                     <!-- 지도 출석부 & 수업일지 -->
-                      <div v-if="currentGuidanceData && teacherTab !== 'plan'" class="space-y-8">
-                         <div class="bg-white p-6 rounded-lg shadow-md flex justify-between items-start">
-                             <h3 class="text-xl font-semibold">{{ teacherTab === 'preventive' ? '예방지도' : '보충지도(추가학습)' }} 출석부 & 수업일지</h3>
-                             <div class="text-right">
-                                 <p><strong>과목명:</strong> {{ teacherPlan.subjectName || '미입력' }}</p>
-                                 <p><strong>교과교사:</strong> {{ formattedTeacherNames }}</p>
-                                 <div class="mt-2 flex space-x-2">
-                                     <button @click="generateCompletionStatusPdf(teacherTab)" class="px-3 py-1.5 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition text-xs">이수현황표 PDF</button>
-                                     <button @click="generateAttendancePdf(teacherTab)" class="px-3 py-1.5 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition text-xs">출석부 PDF</button>
-                                     <button @click="generateLessonLogPdf(teacherTab)" class="px-3 py-1.5 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition text-xs">수업일지 PDF</button>
-                                 </div>
-                             </div>
-                         </div>
+                       <!-- 지도 출석부 & 수업일지 -->
+                        <div v-if="currentGuidanceData && teacherTab !== 'plan'" class="space-y-8">
+                           <div class="bg-white p-6 rounded-lg shadow-md flex justify-between items-start">
+                               <h3 class="text-xl font-semibold">{{ teacherTab === 'preventive' ? '예방지도' : '보충지도(추가학습)' }} 출석부 & 수업일지</h3>
+                               <div class="text-right">
+                                   <p><strong>과목명:</strong> {{ teacherPlan.subjectName || '미입력' }}</p>
+                                   <p><strong>교과교사:</strong> {{ formattedTeacherNames }}</p>
+                                   <div class="mt-2 flex space-x-2">
+                                       <button @click="generateCompletionStatusPdf(teacherTab)" class="px-3 py-1.5 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition text-xs">이수현황표 PDF</button>
+                                       <button @click="generateAttendancePdf(teacherTab)" class="px-3 py-1.5 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition text-xs">출석부 PDF</button>
+                                       <button @click="generateLessonLogPdf(teacherTab)" class="px-3 py-1.5 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition text-xs">수업일지 PDF</button>
+                                   </div>
+                               </div>
+                           </div>
 
-                         <!-- 이수현황표 -->
-                         <div class="bg-white p-6 rounded-lg shadow-md">
-                             <h4 class="text-lg font-semibold mb-4">{{ teacherTab === 'preventive' ? '예방지도' : '보충지도(추가학습)' }} 이수현황표</h4>
-                             <div class="overflow-x-auto">
-                                 <table class="min-w-full text-sm text-center">
-                                     <thead class="bg-gray-50">
-                                         <tr>
-                                             <th class="p-2 border">학생</th>
-                                             <th v-if="teacherTab === 'supplementary'" class="p-2 border">특기사항</th>
-                                             <th v-if="teacherTab === 'supplementary'" class="p-2 border">미도달 항목</th>
-                                             <th v-if="teacherTab === 'supplementary'" class="p-2 border">예방지도</th>
-                                             <th v-if="teacherTab === 'supplementary'" class="p-2 border">정서지원프로그램</th>
-                                             <th v-for="rh in moduleConfig.recognizedHours" :key="rh.name" class="p-2 border">{{ rh.name }}</th>
-                                             <th class="p-2 border bg-gray-100">총계</th>
-                                             <th v-if="teacherTab === 'supplementary'" class="p-2 border bg-gray-100">이수여부</th>
-                                         </tr>
-                                     </thead>
-                                     <tbody>
-                                         <tr v-for="student in currentGuidanceData.students" :key="student.id">
-                                             <td class="p-2 border font-semibold whitespace-nowrap">{{ student.name }} ({{ student.id }})</td>
-                                             <td v-if="teacherTab === 'supplementary'" class="p-2 border">
-                                                 {{ guidanceCompletionStatus[student.id] ? guidanceCompletionStatus[student.id].specialNotes : '일반학생' }}
-                                             </td>
-                                             <td v-if="teacherTab === 'supplementary'" class="p-2 border">{{ student.reason }}</td>
-                                             <td v-if="teacherTab === 'supplementary'" class="p-2 border">
-                                                 {{ guidanceCompletionStatus[student.id] ? guidanceCompletionStatus[student.id].preventiveHours : 0 }}
-                                             </td>
-                                             <td v-if="teacherTab === 'supplementary'" class="p-2 border">
-                                                 {{ guidanceCompletionStatus[student.id] ? guidanceCompletionStatus[student.id].emotionalSupportHours : 0 }}
-                                             </td>
-                                             <td v-for="rh in moduleConfig.recognizedHours" :key="rh.name" class="p-2 border">
-                                                 {{ guidanceCompletionStatus[student.id] ? guidanceCompletionStatus[student.id][rh.name] : 0 }}
-                                             </td>
-                                             <td class="p-2 border bg-gray-100 font-bold">
-                                                 {{ guidanceCompletionStatus[student.id] ? guidanceCompletionStatus[student.id].total : 0 }}
-                                             </td>
-                                             <td v-if="teacherTab === 'supplementary'"
-                                                 class="p-2 border font-bold"
-                                                 :class="{
-                                                     'text-green-600': guidanceCompletionStatus[student.id] && guidanceCompletionStatus[student.id].completionStatus === '이수',
-                                                     'text-red-600': guidanceCompletionStatus[student.id] && guidanceCompletionStatus[student.id].completionStatus === '미이수'
-                                                 }">
-                                                 {{ guidanceCompletionStatus[student.id] ? guidanceCompletionStatus[student.id].completionStatus : '' }}
-                                             </td>
-                                         </tr>
-                                          <tr v-if="currentGuidanceData.students.length === 0">
-                                             <td :colspan="moduleConfig.recognizedHours.length + (teacherTab === 'supplementary' ? 7 : 2)" class="text-center p-4 text-gray-500">학생이 없습니다.</td>
-                                         </tr>
-                                     </tbody>
-                                 </table>
-                             </div>
-                         </div>
+                           <!-- 이수현황표 -->
+                           <div class="bg-white p-6 rounded-lg shadow-md">
+                               <h4 class="text-lg font-semibold mb-4">{{ teacherTab === 'preventive' ? '예방지도' : '보충지도(추가학습)' }} 이수현황표</h4>
+                               <div class="overflow-x-auto">
+                                   <table class="min-w-full text-sm text-center">
+                                       <thead class="bg-gray-50">
+                                           <tr>
+                                               <th class="p-2 border">학생</th>
+                                               <th v-if="teacherTab === 'supplementary'" class="p-2 border">특기사항</th>
+                                               <th v-if="teacherTab === 'supplementary'" class="p-2 border">미도달 항목</th>
+                                               <th v-if="teacherTab === 'supplementary'" class="p-2 border">예방지도</th>
+                                               <th v-if="teacherTab === 'supplementary'" class="p-2 border">정서지원프로그램</th>
+                                               <th v-for="rh in moduleConfig.recognizedHours" :key="rh.name" class="p-2 border">{{ rh.name }}</th>
+                                               <th class="p-2 border bg-gray-100">총계</th>
+                                               <th v-if="teacherTab === 'supplementary'" class="p-2 border bg-gray-100">이수여부</th>
+                                           </tr>
+                                       </thead>
+                                       <tbody>
+                                           <tr v-for="student in currentGuidanceData.students" :key="student.id">
+                                               <td class="p-2 border font-semibold whitespace-nowrap">{{ student.name }} ({{ student.id }})</td>
+                                               <td v-if="teacherTab === 'supplementary'" class="p-2 border">
+                                                   {{ guidanceCompletionStatus[student.id] ? guidanceCompletionStatus[student.id].specialNotes : '일반학생' }}
+                                               </td>
+                                               <td v-if="teacherTab === 'supplementary'" class="p-2 border">{{ student.reason }}</td>
+                                               <td v-if="teacherTab === 'supplementary'" class="p-2 border">
+                                                   {{ guidanceCompletionStatus[student.id] ? guidanceCompletionStatus[student.id].preventiveHours : 0 }}
+                                               </td>
+                                               <td v-if="teacherTab === 'supplementary'" class="p-2 border">
+                                                   {{ guidanceCompletionStatus[student.id] ? guidanceCompletionStatus[student.id].emotionalSupportHours : 0 }}
+                                               </td>
+                                               <td v-for="rh in moduleConfig.recognizedHours" :key="rh.name" class="p-2 border">
+                                                   {{ guidanceCompletionStatus[student.id] ? guidanceCompletionStatus[student.id][rh.name] : 0 }}
+                                               </td>
+                                               <td class="p-2 border bg-gray-100 font-bold">
+                                                   {{ guidanceCompletionStatus[student.id] ? guidanceCompletionStatus[student.id].total : 0 }}
+                                               </td>
+                                               <td v-if="teacherTab === 'supplementary'"
+                                                   class="p-2 border font-bold"
+                                                   :class="{
+                                                       'text-green-600': guidanceCompletionStatus[student.id] && guidanceCompletionStatus[student.id].completionStatus === '이수',
+                                                       'text-red-600': guidanceCompletionStatus[student.id] && guidanceCompletionStatus[student.id].completionStatus === '미이수'
+                                                   }">
+                                                   {{ guidanceCompletionStatus[student.id] ? guidanceCompletionStatus[student.id].completionStatus : '' }}
+                                               </td>
+                                           </tr>
+                                            <tr v-if="!currentGuidanceData.students || currentGuidanceData.students.length === 0">
+                                               <td :colspan="moduleConfig.recognizedHours.length + (teacherTab === 'supplementary' ? 7 : 2)" class="text-center p-4 text-gray-500">학생이 없습니다.</td>
+                                           </tr>
+                                       </tbody>
+                                   </table>
+                               </div>
+                           </div>
 
-                         <!-- 출석부 -->
-                         <div class="bg-white p-6 rounded-lg shadow-md">
-                             <h4 class="text-lg font-semibold mb-4">출석부</h4>
-                             <div v-if="teacherTab === 'preventive'">
-                                 <div class="flex space-x-2 mb-4">
-                                     <input type="text" v-model="newGuidanceStudentId" @keyup.enter="addGuidanceStudent(teacherTab)" placeholder="학번 입력 후 Enter" class="p-2 border rounded-md w-48">
-                                     <button @click="addGuidanceStudent(teacherTab)" class="px-4 py-2 bg-blue-500 text-white rounded-md">학생 추가</button>
-                                 </div>
-                                 <p v-if="currentGuidanceData.error" class="text-red-500 text-sm mb-4 -mt-2">{{ currentGuidanceData.error }}</p>
-                             </div>
-                             <div v-else class="mb-4">
-                                  <!-- Re-enabled Import Button -->
-                                  <div class="flex space-x-2">
-                                      <button @click="showImportModal = true" class="px-4 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 transition">대상자 가져오기</button>
-                                      <button @click="resetSupplementaryStudents" class="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition">대상자 초기화</button>
-                                  </div>
-                                  <p class="mt-2 text-sm text-gray-600">관리자가 배포한 미도달 학생 명단에서 과목, 학급별로 대상자를 검색하여 가져옵니다.</p>
-                             </div>
+                           <!-- 출석부 -->
+                           <div class="bg-white p-6 rounded-lg shadow-md">
+                               <h4 class="text-lg font-semibold mb-4">출석부</h4>
+                               <div v-if="teacherTab === 'preventive'">
+                                   <div class="flex space-x-2 mb-4">
+                                       <input type="text" v-model="newGuidanceStudentId" @keyup.enter="addGuidanceStudent(teacherTab)" placeholder="학번 입력 후 Enter" class="p-2 border rounded-md w-48">
+                                       <button @click="addGuidanceStudent(teacherTab)" class="px-4 py-2 bg-blue-500 text-white rounded-md">학생 추가</button>
+                                   </div>
+                                   <p v-if="currentGuidanceData.error" class="text-red-500 text-sm mb-4 -mt-2">{{ currentGuidanceData.error }}</p>
+                               </div>
+                               <div v-else class="mb-4">
+                                    <!-- Re-enabled Import Button -->
+                                    <div class="flex space-x-2">
+                                        <button @click="showImportModal = true" class="px-4 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 transition">대상자 가져오기</button>
+                                        <button @click="resetSupplementaryStudents" class="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition">대상자 초기화</button>
+                                    </div>
+                                    <p class="mt-2 text-sm text-gray-600">관리자가 배포한 미도달 학생 명단에서 과목, 학급별로 대상자를 검색하여 가져옵니다.</p>
+                               </div>
 
-                             <div class="relative">
-                                 <button @click="scrollAttendance('left', $event)" class="scroll-arrow left">‹</button>
-                                 <div class="overflow-x-auto">
-                                     <table class="min-w-full text-sm border-collapse">
-                                         <thead>
-                                             <tr class="text-center">
-                                                 <th class="sticky left-0 bg-gray-100 z-20 p-2 border-y border-l border-r border-gray-300 w-[80px]">학번</th>
-                                                 <th class="sticky left-[50px] bg-gray-100 z-20 p-2 border-y border-r border-gray-300 w-[96px] whitespace-nowrap">이름</th>
-                                                 <th v-for="(session, index) in currentGuidanceData.sessions" :key="index" class="p-2 border border-gray-300 min-w-[150px]">
-                                                     <div class="flex items-center justify-center space-x-2 mb-2">
-                                                         <p class="font-bold">{{ index + 1 }}차시</p>
-                                                         <button v-if="session.isSaved" @click="toggleSaveSession(session)" title="수정" class="p-1 hover:bg-gray-200 rounded">
-                                                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-600"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
-                                                         </button>
-                                                     </div>
-                                                     <input type="text" class="flatpickr-single w-full p-1 border rounded text-center text-xs mb-1" placeholder="날짜 선택" :value="session.date" @change="session.date = $event.target.value; saveGuidanceData()" :disabled="session.isSaved">
-                                                     <input type="text" class="w-full p-1 border rounded text-center text-xs" placeholder="예: 16:00~17:00" v-model="session.time" @change="saveGuidanceData" :disabled="session.isSaved">
-                                                     <button v-if="!session.isSaved" @click="toggleSaveSession(session)" :disabled="!isSessionReadyToSave(session)" class="w-full mt-1 px-2 py-1 text-xs rounded text-white bg-green-500 hover:bg-green-600 disabled:bg-gray-400">저장</button>
-                                                 </th>
-                                             </tr>
-                                         </thead>
-                                         <tbody>
-                                             <tr v-for="student in currentGuidanceData.students" :key="student.id" class="text-center">
-                                                 <td class="sticky left-0 bg-white z-20 p-2 border-l border-r border-b border-gray-300">{{ student.id }}</td>
-                                                 <td class="sticky left-[50px] bg-white z-20 p-2 border-r border-b border-gray-300 font-semibold whitespace-nowrap">{{ student.name }}</td>
-                                                 <td v-for="(session, index) in currentGuidanceData.sessions" :key="index" class="p-2 border border-gray-300">
-                                                     <select class="w-full p-1 border rounded text-xs" v-model="session.attendance[student.id]" :disabled="session.isSaved" @change="saveGuidanceData">
-                                                         <option value="">선택</option>
-                                                         <option v-for="rh in moduleConfig.recognizedHours" :key="rh.name" :value="rh.name">{{ rh.name }}</option>
-                                                     </select>
-                                                 </td>
-                                             </tr>
-                                             <tr v-if="currentGuidanceData.students.length === 0">
-                                                 <td :colspan="(currentGuidanceData.sessions?.length || 0) + 2" class="text-center p-4 border border-gray-300 text-gray-500">학생을 추가해주세요.</td>
-                                             </tr>
-                                         </tbody>
-                                     </table>
-                                 </div>
-                                 <button @click="scrollAttendance('right', $event)" class="scroll-arrow right">›</button>
-                             </div>
-                             <button @click="addGuidanceSession(teacherTab)" class="mt-4 px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 text-sm">+ 차시 추가</button>
-                         </div>
+                               <div class="relative">
+                                   <button @click="scrollAttendance('left', $event)" class="scroll-arrow left">‹</button>
+                                   <div class="overflow-x-auto">
+                                       <table class="min-w-full text-sm border-collapse">
+                                           <thead>
+                                               <tr class="text-center">
+                                                   <th class="sticky left-0 bg-gray-100 z-20 p-2 border-y border-l border-r border-gray-300 w-[80px]">학번</th>
+                                                   <th class="sticky left-[50px] bg-gray-100 z-20 p-2 border-y border-r border-gray-300 w-[96px] whitespace-nowrap">이름</th>
+                                                   <th v-for="(session, index) in currentGuidanceData.sessions" :key="index" class="p-2 border border-gray-300 min-w-[150px]">
+                                                       <div class="flex items-center justify-center space-x-2 mb-2">
+                                                           <p class="font-bold">{{ index + 1 }}차시</p>
+                                                           <button v-if="session.isSaved" @click="toggleSaveSession(session)" title="수정" class="p-1 hover:bg-gray-200 rounded">
+                                                               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-600"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+                                                           </button>
+                                                       </div>
+                                                       <input type="text" class="flatpickr-single w-full p-1 border rounded text-center text-xs mb-1" placeholder="날짜 선택" :value="session.date" @change="session.date = $event.target.value; saveGuidanceData()" :disabled="session.isSaved">
+                                                       <input type="text" class="w-full p-1 border rounded text-center text-xs" placeholder="예: 16:00~17:00" v-model="session.time" @change="saveGuidanceData" :disabled="session.isSaved">
+                                                       <button v-if="!session.isSaved" @click="toggleSaveSession(session)" :disabled="!isSessionReadyToSave(session)" class="w-full mt-1 px-2 py-1 text-xs rounded text-white bg-green-500 hover:bg-green-600 disabled:bg-gray-400">저장</button>
+                                                   </th>
+                                               </tr>
+                                           </thead>
+                                           <tbody>
+                                               <tr v-for="student in currentGuidanceData.students" :key="student.id" class="text-center">
+                                                   <td class="sticky left-0 bg-white z-20 p-2 border-l border-r border-b border-gray-300">{{ student.id }}</td>
+                                                   <td class="sticky left-[50px] bg-white z-20 p-2 border-r border-b border-gray-300 font-semibold whitespace-nowrap">{{ student.name }}</td>
+                                                   <td v-for="(session, index) in currentGuidanceData.sessions" :key="index" class="p-2 border border-gray-300">
+                                                       <select class="w-full p-1 border rounded text-xs" v-model="session.attendance[student.id]" :disabled="session.isSaved" @change="saveGuidanceData">
+                                                           <option value="">선택</option>
+                                                           <option v-for="rh in moduleConfig.recognizedHours" :key="rh.name" :value="rh.name">{{ rh.name }}</option>
+                                                       </select>
+                                                   </td>
+                                               </tr>
+                                               <tr v-if="!currentGuidanceData.students || currentGuidanceData.students.length === 0">
+                                                   <td :colspan="(currentGuidanceData.sessions?.length || 0) + 2" class="text-center p-4 border border-gray-300 text-gray-500">학생을 추가해주세요.</td>
+                                               </tr>
+                                           </tbody>
+                                       </table>
+                                   </div>
+                                   <button @click="scrollAttendance('right', $event)" class="scroll-arrow right">›</button>
+                               </div>
+                               <button @click="addGuidanceSession(teacherTab)" class="mt-4 px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 text-sm">+ 차시 추가</button>
+                           </div>
 
-                         <!-- 수업일지 -->
-                         <div class="bg-white p-6 rounded-lg shadow-md">
-                             <h4 class="text-lg font-semibold mb-4">수업일지</h4>
-                             <div class="mb-6 p-4 border rounded-md bg-gray-50 grid grid-cols-2 gap-4 text-sm">
-                                 <div><strong>과목명:</strong> {{ teacherPlan.subjectName || '미입력' }}</div>
-                                 <div><strong>운영차시:</strong> {{ savedGuidanceSessions.length }} 차시</div>
-                                 <div><strong>지도교사:</strong> {{ formattedTeacherNames }}</div>
-                                 <div><strong>운영기간:</strong> {{ guidanceOperationPeriod }}</div>
-                             </div>
-                             <div class="space-y-4">
-                                 <div v-for="(session, index) in savedGuidanceSessions" :key="session.date + index" class="p-4 border rounded-md">
-                                     <p class="font-bold mb-2">{{ index + 1 }}차시 수업일지 ({{ session.date }} / {{ session.time }})</p>
-                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                                         <p><strong>수업방법:</strong> {{ [...new Set(Object.values(session.attendance || {}))].filter(Boolean).join(', ') }}</p>
-                                         <div class="flex items-center">
-                                             <label class="font-semibold mr-2 shrink-0">장소:</label>
-                                             <input type="text" class="w-full p-1 border rounded" v-model="session.place" @change="saveGuidanceData">
-                                         </div>
-                                     </div>
-                                     <div class="mt-2">
-                                         <label class="font-semibold text-sm">지도내용:</label>
-                                         <textarea rows="3" class="w-full p-1 border rounded mt-1 text-sm" v-model="session.content" @change="saveGuidanceData"></textarea>
-                                     </div>
-                                 </div>
-                                 <p v-if="savedGuidanceSessions.length === 0" class="text-center text-gray-500">저장된 수업일지가 없습니다.</p>
-                             </div>
-                         </div>
-                     </div>
-                      <!-- Message when teacher tab is not 'plan' but guidance data isn't ready -->
-                      <div v-if="teacherTab !== 'plan' && !teacherPlan.subjectName" class="text-center text-gray-500 mt-10">
-                         <p>출석부 및 수업일지를 보려면 먼저 '계획서 작성' 탭에서 과목명을 입력하고 저장해주세요.</p>
-                      </div>
+                           <!-- 수업일지 -->
+                           <div class="bg-white p-6 rounded-lg shadow-md">
+                               <h4 class="text-lg font-semibold mb-4">수업일지</h4>
+                               <div class="mb-6 p-4 border rounded-md bg-gray-50 grid grid-cols-2 gap-4 text-sm">
+                                   <div><strong>과목명:</strong> {{ teacherPlan.subjectName || '미입력' }}</div>
+                                   <div><strong>운영차시:</strong> {{ savedGuidanceSessions.length }} 차시</div>
+                                   <div><strong>지도교사:</strong> {{ formattedTeacherNames }}</div>
+                                   <div><strong>운영기간:</strong> {{ guidanceOperationPeriod }}</div>
+                               </div>
+                               <div class="space-y-4">
+                                   <div v-for="(session, index) in savedGuidanceSessions" :key="session.date + index" class="p-4 border rounded-md">
+                                       <p class="font-bold mb-2">{{ index + 1 }}차시 수업일지 ({{ session.date }} / {{ session.time }})</p>
+                                       <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                           <p><strong>수업방법:</strong> {{ [...new Set(Object.values(session.attendance || {}))].filter(Boolean).join(', ') }}</p>
+                                           <div class="flex items-center">
+                                               <label class="font-semibold mr-2 shrink-0">장소:</label>
+                                               <input type="text" class="w-full p-1 border rounded" v-model="session.place" @change="saveGuidanceData">
+                                           </div>
+                                       </div>
+                                       <div class="mt-2">
+                                           <label class="font-semibold text-sm">지도내용:</label>
+                                           <textarea rows="3" class="w-full p-1 border rounded mt-1 text-sm" v-model="session.content" @change="saveGuidanceData"></textarea>
+                                       </div>
+                                   </div>
+                                   <p v-if="savedGuidanceSessions.length === 0" class="text-center text-gray-500">저장된 수업일지가 없습니다.</p>
+                               </div>
+                           </div>
+                       </div>
+                        <!-- Message when teacher tab is not 'plan' but guidance data isn't ready -->
+                        <div v-if="teacherTab !== 'plan' && !teacherPlan.subjectName" class="text-center text-gray-500 mt-10">
+                            <p>출석부 및 수업일지를 보려면 먼저 '계획서 작성' 탭에서 과목명을 입력하고 저장해주세요.</p>
+                        </div>
                  </div>
 
                  <!-- Homeroom Teacher View -->
@@ -832,7 +867,7 @@
                      </div>
                  </form>
              </div>
-          </div>
+         </div>
 
 
         <!-- Preview Modal -->
@@ -876,7 +911,7 @@
                      </div>
                  </form>
              </div>
-          </div>
+         </div>
 
 
         <!-- 인쇄용 컨테이너 (숨김 - html2canvas 전용) -->
@@ -1115,10 +1150,10 @@
                     if (this.teacherPlan.subjectName) {
                         const subjectInfo = this.curriculumData.find(s => s.과목명 === this.teacherPlan.subjectName);
                         if (subjectInfo) {
-                            requiredSubjectCredits = Number(subjectInfo.학점) || 0;
-                            supplementaryHours = requiredSubjectCredits * this.moduleConfig.hoursPerCredit;
+                             requiredSubjectCredits = Number(subjectInfo.학점) || 0;
+                             supplementaryHours = requiredSubjectCredits * this.moduleConfig.hoursPerCredit;
                              requiredHoursForCompletion = Math.ceil((supplementaryHours * 2) / 3 * 10) / 10; // 2/3, rounded up to 1 decimal
-                            maxEmotionalSupportHours = supplementaryHours * (this.moduleConfig.emotionalSupportRatio / 100);
+                             maxEmotionalSupportHours = supplementaryHours * (this.moduleConfig.emotionalSupportRatio / 100);
                         }
                     }
 
@@ -1149,7 +1184,7 @@
                                          if (methodConfig) {
                                              status[studentId][methodName] = parseFloat((status[studentId][methodName] + methodConfig.hours).toFixed(2));
                                              if (this.teacherTab === 'preventive') {
-                                                status[studentId].total = parseFloat((status[studentId].total + methodConfig.hours).toFixed(2));
+                                                 status[studentId].total = parseFloat((status[studentId].total + methodConfig.hours).toFixed(2));
                                              }
                                          }
                                      }
@@ -1164,7 +1199,7 @@
 
                              let currentStudentTotal = 0;
                              this.moduleConfig.recognizedHours.forEach(rh => {
-                                currentStudentTotal += (status[student.id][rh.name] || 0);
+                                 currentStudentTotal += (status[student.id][rh.name] || 0);
                              });
 
                             const totalPreventiveHoursForStudent = preventiveTotals[student.id] || 0;
@@ -1178,8 +1213,8 @@
                                      creditedPreventiveHours = Math.min(totalPreventiveHoursForStudent, maxAllowedHours);
                                  } else {
                                     maxAllowedHours = supplementaryHours * (this.moduleConfig.preventiveRatio / 100);
-                                    creditedPreventiveHours = Math.floor(Math.min(totalPreventiveHoursForStudent, maxAllowedHours)); // Floor for general
-                                }
+                                     creditedPreventiveHours = Math.floor(Math.min(totalPreventiveHoursForStudent, maxAllowedHours)); // Floor for general
+                                 }
                                  status[student.id].preventiveHours = parseFloat(creditedPreventiveHours.toFixed(2));
                                  currentStudentTotal += creditedPreventiveHours;
                              }
@@ -1197,8 +1232,8 @@
                              } else {
                                  status[student.id].completionStatus = '미이수';
                              }
-                        });
-                    }
+                         });
+                     }
                     return status;
                 },
                 savedGuidanceSessions() {
@@ -1356,7 +1391,7 @@
                         // onAuthStateChanged will handle the rest
                     } catch (error) {
                         console.error("Login failed:", error);
-                        if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
+                         if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
                              alert(`로그인 실패: ${error.message}`);
                          }
                     }
@@ -1384,13 +1419,13 @@
                          this.showAdminCodeInput = false; this.adminCodeError = ''; this.statusMessage = '';
                          await this.loadCommonData();
                           if(selectedRole === '교과교사') {
-                              await this.loadTeacherPlan();
-                              if(this.teacherPlan.subjectName){
-                                 await this.loadGuidanceData();
-                                 this.filterSupplementaryStudents();
-                              }
+                               await this.loadTeacherPlan();
+                               if(this.teacherPlan.subjectName){
+                                   await this.loadGuidanceData();
+                                   this.filterSupplementaryStudents();
+                               }
                           } else if (selectedRole === '관리자') {
-                              this.underachievers = JSON.parse(JSON.stringify(this.deployedUnderachievers));
+                               this.underachievers = JSON.parse(JSON.stringify(this.deployedUnderachievers));
                           }
                          this.isLoading = false;
                          this.$nextTick(() => { this.initFlatpickr(); });
@@ -1548,7 +1583,7 @@
                             if (type === 'emotionalSupport') this.emotionalSupportData = jsonData;
 
                             this.uploadStatus[type] = `${file.name} 업로드 및 저장 완료.`;
-                             this.updateMaxHours();
+                             this.updateMaxHours(); // Update calculations if curriculum changes
                         } catch (error) {
                             console.error(`Error processing/saving ${type} file:`, error);
                             this.uploadStatus[type] = `${file.name} 처리/저장 중 오류 발생: ${error.message}`;
@@ -1604,39 +1639,49 @@
                          const docSnap = await getDoc(planDocRef);
                          if (docSnap.exists()) {
                              const loadedPlan = docSnap.data();
+                             // Reset to default, then apply loaded
                              Object.assign(this.teacherPlan, this.getInitialTeacherPlan());
                              Object.assign(this.teacherPlan, loadedPlan);
+                             
+                             // Ensure array properties exist
                              this.teacherPlan.teacherNames = this.teacherPlan.teacherNames && this.teacherPlan.teacherNames.length > 0 ? this.teacherPlan.teacherNames : [''];
                              this.teacherPlan.achievements = this.teacherPlan.achievements && this.teacherPlan.achievements.length > 0 ? this.teacherPlan.achievements : [{ text: '', statement: '', loading: false }];
                              this.teacherPlan.preventionMethods = this.teacherPlan.preventionMethods || [];
                              this.teacherPlan.preventionSessions = this.teacherPlan.preventionSessions && this.teacherPlan.preventionSessions.length > 0 ? this.teacherPlan.preventionSessions : [{plan:''}];
                              this.teacherPlan.supplementaryMethods = this.teacherPlan.supplementaryMethods || [];
                              this.teacherPlan.supplementarySessions = this.teacherPlan.supplementarySessions && this.teacherPlan.supplementarySessions.length > 0 ? this.teacherPlan.supplementarySessions : [{plan:''}];
+                             
+                             // Clean up transient state
                              this.teacherPlan.achievements.forEach(a => a.loading = false);
+                             
+                             // Convert Firestore Timestamps or ISO strings back to Date objects for flatpickr
                              this.teacherPlan.preventionPeriod = (this.teacherPlan.preventionPeriod || []).map(d => d ? new Date(d.seconds ? d.seconds * 1000 : d) : null).filter(d => d && !isNaN(d.getTime()));
                              this.teacherPlan.supplementaryPeriod = (this.teacherPlan.supplementaryPeriod || []).map(d => d ? new Date(d.seconds ? d.seconds * 1000 : d) : null).filter(d => d && !isNaN(d.getTime()));
+                             
                              console.log("Teacher plan loaded.");
                          } else {
                              console.log("No saved teacher plan found, using defaults.");
-                             this.resetTeacherData(false);
+                             this.resetTeacherData(false); // Don't reset guidance data
                          }
                      } catch (error) { console.error("Error loading teacher plan:", error); this.resetTeacherData(false); }
-                      this.updateMaxHours();
-                      this.$nextTick(() => { this.initFlatpickr(); });
+                      this.updateMaxHours(); // Calculate max hours based on loaded subject
+                      this.$nextTick(() => { this.initFlatpickr(); }); // Re-init flatpickr for loaded dates
                  },
                  async saveTeacherPlan() {
                      if (!this.user || !db || !this.schoolId || this.role !== '교과교사') return;
                       if (!this.teacherPlan.subjectName) {
-                         this.teacherPlanStatus = "과목명을 먼저 입력해주세요.";
-                         setTimeout(() => this.teacherPlanStatus = '', 3000);
-                         return;
+                          this.teacherPlanStatus = "과목명을 먼저 입력해주세요.";
+                          setTimeout(() => this.teacherPlanStatus = '', 3000);
+                          return;
                      }
                      this.teacherPlanStatus = "계획안 저장 중...";
                       const planDocRef = doc(db, `schools/${this.schoolId}/teacherData/${this.user.uid}`, "teacherPlan");
                      try {
                           const planToSave = { ...JSON.parse(JSON.stringify(this.teacherPlan)) };
+                           // Convert Date objects to ISO strings for Firestore
                            planToSave.preventionPeriod = this.teacherPlan.preventionPeriod.map(d => (d instanceof Date && !isNaN(d.getTime())) ? d.toISOString() : null).filter(Boolean);
                            planToSave.supplementaryPeriod = this.teacherPlan.supplementaryPeriod.map(d => (d instanceof Date && !isNaN(d.getTime())) ? d.toISOString() : null).filter(Boolean);
+                           // Remove transient 'loading' state
                            planToSave.achievements = (planToSave.achievements || []).map(({ loading, ...rest }) => rest);
                           await setDoc(planDocRef, planToSave);
                          this.teacherPlanStatus = "계획안이 저장되었습니다.";
@@ -1684,7 +1729,7 @@
                      try {
                          const dataToSave = JSON.parse(JSON.stringify(this.teacherGuidanceData));
                         await setDoc(doc(db, docPath), dataToSave);
-                        // console.log("Guidance data saved for", this.teacherPlan.subjectName);
+                         // console.log("Guidance data saved for", this.teacherPlan.subjectName);
                      } catch (error) { console.error("Error saving guidance data:", error); }
                 },
                 mergeSessions(defaultSessions, loadedSessions) {
@@ -1720,45 +1765,48 @@
                      await this.saveTeacherPlan();
                      this.updateMaxHours();
                      await this.loadGuidanceData();
-                     this.filterSupplementaryStudents();
+                     this.filterSupplementaryStudents(); // Re-filter supplementary list based on new subject
                  },
 
 
                 // --- Helper and UI Methods ---
                 initFlatpickr() {
                      this.$nextTick(() => {
+                         // Destroy existing instances to prevent memory leaks
                          document.querySelectorAll('.flatpickr-input').forEach(el => {
                              if (el?._flatpickr) { el._flatpickr.destroy(); }
                          });
+                         // Re-initialize range pickers
                          flatpickr(".flatpickr-range", {
                              mode: "range", dateFormat: "Y-m-d", locale: "ko",
                              onChange: (selectedDates, dateStr, instance) => {
                                  let headerText = ''; const headerElement = instance.element.closest('.bg-white')?.querySelector('h3'); if(headerElement) headerText = headerElement.textContent;
                                  const isPrevention = headerText.includes('예방'); const plan = this.teacherPlan; const targetPeriod = isPrevention ? 'preventionPeriod' : 'supplementaryPeriod';
                                  if (Array.isArray(selectedDates) && selectedDates.every(d => d instanceof Date)) { plan[targetPeriod] = selectedDates; } else { plan[targetPeriod] = []; }
-                                 this.saveTeacherPlan();
+                                 this.saveTeacherPlan(); // Auto-save plan when dates change
                              }
                          });
-                        flatpickr(".flatpickr-single", {
+                         // Re-initialize single date pickers (in attendance tables)
+                         flatpickr(".flatpickr-single", {
                              dateFormat: "Y-m-d", locale: "ko",
-                             // onChange handled by @change on input element
+                             // onChange is handled by @change on the input element itself
                          });
-                    });
+                     });
                 },
                 toggleExportOptions() { this.showExportOptions = !this.showExportOptions; },
                 downloadTemplate(type) {
-                     let data, filename;
-                     if (type === 'curriculum') { data = [["분류", "과목명", "학년", "학기", "학점", "교과군"]]; filename = "교육과정_편제표_양식.xlsx"; }
-                     else if (type === 'student') { data = [["학번", "이름", "특기사항"]]; filename = "학적정보_양식.xlsx"; }
-                     else if (type === 'emotionalSupport') { data = [["학번", "이름", "정서지원프로그램 참여시간"]]; filename = "정서지원프로그램_이수시간_양식.xlsx"; }
-                      if (!data) return; const ws = XLSX.utils.aoa_to_sheet(data); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Sheet1"); XLSX.writeFile(wb, filename);
+                    let data, filename;
+                    if (type === 'curriculum') { data = [["분류", "과목명", "학년", "학기", "학점", "교과군"]]; filename = "교육과정_편제표_양식.xlsx"; }
+                    else if (type === 'student') { data = [["학번", "이름", "특기사항"]]; filename = "학적정보_양식.xlsx"; }
+                    else if (type === 'emotionalSupport') { data = [["학번", "이름", "정서지원프로그램 참여시간"]]; filename = "정서지원프로그램_이수시간_양식.xlsx"; }
+                     if (!data) return; const ws = XLSX.utils.aoa_to_sheet(data); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Sheet1"); XLSX.writeFile(wb, filename);
                 },
                 handleImageUpload(event, formType, field) {
                     if (this.role !== '관리자') return;
                     const file = event.target.files[0]; if (!file) return; const reader = new FileReader();
                     reader.onload = (e) => {
                          if (file.size > 1048576) { // 1MB limit
-                             alert("오류: 이미지 파일 크기는 1MB를 초과할 수 없습니다."); return;
+                            alert("오류: 이미지 파일 크기는 1MB를 초과할 수 없습니다."); return;
                          }
                         if (formType === 'newsletter') this.newsletterForm[field] = e.target.result;
                         else if (formType === 'pledge') this.pledgeForm[field] = e.target.result;
@@ -1767,7 +1815,7 @@
                 },
                 previewForm(type, studentsToPrint) {
                      const studentsArray = Array.isArray(studentsToPrint) ? studentsToPrint : [studentsToPrint];
-                      if (!studentsArray || studentsArray.length === 0) {
+                     if (!studentsArray || studentsArray.length === 0) {
                          studentsArray.push({ id: '10101', name: '김학생', gradeSubjects: [{name: '샘플과목', credits: 3}], attendanceSubjects: [] });
                          this.adminActionStatus = "샘플 학생 데이터로 미리보기를 생성합니다.";
                      } else {
@@ -1918,7 +1966,7 @@
                      
                      // Keep track of attendance-only students from the *current* local list
                      const attendanceOnly = this.underachievers.filter(s =>
-                        (!s.gradeSubjects || s.gradeSubjects.length === 0) && (s.attendanceSubjects && s.attendanceSubjects.length > 0)
+                         (!s.gradeSubjects || s.gradeSubjects.length === 0) && (s.attendanceSubjects && s.attendanceSubjects.length > 0)
                      );
                      let processedUnderachievers = [...attendanceOnly];
                      const resultData = new Map();
@@ -1938,7 +1986,7 @@
                                  if (!classInfoRow || !classInfoRow[0]) throw new Error(`'${file.name}' 파일의 3행 A열에서 학급 정보를 찾을 수 없습니다.`);
                                  const classInfo = String(classInfoRow[0]);
 
-                                 // FIX: Regex updated to ignore '학년도' using negative lookahead (?!도)
+                                 // FIX: Regex updated to ignore '학년도'
                                  const gradeMatch = classInfo.match(/(\d+)\s*학년(?!도)/);
                                  const classNumMatch = classInfo.match(/(\d{1,2})\s*반/);
 
@@ -2044,7 +2092,7 @@
                      
                      detailToDelete.originalSubjects.forEach(subjectInfo => {
                          if (detailToDelete.reason.includes('학업성취율')) {
-                            student.gradeSubjects = student.gradeSubjects.filter(gs => gs.name !== subjectInfo.name);
+                             student.gradeSubjects = student.gradeSubjects.filter(gs => gs.name !== subjectInfo.name);
                          }
                          if (detailToDelete.reason.includes('과목출석률')) {
                              student.attendanceSubjects = student.attendanceSubjects.filter(asName => asName !== subjectInfo.name);
@@ -2052,7 +2100,7 @@
                      });
                      
                      if (student.gradeSubjects.length === 0 && student.attendanceSubjects.length === 0) {
-                        this.underachievers = this.underachievers.filter(s => s.id !== student.id);
+                         this.underachievers = this.underachievers.filter(s => s.id !== student.id);
                      }
                 },
                 exportTable(format) {
@@ -2076,12 +2124,12 @@
                              rows.forEach(row => { row.querySelector('th:last-child, td:last-child')?.remove(); });
                              const style = document.createElement('style');
                              style.innerHTML = `
-                                .pdf-table { width: 100%; font-size: 8pt; border-collapse: collapse; table-layout: fixed; }
-                                .pdf-table th, .pdf-table td { border: 1px solid #ddd; padding: 3px; text-align: left; vertical-align: top; word-wrap: break-word; }
-                                .pdf-table th { background-color: #f2f2f2; text-align: center; }
-                                .pdf-table tr > *:nth-child(1) { width: 7%; } .pdf-table tr > *:nth-child(2) { width: 7%; }
-                                .pdf-table tr > *:nth-child(3) { width: 10%; } .pdf-table tr > *:nth-child(4) { width: 14%; }
-                                .pdf-table tr > *:nth-child(5) { width: 40%; } .pdf-table tr > *:nth-child(6) { width: 22%; }
+                                 .pdf-table { width: 100%; font-size: 8pt; border-collapse: collapse; table-layout: fixed; }
+                                 .pdf-table th, .pdf-table td { border: 1px solid #ddd; padding: 3px; text-align: left; vertical-align: top; word-wrap: break-word; }
+                                 .pdf-table th { background-color: #f2f2f2; text-align: center; }
+                                 .pdf-table tr > *:nth-child(1) { width: 7%; } .pdf-table tr > *:nth-child(2) { width: 7%; }
+                                 .pdf-table tr > *:nth-child(3) { width: 10%; } .pdf-table tr > *:nth-child(4) { width: 14%; }
+                                 .pdf-table tr > *:nth-child(5) { width: 40%; } .pdf-table tr > *:nth-child(6) { width: 22%; }
                              `;
                              tableClone.classList.add('pdf-table');
                              const printContainer = document.createElement('div');
@@ -2142,26 +2190,6 @@
                      const newSupplementaryStudents = [];
                      const currentSuppStudents = this.teacherGuidanceData.supplementary?.students || [];
                      
-                     subjectSpecificUnderachievers.forEach(underachiever => {
-                         let reason = '';
-                         const gradeMatch = (underachiever.gradeSubjects || []).some(s => s.name === subject);
-                         const attendanceMatch = (underachiever.attendanceSubjects || []).includes(subject);
-                         if (gradeMatch && attendanceMatch) reason = '학업성취율&과목출석률';
-                         else if (gradeMatch) reason = '학업성취율';
-                         else if (attendanceMatch) reason = '과목출석률';
-
-                         const existingStudent = currentSuppStudents.find(s => s.id === underachiever.id);
-                         if (existingStudent) {
-                             existingStudent.reason = reason;
-                             newSupplementaryStudents.push(existingStudent);
-                         } else {
-                             // This student isn't in the *current* supplementary list,
-                             // but maybe they are in the *preventive* list?
-                             // No, just add them if they match the criteria
-                             // newSupplementaryStudents.push({ id: underachiever.id, name: underachiever.name, reason: reason });
-                         }
-                     });
-                     
                      // Re-filter the *current* list to *only* include those from the deployed list
                      const deployedIds = new Set(subjectSpecificUnderachievers.map(s => s.id));
                      const existingStudentsToKeep = currentSuppStudents.filter(s => deployedIds.has(s.id));
@@ -2187,7 +2215,7 @@
                          const newAttendance = {};
                          existingStudentsToKeep.forEach(student => {
                              if (student) {
-                                newAttendance[student.id] = (session.attendance && session.attendance[student.id]) ? session.attendance[student.id] : '';
+                                 newAttendance[student.id] = (session.attendance && session.attendance[student.id]) ? session.attendance[student.id] : '';
                              }
                          });
                          session.attendance = newAttendance;
@@ -2215,7 +2243,7 @@
                 removeAchievement(index) { this.teacherPlan.achievements.splice(index, 1); },
                 addPreventionSession() { this.teacherPlan.preventionSessions.push({ plan: '' }); },
                 removePreventionSession(index) { this.teacherPlan.preventionSessions.splice(index, 1); },
-                addSupplementarySession() { if (this.teacherPlan.supplementarySessions.length < this.teacherPlan.maxSupplementaryHours) this.teacherPlan.supplementarySessions.push({ plan: '' }); },
+                addSupplementarySession() { if (!this.teacherPlan.maxSupplementaryHours) { alert("먼저 과목명을 입력하여 최대 차시를 설정하세요."); return; } if (this.teacherPlan.supplementarySessions.length < this.teacherPlan.maxSupplementaryHours) this.teacherPlan.supplementarySessions.push({ plan: '' }); },
                 removeSupplementarySession(index) { this.teacherPlan.supplementarySessions.splice(index, 1); },
                 addTeacher() { this.teacherPlan.teacherNames.push(''); },
                 removeTeacher(index) { this.teacherPlan.teacherNames.splice(index, 1); },
@@ -2249,7 +2277,7 @@
                          const response = await fetch(apiUrl, { method: 'POST', headers: headers, body: JSON.stringify(payload) });
                          if (!response.ok) { const errorBody = await response.json().catch(() => ({})); const errorMessage = errorBody.error?.message || errorBody.message || errorBody.error || response.statusText; throw new Error(`API 요청 실패 (${response.status}): ${errorMessage}`); }
                          const result = await response.json();
-                         const actualResult = result.data || result;
+                         const actualResult = result.data || result; // Handle proxy structure
                          const generatedText = responseParser(actualResult);
                          if (generatedText) {
                              achievement.statement = generatedText.trim().replace(/^(E수준:|최소 성취수준:)\s*/, '');
@@ -2347,16 +2375,16 @@
                      } else { data.error = '학적 정보에 없는 학생입니다. 먼저 학적 정보를 업로드해주세요.'; }
                 },
                 removeGuidanceStudent(type, studentIdToRemove) {
-                      if (this.role !== '교과교사') return; const data = this.teacherGuidanceData[type]; if (!data) return;
-                      const index = data.students.findIndex(s => s.id === studentIdToRemove);
-                      if (index > -1) {
+                     if (this.role !== '교과교사') return; const data = this.teacherGuidanceData[type]; if (!data) return;
+                     const index = data.students.findIndex(s => s.id === studentIdToRemove);
+                     if (index > -1) {
                          data.students.splice(index, 1);
                          data.sessions.forEach(session => { if (session) delete session.attendance[studentIdToRemove]; });
                          this.saveGuidanceData();
-                      }
+                     }
                 },
                 addGuidanceSession(type) {
-                      if (this.role !== '교과교사') return; const data = this.teacherGuidanceData[type]; if (!data) return;
+                     if (this.role !== '교과교사') return; const data = this.teacherGuidanceData[type]; if (!data) return;
                      const initialAttendance = {};
                      data.students.forEach(s => { if (s) initialAttendance[s.id] = ''; });
                      data.sessions.push({ date: '', time: '', isSaved: false, place: '', content: '', attendance: initialAttendance });
@@ -2572,12 +2600,12 @@
                      } else { this.importModalError = '새로 추가할 학생이 없습니다. (이미 목록에 있거나 조건 불일치)'; }
                 },
                 resetSupplementaryStudents() {
-                    if (this.role !== '교과교사') return;
-                    if (this.teacherGuidanceData.supplementary) {
-                        this.teacherGuidanceData.supplementary.students = [];
-                        this.teacherGuidanceData.supplementary.sessions.forEach(session => { if(session) session.attendance = {}; });
-                        this.saveGuidanceData();
-                    }
+                     if (this.role !== '교과교사') return;
+                     if (this.teacherGuidanceData.supplementary) {
+                         this.teacherGuidanceData.supplementary.students = [];
+                         this.teacherGuidanceData.supplementary.sessions.forEach(session => { if(session) session.attendance = {}; });
+                         this.saveGuidanceData();
+                     }
                 },
 
                 // --- Homeroom Teacher Methods ---
@@ -2603,29 +2631,31 @@
                 // This method remains a placeholder
                 getSubjectCompletionStatus(studentId, subjectName){
                      if(this.role !== '담임교사') return { status: 'N/A', color: 'text-gray-500'};
+                     // Real implementation would require querying *other* teachers' data,
+                     // which is complex and requires broader read permissions.
                      return { status: '확인필요', color: 'text-gray-500'};
                 },
-               
+                
                 // --- Helper functions ---
                 resetAllLocalData(resetAuth = true) {
-                    if (resetAuth) {
-                        this.user = null; this.isLoggedIn = false; this.schoolId = null;
-                    }
-                    this.curriculumData = []; this.studentData = []; this.emotionalSupportData = []; this.deployedUnderachievers = [];
-                    this.underachievers = [];
-                    this.resetTeacherData(true);
-                    Object.assign(this.moduleConfig, this.$options.data().moduleConfig);
-                    Object.assign(this.newsletterForm, this.$options.data().newsletterForm);
-                    Object.assign(this.pledgeForm, this.$options.data().pledgeForm);
-                    this.uploadStatus = { curriculum: '', student: '', emotionalSupport: '' };
-                    this.homeroomClassInput = ''; this.searchedStudents = []; this.homeroomMessage = '';
-                    this.statusMessage = ''; this.moduleConfigStatus = ''; this.underachieversStatus = ''; this.teacherPlanStatus = ''; this.adminActionStatus = '';
-                    console.log("Local data reset.");
+                     if (resetAuth) {
+                         this.user = null; this.isLoggedIn = false; this.schoolId = null;
+                     }
+                     this.curriculumData = []; this.studentData = []; this.emotionalSupportData = []; this.deployedUnderachievers = [];
+                     this.underachievers = [];
+                     this.resetTeacherData(true);
+                     Object.assign(this.moduleConfig, this.$options.data().moduleConfig);
+                     Object.assign(this.newsletterForm, this.$options.data().newsletterForm);
+                     Object.assign(this.pledgeForm, this.$options.data().pledgeForm);
+                     this.uploadStatus = { curriculum: '', student: '', emotionalSupport: '' };
+                     this.homeroomClassInput = ''; this.searchedStudents = []; this.homeroomMessage = '';
+                     this.statusMessage = ''; this.moduleConfigStatus = ''; this.underachieversStatus = ''; this.teacherPlanStatus = ''; this.adminActionStatus = '';
+                     console.log("Local data reset.");
                 },
                 resetTeacherData(resetGuidance = true) {
                      Object.assign(this.teacherPlan, this.getInitialTeacherPlan());
                      if (resetGuidance) {
-                        this.teacherGuidanceData = this.getInitialGuidanceData();
+                         this.teacherGuidanceData = this.getInitialGuidanceData();
                      }
                      this.teacherPlanError = ''; this.teacherPlanStatus = ''; this.newGuidanceStudentId = '';
                      console.log("Teacher data reset.");
@@ -2644,7 +2674,4 @@
     </script>
 </body>
 </html>
-
-
-
 
