@@ -946,38 +946,38 @@
          </div>
 
         <!-- NEW: Admin Modify Modal (SchoolId & Admin Code) -->
-        <div v-if="showAdminModifyModal" class="modal-overlay" @click.self="showAdminModifyModal = false">
-            <div class="modal-content">
-                <h3 class="text-2xl font-bold mb-4 text-center">학교 코드 수정 및 발급</h3>
-                <div class="mb-4">
-                    <label for="modify-mode" class="block text-sm font-medium text-gray-700">수정 항목</label>
-                    <select id="modify-mode" v-model="adminModifyMode" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
-                        <option value="schoolId">학교 ID</option>
-                        <option value="adminCode">관리자 코드</option>
-                    </select>
-                </div>
+        <div v-if="showAdminModifyModal" class="modal-overlay" @click.self="showAdminModifyModal = false">
+            <div class="modal-content">
+                <h3 class="text-2xl font-bold mb-4 text-center">학교 코드 수정 및 발급</h3>
+                <div class="mb-4">
+                    <label for="modify-mode" class="block text-sm font-medium text-gray-700">수정 항목</label>
+                    <select id="modify-mode" v-model="adminModifyMode" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                        <option value="schoolId">학교 ID</option>
+                        <option value="adminCode">관리자 코드</option>
+                    </select>
+                </div>
 
-                <!-- 학교 ID 수정 -->
-                <div v-if="adminModifyMode === 'schoolId'">
-                    <p class="text-sm text-gray-600 mb-2">현재 학교 ID: <strong class="text-indigo-600">{{ schoolId }}</strong></p>
-                    <p class="text-sm text-gray-600 mb-2">새로운 학교 ID를 입력(발급)하거나, 다른 학교 ID로 변경할 수 있습니다. <br/> <strong class="text-red-600">주의: 변경 시, 해당 학교 ID의 데이터로 즉시 전환됩니다.</strong></p>
-                    <input type="text" v-model="newSchoolIdForModify" placeholder="새 학교 ID 입력" class="w-full p-3 border border-gray-300 rounded-md">
-                </div>
-                
-                <!-- 관리자 코드 확인 -->
-                <div v-if="adminModifyMode === 'adminCode'">
-                    <p class="text-sm text-gray-600 mb-2">현재 앱의 관리자 코드는 <strong class="text-indigo-600">'0822'</strong> 입니다.</p>
-                    <p class="text-sm text-gray-600 mb-2">이 코드는 앱에 고정되어 있으며, 모든 학교 관리자가 동일하게 사용합니다. (변경 불가)</p>
-                </div>
+                <!-- 학교 ID 수정 -->
+                <div v-if="adminModifyMode === 'schoolId'">
+                    <p class="text-sm text-gray-600 mb-2">현재 학교 ID: <strong class="text-indigo-600">{{ schoolId }}</strong></p>
+                    <p class="text-sm text-gray-600 mb-2">새로운 학교 ID를 입력(발급)하거나, 다른 학교 ID로 변경할 수 있습니다. <br/> <strong class="text-red-600">주의: 변경 시, 해당 학교 ID의 데이터로 즉시 전환됩니다.</strong></p>
+                    <input type="text" v-model="newSchoolIdForModify" placeholder="새 학교 ID 입력" class="w-full p-3 border border-gray-300 rounded-md">
+                </div>
+                
+                <!-- 관리자 코드 확인 -->
+                <div v-if="adminModifyMode === 'adminCode'">
+                    <p class="text-sm text-gray-600 mb-2">현재 앱의 관리자 코드는 <strong class="text-indigo-600">'0822'</strong> 입니다.</p>
+                    <p class="text-sm text-gray-600 mb-2">이 코드는 앱에 고정되어 있으며, 모든 학교 관리자가 동일하게 사용합니다. (변경 불가)</p>
+                </div>
 
-                <p v-if="adminModifyError" class="text-red-500 text-sm mt-2">{{ adminModifyError }}</p>
-                
-                <div class="mt-6 flex justify-end space-x-2">
-                    <button type="button" @click="showAdminModifyModal = false" class="px-4 py-2 bg-gray-300 rounded-md">닫기</button>
-                    <button v-if="adminModifyMode === 'schoolId'" type="button" @click="saveAdminSchoolIdModification" class="px-4 py-2 bg-indigo-600 text-white rounded-md">학교 ID 저장</button>
-                </div>
-            </div>
-        </div>    
+                <p v-if="adminModifyError" class="text-red-500 text-sm mt-2">{{ adminModifyError }}</p>
+                
+                <div class="mt-6 flex justify-end space-x-2">
+                    <button type="button" @click="showAdminModifyModal = false" class="px-4 py-2 bg-gray-300 rounded-md">닫기</button>
+                    <button v-if="adminModifyMode === 'schoolId'" type="button" @click="saveAdminSchoolIdModification" class="px-4 py-2 bg-indigo-600 text-white rounded-md">학교 ID 저장</button>
+                </div>
+            </div>
+        </div>    
         
         <!-- 인쇄용 컨테이너 (숨김 - html2canvas 전용) -->
         <div id="print-area-container" class="hidden"></div>
@@ -1048,11 +1048,11 @@
                     adminActionStatus: '', // Generic status for other admin actions
 
                     // --- NEW: Admin Modify Modal State ---
-                    showAdminModifyModal: false,
-                    adminModifyMode: 'schoolId', // 'schoolId' or 'adminCode'
-                    newSchoolIdForModify: '',
-                    adminModifyError: '',
-                    // --- End of NEW ---
+                    showAdminModifyModal: false,
+                    adminModifyMode: 'schoolId', // 'schoolId' or 'adminCode'
+                    newSchoolIdForModify: '',
+                    adminModifyError: '',
+                    // --- End of NEW ---
                     
                     // --- Common Data (Loaded from Firestore) ---
                     moduleConfig: { // Default structure
@@ -1561,28 +1561,29 @@
                     this.newSchoolId = '';
                     this.$nextTick(() => { this.initFlatpickr(); });
                 },
+                // --- FUNCTION MODIFIED ---
                 async resetRole() {
-                     // 1. Firestore에 역할만 null로 저장 (schoolId는 유지)
-                     await this.saveUserRole(null);
-                     
-                     // 2. 로컬 상태 변경
-                     this.role = null; // 로컬 역할 null로
-                     
-                     // 3. 역할 선택 모달 UI 초기화
-                     this.showAdminCodeInput = false;
-                     this.adminCode = '';
-                     this.adminCodeError = '';
-                     this.statusMessage = '';
-                     this.showSchoolIdModal = false;
-                     this.newSchoolId = '';
-                     this.schoolIdError = '';
+                    // 1. 로컬의 role과 schoolId를 즉시 null로 설정합니다.
+                    this.role = null;
+                    this.schoolId = null;
 
-                     // 4. (중요) 공용 데이터를 제외한 역할-특화 데이터만 리셋
-                     this.resetRoleSpecificData();
-                     
-                     // 5. resetAllLocalData()는 호출하지 않음!
-                     // (공용 데이터: curriculumData, studentData, deployedUnderachievers 등은 유지됨)
-                },
+                    // 2. Firestore의 userData 문서에도 role과 schoolId를 null로 저장합니다.
+                    // saveUserRole은 현재 this.schoolId (null)를 사용하므로 올바르게 동작합니다.
+                    await this.saveUserRole(this.role); // this.role은 이미 null입니다.
+
+                    // 3. 역할 선택 UI를 초기 상태로 리셋합니다.
+                    this.showAdminCodeInput = false;
+                    this.adminCode = '';
+                    this.adminCodeError = '';
+                    this.statusMessage = '';
+                    this.showSchoolIdModal = false;
+                    this.newSchoolId = '';
+                    this.schoolIdError = '';
+
+                    // 4. 인증 상태(로그인)를 제외한 모든 로컬 데이터를 초기화합니다.
+                    // 이렇게 하면 이전 학교의 공용 데이터(편제표, 학생 명단 등)가 깨끗이 지워집니다.
+                    this.resetAllLocalData(false);
+                },
                 // 1) 학교 ID 수정 모달을 여는 함수 추가
                 openSchoolIdModal() {
                     this.schoolIdMode = this.role === '관리자' ? 'create' : 'join';
@@ -2795,50 +2796,54 @@
                 
                 // --- Helper functions ---
                 // (NEW HELPER FUNCTION - resetAllLocalData와 resetRole에서 공통 사용)
-                resetRoleSpecificData() {
-                     // 교과교사 데이터 초기화
-                     Object.assign(this.teacherPlan, this.getInitialTeacherPlan());
-                     this.teacherGuidanceData = this.getInitialGuidanceData();
-                     this.teacherPlanError = '';
-                     this.teacherPlanStatus = '';
-                     this.newGuidanceStudentId = '';
+                resetRoleSpecificData() {
+                    // 교과교사 데이터 초기화
+                    Object.assign(this.teacherPlan, this.getInitialTeacherPlan());
+                    this.teacherGuidanceData = this.getInitialGuidanceData();
+                    this.teacherPlanError = '';
+                    this.teacherPlanStatus = '';
+                    this.newGuidanceStudentId = '';
 
-                     // 담임교사 데이터 초기화
-                     this.homeroomClassInput = '';
-                     this.searchedStudents = [];
-                     this.homeroomMessage = '';
-                     console.log("Role-specific data reset.");
-                },
+                    // 담임교사 데이터 초기화
+                    this.homeroomClassInput = '';
+                    this.searchedStudents = [];
+                    this.homeroomMessage = '';
+                    console.log("Role-specific data reset.");
+                },
 
-                resetAllLocalData(resetAuth = true) {
-                     // (로그아웃 시 호출됨)
-                     if (resetAuth) {
-                         this.user = null; this.isLoggedIn = false; this.schoolId = null; this.role = null;
-                     }
-                     // 공용 데이터 초기화
-                     this.curriculumData = [];
-                     this.studentData = [];
-                     this.emotionalSupportData = [];
-                     this.deployedUnderachievers = [];
-                     this.underachievers = []; // 관리자 로컬 리스트
+                resetAllLocalData(resetAuth = true) {
+                    // (로그아웃 시 호출됨)
+                    if (resetAuth) {
+                        this.user = null; this.isLoggedIn = false;
+                    }
+                    // role과 schoolId도 초기화
+                    this.role = null;
+                    this.schoolId = null;
 
-                     // 역할별 데이터 초기화 (헬퍼 함수 호출)
-                     this.resetRoleSpecificData();
-                     
-                     // 모듈 및 양식 폼 초기화
-                     Object.assign(this.moduleConfig, this.$options.data().moduleConfig);
-                     Object.assign(this.newsletterForm, this.$options.data().newsletterForm);
-                     Object.assign(this.pledgeForm, this.$options.data().pledgeForm);
+                    // 공용 데이터 초기화
+                    this.curriculumData = [];
+                    this.studentData = [];
+                    this.emotionalSupportData = [];
+                    this.deployedUnderachievers = [];
+                    this.underachievers = []; // 관리자 로컬 리스트
 
-                     // UI 상태 메시지 초기화
-                     this.uploadStatus = { curriculum: '', student: '', emotionalSupport: '' };
-                     this.statusMessage = '';
-                     this.moduleConfigStatus = '';
-                     this.underachieversStatus = '';
-                     this.adminActionStatus = '';
-                     
-                     console.log("All local data reset for logout.");
-                },
+                    // 역할별 데이터 초기화 (헬퍼 함수 호출)
+                    this.resetRoleSpecificData();
+                    
+                    // 모듈 및 양식 폼 초기화
+                    Object.assign(this.moduleConfig, this.$options.data().moduleConfig);
+                    Object.assign(this.newsletterForm, this.$options.data().newsletterForm);
+                    Object.assign(this.pledgeForm, this.$options.data().pledgeForm);
+
+                    // UI 상태 메시지 초기화
+                    this.uploadStatus = { curriculum: '', student: '', emotionalSupport: '' };
+                    this.statusMessage = '';
+                    this.moduleConfigStatus = '';
+                    this.underachieversStatus = '';
+                    this.adminActionStatus = '';
+                    
+                    console.log("All local data reset.");
+                },
                 resetTeacherData(resetGuidance = true) {
                      Object.assign(this.teacherPlan, this.getInitialTeacherPlan());
                      if (resetGuidance) {
@@ -2849,46 +2854,63 @@
                 },
 
                 // --- NEW Admin Modify Modal Methods ---
-                openAdminModifyModal() {
-                    if (this.role !== '관리자') return;
-                    this.newSchoolIdForModify = this.schoolId; // 현재 ID로 미리 채우기
-                    this.adminModifyMode = 'schoolId';
-                    this.adminModifyError = '';
-                    this.showAdminModifyModal = true;
-                },
-                async saveAdminSchoolIdModification() {
-                    this.adminModifyError = '';
-                    const id = this.newSchoolIdForModify.trim();
-                    const invalidChars = /[\s./*#$[\]]/;
+                openAdminModifyModal() {
+                    if (this.role !== '관리자') return;
+                    this.newSchoolIdForModify = this.schoolId; // 현재 ID로 미리 채우기
+                    this.adminModifyMode = 'schoolId';
+                    this.adminModifyError = '';
+                    this.showAdminModifyModal = true;
+                },
+                // --- FUNCTION MODIFIED ---
+                async saveAdminSchoolIdModification() {
+                    this.adminModifyError = '';
+                    const id = this.newSchoolIdForModify.trim();
+                    const invalidChars = /[\s./*#$[\]]/;
 
-                    if (!id) {
-                        this.adminModifyError = "학교 고유 ID를 입력해주세요."; return;
-                    }
-                    if (invalidChars.test(id)) {
-                        this.adminModifyError = "공백이나 특수문자 (/, ., *, # 등)는 사용할 수 없습니다."; return;
-                    }
+                    if (!id) {
+                        this.adminModifyError = "학교 고유 ID를 입력해주세요."; return;
+                    }
+                    if (invalidChars.test(id)) {
+                        this.adminModifyError = "공백이나 특수문자 (/, ., *, # 등)는 사용할 수 없습니다."; return;
+                    }
 
-                    if (id === this.schoolId) {
-                        this.showAdminModifyModal = false; // 변경 사항 없음
-                        return;
-                    }
+                    if (id === this.schoolId) {
+                        this.showAdminModifyModal = false;
+                        this.newSchoolIdForModify = ''; // 입력 필드 초기화
+                        return;
+                    }
 
-                    // (주의) 학교 ID를 변경하면, 해당 관리자 계정은 새 학교 ID의 데이터로 전환됩니다.
-                    this.schoolId = id; // 1. 새 ID로 로컬 상태 변경
-                    this.isLoading = true;
-                    this.showAdminModifyModal = false;
+                    this.isLoading = true;
+                    this.showAdminModifyModal = false;
 
-                    await this.saveUserRole(this.role); // 2. 새 ID를 관리자 프로필에 저장
-                    this.resetAllLocalData(false); // 3. 이전 학교의 모든 로컬 데이터 초기화 (auth 제외)
-                    
-                    await this.loadCommonData(); // 4. 새 학교 ID의 공용 데이터 로드
-                    
-                    // 5. 관리자 로컬 목록을 새 학교의 데이터로 동기화
-                    this.underachievers = JSON.parse(JSON.stringify(this.deployedUnderachievers));
-                    
-                    this.isLoading = false;
-                    this.$nextTick(() => { this.initFlatpickr(); });
-          _       },
+                    // 1. 변경할 role과 schoolId를 임시 변수에 백업합니다.
+                    const newSchoolId = id;
+                    const currentRole = this.role;
+
+                    // 2. 새 ID로 로컬 상태를 먼저 설정합니다.
+                    this.schoolId = newSchoolId;
+                    
+                    // 3. Firestore에 새 schoolId를 포함한 사용자 정보를 저장합니다.
+                    await this.saveUserRole(currentRole); 
+
+                    // 4. 인증 상태를 제외한 모든 로컬 데이터를 초기화합니다.
+                    // 이 과정에서 role과 schoolId가 일시적으로 null이 되지만, 백업해두었으므로 안전합니다.
+                    this.resetAllLocalData(false); 
+
+                    // 5. 백업해둔 role과 schoolId를 복원합니다.
+                    this.role = currentRole;
+                    this.schoolId = newSchoolId;
+
+                    // 6. 새 학교 ID의 공용 데이터를 로드합니다.
+                    await this.loadCommonData();
+                    
+                    // 7. 관리자 로컬 목록을 새 학교의 데이터로 동기화합니다.
+                    this.underachievers = JSON.parse(JSON.stringify(this.deployedUnderachievers));
+                    
+                    this.isLoading = false;
+                    this.newSchoolIdForModify = ''; // 8. 모달 입력 필드를 비웁니다.
+                    this.$nextTick(() => { this.initFlatpickr(); });
+                },
             },
 
             // --- Mounted Hook ---
@@ -2903,4 +2925,3 @@
     </script>
 </body>
 </html>
-
