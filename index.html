@@ -1500,9 +1500,16 @@
                             this.isLoading = true;
                             await this.saveUserRoleAndSchoolId('관리자');
                             if (this.schoolId) {
-                                await this.loadCommonData();
-                                this.underachievers = JSON.parse(JSON.stringify(this.deployedUnderachievers));
-                            }
+                                // 기존 사용자: schoolId가 있으므로 데이터 로드
+                                await this.loadCommonData();
+                                this.underachievers = JSON.parse(JSON.stringify(this.deployedUnderachievers));
+                                this.isLoading = false;
+                            } else {
+                                // 신규 관리자: schoolId가 없으므로 'ID 생성' 모달 표시
+                                this.schoolIdMode = 'create';
+                                this.showSchoolIdModal = true;
+                                this.isLoading = false; // School ID 모달을 띄우기 위해 로딩 종료
+                            }
                             this.isLoading = false;
                             this.$nextTick(() => { this.initFlatpickr(); });
                         } else {
@@ -2717,4 +2724,5 @@
 
 </body>
 </html>
+
 
