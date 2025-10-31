@@ -1405,31 +1405,45 @@
                 // --- Initialization and Auth ---
                 async initApp() {
                     this.isLoading = true;
-                     if (!auth) { this.isLoading = false; return; }
-                    onAuthStateChanged(auth, async (user) => {
-                        if (user) {
-                            this.user = user;
-                            this.isLoggedIn = true;
-                            await this.loadUserRoleAndSchoolId(); 
-                             if (this.role && this.schoolId) {
-                                 await this.loadCommonData();
-                                 if(this.role === '교과교사') {
-                                     await this.loadTeacherPlan();
-                                     if (this.teacherPlan.subjectName) {
-                                         await this.loadGuidanceData();
-                                         this.filterSupplementaryStudents();
-                                     }
-                                 } else if (this.role === '관리자') {
-                                     this.underachievers = JSON.parse(JSON.stringify(this.deployedUnderachievers));
-                                 }
-                             }
-                        } else {
-                            this.user = null;
-                            this.isLoggedIn = false;
-                            this.resetAllLocalData();
-                        }
+                    if (!auth) {
                         this.isLoading = false;
-                         this.$nextTick(() => { this.initFlatpickr(); });
+                        return;
+                    }
+                    onAuthStateChanged(auth, async (user) => {
+                        // [수정] 전체 로직을 try...finally 블록으로 감싸 안정성을 높입니다.
+                        try {
+                            if (user) {
+                                this.user = user;
+                                this.isLoggedIn = true;
+                                await this.loadUserRoleAndSchoolId();
+                                if (this.role && this.schoolId) {
+                                    await this.loadCommonData();
+                                    if(this.role === '교과교사') {
+                                        await this.loadTeacherPlan();
+                                        if (this.teacherPlan.subjectName) {
+                                            await this.loadGuidanceData();
+                                            this.filterSupplementaryStudents();
+                                        }
+                                    } else if (this.role === '관리자') {
+                                        this.underachievers = JSON.parse(JSON.stringify(this.deployedUnderachievers));
+                                    }
+                                }
+                            } else {
+                                this.user = null;
+                                this.isLoggedIn = false;
+                                this.resetAllLocalData();
+                            }
+                        } catch (error) {
+                            // [추가] 오류 발생 시 콘솔에 로그를 남기고 데이터를 초기화합니다.
+                            console.error("Authentication state change process failed:", error);
+                            this.resetAllLocalData();
+                        } finally {
+                            // [수정] 로딩 상태 해제 코드를 finally 블록으로 이동합니다.
+                            this.isLoading = false;
+                            this.$nextTick(() => {
+                                this.initFlatpickr();
+                            });
+                        }
                     });
                 },
                 async login() {
@@ -2697,5 +2711,6 @@
 
 </body>
 </html>
+
 
 
