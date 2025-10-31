@@ -333,7 +333,7 @@
                 </div>
             </div>
 
-             <!-- Main Dashboard (Show only if logged in, role, AND schoolId are selected) -->
+             <!-- Main Dashboard (Show only if logged in and role is selected) -->
              <div v-if="isLoggedIn && role && !isLoading">
                 <!-- Admin View -->
                  <div v-if="role === '관리자'">
@@ -988,8 +988,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc, collection, query, where, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-        // import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics.js"; // Optional
-
+        
         // --- Firebase Configuration ---
         const firebaseConfig = {
             apiKey: "AIzaSyD_KHsc9Izjj38b44-2GcH1YDKoQ9Sek1k",
@@ -998,7 +997,7 @@
             storageBucket: "min-achievement-app-184d2.appspot.com",
             messagingSenderId: "177231838739",
             appId: "1:177231838739:web:7e2f2b2cf20d8e4e2949e6",
-            measurementId: "G-4GT4CZRPXB" // Optional
+            measurementId: "G-4GT4CZRPXB"
         };
 
         // --- Initialize Firebase ---
@@ -1020,17 +1019,16 @@
                     // --- Authentication State ---
                     user: null,
                     isLoggedIn: false,
-                    isLoading: true, // Start in loading state
+                    isLoading: true,
 
                     // --- Role Management State ---
-                    role: null, // User's selected role, initially null
-                    schoolId: null, // NEW: Added for multi-tenancy
+                    role: null,
+                    schoolId: null,
                     showAdminCodeInput: false,
                     adminCode: '',
                     adminCodeError: '',
-                    // NEW: School ID Modal State
                     showSchoolIdModal: false,
-                    schoolIdMode: 'join', // 'join' or 'create'
+                    schoolIdMode: 'join',
                     newSchoolId: '',
                     schoolIdError: '',
 
@@ -1042,16 +1040,16 @@
                     moduleConfigStatus: '',
                     underachieversStatus: '',
                     teacherPlanStatus: '',
-                    adminActionStatus: '', // Generic status for other admin actions
+                    adminActionStatus: '',
 
-                    // --- NEW: Admin Modify Modal State ---
+                    // --- Admin Modify Modal State ---
                     showAdminModifyModal: false,
-                    adminModifyMode: 'schoolId', // 'schoolId' or 'adminCode'
+                    adminModifyMode: 'schoolId',
                     newSchoolIdForModify: '',
                     adminModifyError: '',
                     
                     // --- Common Data (Loaded from Firestore) ---
-                    moduleConfig: { // Default structure
+                    moduleConfig: {
                         hoursPerCredit: 1,
                         preventiveRatio: 50,
                         emotionalSupportRatio: 20,
@@ -1062,20 +1060,20 @@
                             { name: '대면지도', hours: 1 }, { name: '보충과제부여', hours: 1 }
                         ]
                     },
-                    newsletterForm: { // Defaults
+                    newsletterForm: {
                         title: '최소 성취수준 보장지도 참여 안내', docNumber: '교무기획부-000', department: '담당부서 (연락처)',
                         logoUrl: null, body: '학부모님, 안녕하십니까?\n\n귀 자녀는 다음과 같은 사유로 최소 성취수준 보장지도 대상자로 선정되었음을 알려드립니다. 본교에서는 학생의 학업 능력 향상을 위해 보충 학습 프로그램을 운영하고 있으니, 학생이 프로그램에 성실히 참여할 수 있도록 가정에서도 많은 격려와 지도 부탁드립니다.\n\n[대상 학생 정보는 하단 참조]', dispatchDate: 'YYYY.MM.DD.', includeSeal: false, sealUrl: null
                     },
-                    pledgeForm: { // Defaults
+                    pledgeForm: {
                         content: '본인은 최소 성취수준 보장지도 프로그램의 모든 활동에 성실하게 참여할 것을 서약합니다.\n\n[대상 학생 정보는 하단 참조]', dispatchDate: 'YYYY.MM.DD.', includeSeal: false, sealUrl: null
                     },
                     curriculumData: [],
                     studentData: [],
                     emotionalSupportData: [],
-                    deployedUnderachievers: [], // List from Firestore commonData/underachievers
+                    deployedUnderachievers: [],
 
                     // --- Admin Specific Local State ---
-                    underachievers: [], // Local list processed by admin before deploying
+                    underachievers: [],
                     fileProcessingError: '',
                     showAttendanceModal: false,
                     newAttendanceStudent: { id: '', subjects: [''] },
@@ -1086,9 +1084,9 @@
                     showImportModal: false,
                     importClasses: [''],
                     importModalError: '',
-                    teacherPlan: this.getInitialTeacherPlan(), // Use helper function
-                    teacherPlanError: '', // Error specific to AI generation
-                    teacherGuidanceData: this.getInitialGuidanceData(), // Use helper function
+                    teacherPlan: this.getInitialTeacherPlan(),
+                    teacherPlanError: '',
+                    teacherGuidanceData: this.getInitialGuidanceData(),
                     newGuidanceStudentId: '',
 
                     // --- Homeroom Teacher State ---
@@ -1102,13 +1100,10 @@
                 }
             },
 
-            // --- Computed Properties ---
             computed: {
-                // Combined status message for preview modal
                 statusText() {
                     return this.teacherPlanError || this.adminActionStatus || this.moduleConfigStatus || this.underachieversStatus || this.teacherPlanStatus || '';
                 },
-                // Dynamic class for preview modal status
                 statusClass() {
                     const text = this.statusText;
                     if (text.includes('오류') || text.includes('실패')) return 'text-red-500';
@@ -1124,7 +1119,7 @@
                         .map(name => `${name} (인)`)
                         .join(', ');
                 },
-                groupedUnderachievers() { // For Admin view processing local underachievers list
+                groupedUnderachievers() {
                     if (this.role !== '관리자') return [];
                     const result = [];
                     this.underachievers.forEach(student => {
@@ -1157,7 +1152,7 @@
                             else if (details.grade) reason = '학업성취율';
                             else if (details.attendance) reason = '과목출석률';
 
-                            if (reason) { // Only add if there's a reason
+                            if (reason) {
                                 if (!subjectsByReason.has(reason)) subjectsByReason.set(reason, []);
                                 subjectsByReason.get(reason).push({ name: subjectName, ...details });
                             }
@@ -1181,7 +1176,7 @@
                     return result;
                 },
                 currentGuidanceData() {
-                    if (!this.role || this.role !== '교과교사') return null;
+                    if (this.role !== '교과교사') return null;
                     if (this.teacherTab === 'preventive' || this.teacherTab === 'supplementary') {
                         if (!this.teacherGuidanceData[this.teacherTab]) {
                             this.teacherGuidanceData[this.teacherTab] = this.getInitialGuidanceData()[this.teacherTab];
@@ -1224,7 +1219,7 @@
                         if (subjectInfo) {
                              requiredSubjectCredits = Number(subjectInfo.학점) || 0;
                              supplementaryHours = requiredSubjectCredits * this.moduleConfig.hoursPerCredit;
-                             requiredHoursForCompletion = Math.ceil((supplementaryHours * 2) / 3 * 10) / 10; // 2/3, rounded up to 1 decimal
+                             requiredHoursForCompletion = Math.ceil((supplementaryHours * 2) / 3 * 10) / 10;
                              maxEmotionalSupportHours = supplementaryHours * (this.moduleConfig.emotionalSupportRatio / 100);
                         }
                     }
@@ -1285,7 +1280,7 @@
                                      creditedPreventiveHours = Math.min(totalPreventiveHoursForStudent, maxAllowedHours);
                                  } else {
                                     maxAllowedHours = supplementaryHours * (this.moduleConfig.preventiveRatio / 100);
-                                     creditedPreventiveHours = Math.floor(Math.min(totalPreventiveHoursForStudent, maxAllowedHours)); // Floor for general
+                                     creditedPreventiveHours = Math.floor(Math.min(totalPreventiveHoursForStudent, maxAllowedHours));
                                  }
                                  status[student.id].preventiveHours = parseFloat(creditedPreventiveHours.toFixed(2));
                                  currentStudentTotal += creditedPreventiveHours;
@@ -1332,10 +1327,8 @@
 
                     const studentMap = new Map();
                      const classInput = this.homeroomClassInput.trim();
-                     // Use deployedUnderachievers loaded from Firestore
                     this.deployedUnderachievers.forEach(student => {
                          if (!student || !student.id) return;
-                         // Filter by class
                          const studentClassIdentifier = student.id.substring(0, 3);
                          if (studentClassIdentifier !== classInput) return;
 
@@ -1356,16 +1349,13 @@
                             if (reasons.grade && reasons.attendance) reason = '학업성취율&과목출석률';
                             else if (reasons.grade) reason = '학업성취율';
                             else if (reasons.attendance) reason = '과목출석률';
-
-                             // Homeroom teacher cannot reliably get status
                              const completion = { status: '확인필요', color: 'text-gray-500'};
-
                             return { subject: name, reason: reason, status: completion.status, statusColor: completion.color };
                         });
 
                         studentMap.set(student.id, {
                             id: student.id, name: student.name, subjects: subjectsArray,
-                            originalStudent: student // Keep original student for printing
+                            originalStudent: student
                         });
                     });
 
@@ -1383,7 +1373,6 @@
                 },
             },
 
-            // --- Methods ---
             methods: {
                 // --- Initial Data Helpers ---
                 getInitialTeacherPlan() {
@@ -1409,7 +1398,7 @@
                 // --- Initialization and Auth ---
                 async initApp() {
                     this.isLoading = true;
-                     if (!auth) { console.error("Firebase Auth is not initialized."); this.isLoading = false; return; }
+                     if (!auth) { this.isLoading = false; return; }
                     onAuthStateChanged(auth, async (user) => {
                         if (user) {
                             this.user = user;
@@ -1426,9 +1415,6 @@
                                  } else if (this.role === '관리자') {
                                      this.underachievers = JSON.parse(JSON.stringify(this.deployedUnderachievers));
                                  }
-                             } else if (this.role === '관리자' && !this.schoolId) {
-                                 // Admin logged in, but no schoolId is set. This is a valid state.
-                                 // Do nothing, the dashboard will show the "ID: null" state.
                              }
                         } else {
                             this.user = null;
@@ -1442,7 +1428,6 @@
                 async login() {
                     const provider = new GoogleAuthProvider();
                     try {
-                         if (!auth) throw new Error("Firebase Auth not initialized.");
                         await signInWithPopup(auth, provider);
                     } catch (error) {
                         console.error("Login failed:", error);
@@ -1453,7 +1438,6 @@
                 },
                 async logout() {
                      try {
-                         if (!auth) throw new Error("Firebase Auth not initialized.");
                         await signOut(auth);
                      } catch (error) { console.error("Logout failed:", error); alert(`로그아웃 실패: ${error.message}`); }
                 },
@@ -1466,7 +1450,7 @@
                          this.showAdminCodeInput = true;
                      } else {
                          this.showAdminCodeInput = false;
-                         this.role = selectedRole; // Temporarily set role for logic
+                         this.role = selectedRole;
                          if (!this.schoolId) {
                              this.schoolIdMode = 'join';
                              this.showSchoolIdModal = true;
@@ -1533,8 +1517,8 @@
                 },
                 async resetRole() {
                     this.role = null;
-                    await this.saveUserRoleAndSchoolId(null); // Clear role in DB, keep schoolId
-                    this.resetRoleSpecificData(); // Clear only local teacher/homeroom data
+                    await this.saveUserRoleAndSchoolId(null);
+                    this.resetRoleSpecificData();
                     this.showAdminCodeInput = false;
                     this.adminCode = '';
                     this.adminCodeError = '';
@@ -1622,9 +1606,8 @@
 
                 // --- Data Saving (Admin) ---
                 async uploadFile(event, type) {
-                    if (!this.schoolId) { alert("학교 ID가 설정되지 않았습니다. '학교 코드 수정 및 발급' 메뉴에서 ID를 먼저 설정해주세요."); return; }
-                    if (this.role !== '관리자') { alert("데이터 업로드는 관리자만 가능합니다."); return; }
-                    if (!db) { alert("오류: DB가 없습니다."); return; }
+                    if (!this.schoolId) { alert("학교 ID가 설정되지 않았습니다. '학교 코드 수정 및 발급' 메뉴에서 ID를 먼저 설정해주세요."); event.target.value = null; return; }
+                    if (this.role !== '관리자' || !db) { event.target.value = null; return; }
 
                     const file = event.target.files[0];
                     if (!file) return;
@@ -1720,9 +1703,7 @@
                              this.teacherPlan.preventionPeriod = (this.teacherPlan.preventionPeriod || []).map(d => d ? new Date(d.seconds ? d.seconds * 1000 : d) : null).filter(d => d && !isNaN(d.getTime()));
                              this.teacherPlan.supplementaryPeriod = (this.teacherPlan.supplementaryPeriod || []).map(d => d ? new Date(d.seconds ? d.seconds * 1000 : d) : null).filter(d => d && !isNaN(d.getTime()));
                              
-                             console.log("Teacher plan loaded.");
                          } else {
-                             console.log("No saved teacher plan found, using defaults.");
                              this.resetTeacherData(false);
                          }
                      } catch (error) { console.error("Error loading teacher plan:", error); this.resetTeacherData(false); }
@@ -1754,7 +1735,6 @@
                          return;
                      }
                      const docPath = `schools/${this.schoolId}/teacherData/${this.user.uid}/${this.teacherPlan.subjectName}`;
-                     console.log("Loading guidance data from:", docPath);
                      try {
                          const docSnap = await getDoc(doc(db, docPath));
                          if (docSnap.exists()) {
@@ -1770,10 +1750,8 @@
                                  sessions: this.mergeSessions(defaultGuidance.supplementary.sessions, fetchedData.supplementary?.sessions),
                                  error: fetchedData.supplementary?.error || ''
                              };
-                             console.log("Guidance data loaded for", this.teacherPlan.subjectName);
                          } else {
                              this.teacherGuidanceData = this.getInitialGuidanceData();
-                             console.log("No guidance data found for", this.teacherPlan.subjectName, ", initializing.");
                          }
                      } catch (error) {
                          console.error("Error loading guidance data:", error);
@@ -1910,7 +1888,7 @@
                              if (s && s.name) { if (!subjectsMap.has(s.name)) subjectsMap.set(s.name, new Set()); subjectsMap.get(s.name).add('학업성취율'); }
                          });
                          (fullStudent.attendanceSubjects || []).forEach(sName => {
-                             if (sName) { if (!subjectsMap.has(sName)) subjectsMap.set(sName, new Set()); subjectsMap.get(sName).add('과목출석률'); }
+                             if (sName) { if (!subjectsMap.has(sName)) subjectsMap.set(sName, new Set()); subjectsMap.get(s.name).add('과목출석률'); }
                          });
 
                       if (subjectsMap.size > 0) {
@@ -2137,46 +2115,13 @@
                      if (format === 'xlsx') { const ws = XLSX.utils.json_to_sheet(data); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "현황"); XLSX.writeFile(wb, `${filename}.xlsx`); }
                      else if (format === 'csv') { const ws = XLSX.utils.json_to_sheet(data); const csv = XLSX.utils.sheet_to_csv(ws); const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }); saveAs(blob, `${filename}.csv`); }
                      else if (format === 'pdf') {
+                         this.adminActionStatus = 'PDF 생성 중...';
                          const table = document.getElementById('underachievers-table');
                          if (table) {
                              const tableClone = table.cloneNode(true);
-                             const rows = tableClone.querySelectorAll('tr');
-                             rows.forEach(row => { row.querySelector('th:last-child, td:last-child')?.remove(); });
-                             const style = document.createElement('style');
-                             style.innerHTML = `
-                                 .pdf-table { width: 100%; font-size: 8pt; border-collapse: collapse; table-layout: fixed; }
-                                 .pdf-table th, .pdf-table td { border: 1px solid #ddd; padding: 3px; text-align: left; vertical-align: top; word-wrap: break-word; }
-                                 .pdf-table th { background-color: #f2f2f2; text-align: center; }
-                                 .pdf-table tr > *:nth-child(1) { width: 7%; } .pdf-table tr > *:nth-child(2) { width: 7%; }
-                                 .pdf-table tr > *:nth-child(3) { width: 10%; } .pdf-table tr > *:nth-child(4) { width: 14%; }
-                                 .pdf-table tr > *:nth-child(5) { width: 40%; } .pdf-table tr > *:nth-child(6) { width: 22%; }
-                             `;
-                             tableClone.classList.add('pdf-table');
-                             const printContainer = document.createElement('div');
-                             printContainer.style.position = 'absolute'; printContainer.style.left = '-9999px'; printContainer.style.width = '1120px';
-                             printContainer.appendChild(style); printContainer.appendChild(tableClone);
-                             document.body.appendChild(printContainer);
-                             
-                             html2canvas(printContainer, { scale: 2 }).then(canvas => {
-                                 const imgData = canvas.toDataURL('image/png');
-                                 const { jsPDF } = window.jspdf;
-                                 const pdf = new jsPDF('l', 'mm', 'a4');
-                                 const imgProps = pdf.getImageProperties(imgData);
-                                 const margin = 10;
-                                 const pdfWidth = pdf.internal.pageSize.getWidth() - (margin * 2);
-                                 const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-                                 const pageHeight = pdf.internal.pageSize.getHeight() - (margin * 2);
-                                 let heightLeft = pdfHeight; let position = 0;
-                                 pdf.addImage(imgData, 'PNG', margin, margin, pdfWidth, pdfHeight);
-                                 heightLeft -= pageHeight;
-                                 while (heightLeft > 0) {
-                                     position -= pageHeight;
-                                     pdf.addPage();
-                                     pdf.addImage(imgData, 'PNG', margin, margin + position, pdfWidth, pdfHeight);
-                                     heightLeft -= pageHeight;
-                                 }
-                                 pdf.save(`${filename}.pdf`);
-                             }).finally(() => { document.body.removeChild(printContainer); });
+                             tableClone.querySelector('th:last-child, td:last-child')?.remove();
+                             this.previewHtml = `<div id="print-area"><h1>미도달 학생 현황</h1>${tableClone.outerHTML}</div>`;
+                             this.showPreviewModal = true;
                          }
                      }
                      this.showExportOptions = false;
@@ -2384,15 +2329,6 @@
                          this.saveGuidanceData();
                      } else { data.error = '학적 정보에 없는 학생입니다. 먼저 학적 정보를 업로드해주세요.'; }
                 },
-                removeGuidanceStudent(type, studentIdToRemove) {
-                     if (this.role !== '교과교사') return; const data = this.teacherGuidanceData[type]; if (!data) return;
-                     const index = data.students.findIndex(s => s.id === studentIdToRemove);
-                     if (index > -1) {
-                         data.students.splice(index, 1);
-                         data.sessions.forEach(session => { if (session) delete session.attendance[studentIdToRemove]; });
-                         this.saveGuidanceData();
-                     }
-                },
                 addGuidanceSession(type) {
                      if (this.role !== '교과교사') return; const data = this.teacherGuidanceData[type]; if (!data) return;
                      const initialAttendance = {};
@@ -2402,8 +2338,7 @@
                 },
                 isSessionReadyToSave(session) {
                     if (!session || !session.date || !session.time) return false;
-                    const currentStudents = this.currentGuidanceData?.students;
-                    if (!currentStudents) return false;
+                    if (!this.currentGuidanceData?.students || this.currentGuidanceData.students.length === 0) return false;
                      return Object.values(session.attendance || {}).some(value => value);
                 },
                 toggleSaveSession(session) {
@@ -2425,7 +2360,7 @@
                     const scrollAmount = container.clientWidth * 0.8;
                     container.scrollBy({ left: direction === 'left' ? -scrollAmount : scrollAmount, behavior: 'smooth' });
                 },
-                async generatePdfFromHtml(htmlContent, orientation = 'p', filename = 'document.pdf') {
+                async generatePdfFromHtml(htmlContent) {
                     this.previewHtml = htmlContent;
                     this.showPreviewModal = true;
                     this.adminActionStatus = '미리보기 생성 완료. 인쇄 버튼을 눌러 PDF로 저장하세요.';
@@ -2435,7 +2370,7 @@
                      if (!data || !this.role) return;
                      const title = type === 'preventive' ? '예방지도' : '보충지도(추가학습)';
                      
-                     let completionStatusTable = `<table><thead><tr>
+                     let tableHtml = `<table><thead><tr>
                          <th>학생</th>
                          ${type === 'supplementary' ? '<th>특기사항</th><th>미도달 항목</th><th>예방지도</th><th>정서지원프로그램</th>' : ''}
                          ${this.moduleConfig.recognizedHours.map(rh => `<th>${rh.name}</th>`).join('')}
@@ -2446,41 +2381,30 @@
                      if (data.students && data.students.length > 0) {
                          data.students.forEach(student => {
                              if (!student) return;
-                             completionStatusTable += `<tr><td class="text-left">${student.name} (${student.id})</td>`;
+                             tableHtml += `<tr><td class="text-left">${student.name} (${student.id})</td>`;
                              const studentStatus = this.guidanceCompletionStatus[student.id] || {};
                              if (type === 'supplementary') {
-                                 completionStatusTable += `<td>${studentStatus.specialNotes || '일반학생'}</td>
-                                     <td>${student.reason || ''}</td>
-                                     <td>${studentStatus.preventiveHours || 0}</td>
-                                     <td>${studentStatus.emotionalSupportHours || 0}</td>`;
+                                 tableHtml += `<td>${studentStatus.specialNotes || '일반학생'}</td><td>${student.reason || ''}</td><td>${studentStatus.preventiveHours || 0}</td><td>${studentStatus.emotionalSupportHours || 0}</td>`;
                              }
                              this.moduleConfig.recognizedHours.forEach(rh => {
-                                 completionStatusTable += `<td>${studentStatus[rh.name] || 0}</td>`;
+                                 tableHtml += `<td>${studentStatus[rh.name] || 0}</td>`;
                              });
-                             completionStatusTable += `<td>${studentStatus.total || 0}</td>`;
+                             tableHtml += `<td>${studentStatus.total || 0}</td>`;
                              if (type === 'supplementary') {
                                  const status = studentStatus.completionStatus || '미이수';
-                                 const color = status === '이수' ? 'green' : 'red';
-                                 completionStatusTable += `<td style="color: ${color}; font-weight: bold;">${status}</td>`;
+                                 tableHtml += `<td style="color: ${status === '이수' ? 'green' : 'red'}; font-weight: bold;">${status}</td>`;
                              }
-                             completionStatusTable += '</tr>';
+                             tableHtml += '</tr>';
                          });
                      } else {
                          const colspan = this.moduleConfig.recognizedHours.length + (type === 'supplementary' ? 7 : 2);
-                         completionStatusTable += `<tr><td colspan="${colspan}">학생 정보가 없습니다.</td></tr>`;
+                         tableHtml += `<tr><td colspan="${colspan}">학생 정보가 없습니다.</td></tr>`;
                      }
-                     completionStatusTable += '</tbody></table>';
+                     tableHtml += '</tbody></table>';
                      
-                     const pdfHtml = `<div id="print-area">
-                         <h1>${title} 이수현황표</h1>
-                         <div style="font-size: 1rem; line-height: 1.6; border: 1px solid #ccc; padding: 10px; margin-bottom: 2rem;">
-                             <p><strong>과목명:</strong> ${this.teacherPlan.subjectName || '미입력'}</p>
-                             <p><strong>지도교사:</strong> ${this.formattedTeacherNames}</p>
-                         </div>
-                         ${completionStatusTable}
-                     </div>`;
+                     const finalHtml = `<div id="print-area"><h1>${title} 이수현황표</h1><div style="font-size: 1rem; line-height: 1.6; border: 1px solid #ccc; padding: 10px; margin-bottom: 2rem;"><p><strong>과목명:</strong> ${this.teacherPlan.subjectName || '미입력'}</p><p><strong>지도교사:</strong> ${this.formattedTeacherNames}</p></div>${tableHtml}</div>`;
                      
-                     await this.generatePdfFromHtml(pdfHtml, 'l', `${title}_이수현황표.pdf`);
+                     this.generatePdfFromHtml(finalHtml);
                 },
                 async generateAttendancePdf(type) {
                      const data = this.teacherGuidanceData[type];
@@ -2488,75 +2412,33 @@
                      const title = type === 'preventive' ? '예방지도' : '보충지도(추가학습)';
                      const savedSessions = data.sessions.filter(s => s && s.date);
                      
-                     let attendanceTable = `<table><thead><tr>
-                         <th>학번</th><th>이름</th>
-                         ${savedSessions.map((session, index) => `<th>${index + 1}차시<br/>(${session.date})</th>`).join('')}
-                         </tr></thead><tbody>`;
-                         
+                     let tableHtml = `<table><thead><tr><th>학번</th><th>이름</th>${savedSessions.map((s, i) => `<th>${i + 1}차시<br/>(${s.date})</th>`).join('')}</tr></thead><tbody>`;
                      if (data.students && data.students.length > 0) {
                          data.students.forEach(student => {
                              if (!student) return;
-                             attendanceTable += `<tr><td class="text-left">${student.id}</td><td class="text-left">${student.name}</td>`;
-                             savedSessions.forEach(session => {
-                                 attendanceTable += `<td>${(session && session.attendance) ? (session.attendance[student.id] || '') : ''}</td>`;
-                             });
-                             attendanceTable += '</tr>';
+                             tableHtml += `<tr><td class="text-left">${student.id}</td><td class="text-left">${student.name}</td>`;
+                             savedSessions.forEach(s => { tableHtml += `<td>${(s?.attendance?.[student.id] || '')}</td>`; });
+                             tableHtml += '</tr>';
                          });
                      } else {
-                         attendanceTable += `<tr><td colspan="${savedSessions.length + 2}">학생 정보가 없습니다.</td></tr>`;
+                         tableHtml += `<tr><td colspan="${savedSessions.length + 2}">학생 정보가 없습니다.</td></tr>`;
                      }
-                     attendanceTable += '</tbody></table>';
+                     tableHtml += '</tbody></table>';
                      
-                     const pdfHtml = `<div id="print-area">
-                         <h1>${title} 출석부</h1>
-                         <div style="font-size: 1rem; line-height: 1.6; border: 1px solid #ccc; padding: 10px; margin-bottom: 2rem;">
-                             <p><strong>과목명:</strong> ${this.teacherPlan.subjectName || '미입력'}</p>
-                             <p><strong>지도교사:</strong> ${this.formattedTeacherNames}</p>
-                         </div>
-                         ${attendanceTable}
-                     </div>`;
-                     
-                     await this.generatePdfFromHtml(pdfHtml, 'l', `${title}_출석부.pdf`);
+                     const finalHtml = `<div id="print-area"><h1>${title} 출석부</h1><div style="font-size: 1rem; line-height: 1.6; border: 1px solid #ccc; padding: 10px; margin-bottom: 2rem;"><p><strong>과목명:</strong> ${this.teacherPlan.subjectName || '미입력'}</p><p><strong>지도교사:</strong> ${this.formattedTeacherNames}</p></div>${tableHtml}</div>`;
+                     this.generatePdfFromHtml(finalHtml);
                 },
                 async generateLessonLogPdf(type) {
-                     const data = this.teacherGuidanceData[type];
-                     if (!data || !this.role) return;
+                     if (!this.currentGuidanceData || !this.role) return;
                      const title = type === 'preventive' ? '예방지도' : '보충지도(추가학습)';
                      
-                     let lessonLogHtml = '';
-                     this.savedGuidanceSessions.forEach((session, index) => {
-                         if (!session) return;
-                         lessonLogHtml += `
-                             <div class="page-break" style="border: 1px solid #ccc; padding: 15px; margin-bottom: 15px;">
-                                 <h3>${index + 1}차시 수업일지 (${session.date} / ${session.time})</h3>
-                                 <table style="font-size: 10pt;">
-                                     <tr>
-                                         <th style="width: 20%;">장소</th>
-                                         <td class="text-left" style="width: 30%;">${session.place || ''}</td>
-                                         <th style="width: 20%;">수업방법</th>
-                                         <td class="text-left" style="width: 30%;">${[...new Set(Object.values(session.attendance || {}))].filter(Boolean).join(', ')}</td>
-                                     </tr>
-                                     <tr>
-                                         <th>지도내용</th>
-                                         <td colspan="3" class="text-left">
-                                             <div class="whitespace-pre-wrap" style="min-height: 100px;">${session.content || ''}</div>
-                                         </td>
-                                     </tr>
-                                 </table>
-                             </div>`;
-                     });
+                     let lessonLogHtml = this.savedGuidanceSessions.map((session, index) => {
+                         if (!session) return '';
+                         return `<div class="page-break" style="border: 1px solid #ccc; padding: 15px; margin-bottom: 15px;"><h3>${index + 1}차시 수업일지 (${session.date} / ${session.time})</h3><table style="font-size: 10pt;"><tr><th style="width: 20%;">장소</th><td class="text-left" style="width: 30%;">${session.place || ''}</td><th style="width: 20%;">수업방법</th><td class="text-left" style="width: 30%;">${[...new Set(Object.values(session.attendance || {}))].filter(Boolean).join(', ')}</td></tr><tr><th>지도내용</th><td colspan="3" class="text-left"><div class="whitespace-pre-wrap" style="min-height: 100px;">${session.content || ''}</div></td></tr></table></div>`;
+                     }).join('');
                      
-                     const pdfHtml = `<div id="print-area">
-                         <h1>${title} 수업일지</h1>
-                         <div style="font-size: 1rem; line-height: 1.6; border: 1px solid #ccc; padding: 10px; margin-bottom: 2rem;">
-                             <p><strong>과목명:</strong> ${this.teacherPlan.subjectName || '미입력'}</p>
-                             <p><strong>지도교사:</strong> ${this.formattedTeacherNames}</p>
-                             <p><strong>운영기간:</strong> ${this.guidanceOperationPeriod}</p>
-                         </div>
-                         ${lessonLogHtml.length > 0 ? lessonLogHtml : '<p style="text-align: center;">저장된 수업일지가 없습니다.</p>'}
-                     </div>`;
-                     
-                     await this.generatePdfFromHtml(pdfHtml, 'p', `${title}_수업일지.pdf`);
+                     const finalHtml = `<div id="print-area"><h1>${title} 수업일지</h1><div style="font-size: 1rem; line-height: 1.6; border: 1px solid #ccc; padding: 10px; margin-bottom: 2rem;"><p><strong>과목명:</strong> ${this.teacherPlan.subjectName || '미입력'}</p><p><strong>지도교사:</strong> ${this.formattedTeacherNames}</p><p><strong>운영기간:</strong> ${this.guidanceOperationPeriod}</p></div>${lessonLogHtml.length > 0 ? lessonLogHtml : '<p style="text-align: center;">저장된 수업일지가 없습니다.</p>'}</div>`;
+                     this.generatePdfFromHtml(finalHtml);
                 },
                 closeImportModal() { this.showImportModal = false; this.importClasses = ['']; this.importModalError = ''; },
                 addImportClassInput() { this.importClasses.push(''); },
@@ -2647,46 +2529,30 @@
                 resetRoleSpecificData() {
                     Object.assign(this.teacherPlan, this.getInitialTeacherPlan());
                     this.teacherGuidanceData = this.getInitialGuidanceData();
-                    this.teacherPlanError = '';
-                    this.teacherPlanStatus = '';
-                    this.newGuidanceStudentId = '';
-                    this.homeroomClassInput = '';
-                    this.searchedStudents = [];
-                    this.homeroomMessage = '';
-                    console.log("Role-specific data reset.");
+                    this.teacherPlanError = ''; this.teacherPlanStatus = ''; this.newGuidanceStudentId = '';
+                    this.homeroomClassInput = ''; this.searchedStudents = []; this.homeroomMessage = '';
                 },
                 resetAllLocalData(resetAuth = true) {
                     if (resetAuth) {
                         this.user = null; this.isLoggedIn = false;
                     }
-                    this.role = null;
-                    this.schoolId = null;
-                    this.curriculumData = [];
-                    this.studentData = [];
-                    this.emotionalSupportData = [];
-                    this.deployedUnderachievers = [];
-                    this.underachievers = [];
+                    this.role = null; this.schoolId = null;
+                    this.curriculumData = []; this.studentData = []; this.emotionalSupportData = [];
+                    this.deployedUnderachievers = []; this.underachievers = [];
                     this.resetRoleSpecificData();
                     Object.assign(this.moduleConfig, this.$options.data().moduleConfig);
                     Object.assign(this.newsletterForm, this.$options.data().newsletterForm);
                     Object.assign(this.pledgeForm, this.$options.data().pledgeForm);
                     this.uploadStatus = { curriculum: '', student: '', emotionalSupport: '' };
-                    this.statusMessage = '';
-                    this.moduleConfigStatus = '';
-                    this.underachieversStatus = '';
-                    this.adminActionStatus = '';
-                    console.log("All local data reset.");
+                    this.statusMessage = ''; this.moduleConfigStatus = ''; this.underachieversStatus = ''; this.adminActionStatus = '';
                 },
                 resetTeacherData(resetGuidance = true) {
                      Object.assign(this.teacherPlan, this.getInitialTeacherPlan());
-                     if (resetGuidance) {
-                         this.teacherGuidanceData = this.getInitialGuidanceData();
-                     }
+                     if (resetGuidance) { this.teacherGuidanceData = this.getInitialGuidanceData(); }
                      this.teacherPlanError = ''; this.teacherPlanStatus = ''; this.newGuidanceStudentId = '';
-                     console.log("Teacher data reset.");
                 },
 
-                // --- NEW Admin Modify Modal Methods ---
+                // --- Admin Modify Modal Methods ---
                 openAdminModifyModal() {
                     if (this.role !== '관리자') return;
                     this.newSchoolIdForModify = this.schoolId;
@@ -2709,11 +2575,14 @@
                     this.schoolId = newId;
                     await this.saveUserRoleAndSchoolId(this.role);
                     
-                    this.resetAllLocalData(false); // Clear all local data except auth
+                    // 현재 인증 상태를 제외한 모든 로컬 데이터 초기화
+                    this.resetAllLocalData(false);
                     
-                    this.role = '관리자'; // Restore role
-                    this.schoolId = newId; // Restore new schoolId
+                    // 역할과 새 schoolId 복원
+                    this.role = '관리자';
+                    this.schoolId = newId;
 
+                    // 새 schoolId로 데이터 다시 로드
                     await this.loadCommonData();
                     this.underachievers = JSON.parse(JSON.stringify(this.deployedUnderachievers));
                     
@@ -2723,7 +2592,6 @@
                 },
             },
 
-            // --- Mounted Hook ---
             mounted() {
                  if (auth) {
                     this.initApp();
