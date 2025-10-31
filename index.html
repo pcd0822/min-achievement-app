@@ -980,7 +980,6 @@
         <div id="print-area-container" class="hidden"></div>
 
     </div>
-
     <script type="module">
         // Vue 3 CDN
         import { createApp } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js'
@@ -1011,6 +1010,9 @@
             console.error("Firebase initialization error:", error);
             alert("Firebase 초기화 중 오류가 발생했습니다. 페이지를 새로고침하거나 관리자에게 문의하세요.");
         }
+
+
+
 
 
         createApp({
@@ -1338,11 +1340,15 @@
                             if (!allSubjects.has(subject.name)) { allSubjects.set(subject.name, { grade: true, attendance: false }); }
                             else { allSubjects.get(subject.name).grade = true; }
                         });
-                         (student.attendanceSubjects || []).forEach(subjectName => {
-                             if (!subjectName) return;
-                            if (!allSubjects.has(subjectName)) { allSubjects.set(subjectName, { grade: false, attendance: true }); }
-                            else { allSubjects.get(subjectName).attendance = true; }
-                        });
+                         (student.attendanceSubjects || []).forEach(sName => { // FIXED: s.name -> sName
+                             if (sName) { 
+                                 if (!allSubjects.has(sName)) { 
+                                     allSubjects.set(sName, { grade: false, attendance: true }); 
+                                 } else { 
+                                     allSubjects.get(sName).attendance = true; 
+                                 }
+                             }
+                         });
 
                         const subjectsArray = Array.from(allSubjects.entries()).map(([name, reasons]) => {
                             let reason = '';
@@ -1501,7 +1507,7 @@
                     this.showSchoolIdModal = false;
                     
                     await this.saveUserRoleAndSchoolId(this.role);
-                    await this.loadCommonData();
+                    await this.loadCommonData(); // CHANGED: Ensure common data is loaded right after joining a school
                     
                     if(this.role === '교과교사') {
                          await this.loadTeacherPlan();
@@ -1676,7 +1682,12 @@
                         await setDoc(docRef, { data: JSON.parse(JSON.stringify(this.underachievers)) });
                          this.deployedUnderachievers = JSON.parse(JSON.stringify(this.underachievers));
                         this.underachieversStatus = "대상자 명단이 Firestore에 배포되었습니다.";
-                    } catch (error) { console.error("Error deploying underachievers:", error); this.underachieversStatus = "배포 중 오류 발생: " + error.message; }
+                        alert('미도달 학생 명단이 성공적으로 배포되었습니다.'); // CHANGED: Add clear user feedback
+                    } catch (error) { 
+                        console.error("Error deploying underachievers:", error); 
+                        this.underachieversStatus = "배포 중 오류 발생: " + error.message; 
+                        alert('명단 배포 중 오류가 발생했습니다.');
+                    }
                      setTimeout(() => this.underachieversStatus = '', 3000);
                 },
 
@@ -1888,7 +1899,7 @@
                              if (s && s.name) { if (!subjectsMap.has(s.name)) subjectsMap.set(s.name, new Set()); subjectsMap.get(s.name).add('학업성취율'); }
                          });
                          (fullStudent.attendanceSubjects || []).forEach(sName => {
-                             if (sName) { if (!subjectsMap.has(sName)) subjectsMap.set(sName, new Set()); subjectsMap.get(s.name).add('과목출석률'); }
+                             if (sName) { if (!subjectsMap.has(sName)) subjectsMap.set(sName, new Set()); subjectsMap.get(sName).add('과목출석률'); }
                          });
 
                       if (subjectsMap.size > 0) {
@@ -2443,7 +2454,7 @@
                 closeImportModal() { this.showImportModal = false; this.importClasses = ['']; this.importModalError = ''; },
                 addImportClassInput() { this.importClasses.push(''); },
                 removeImportClassInput(index) { this.importClasses.splice(index, 1); },
-                importUnderachievers() {
+                async importUnderachievers() { // CHANGED: Made async and added data refresh
                      if (this.role !== '교과교사') return;
                      this.importModalError = '';
                      const subject = this.teacherPlan.subjectName.trim();
@@ -2452,6 +2463,17 @@
                      const classes = this.importClasses.map(c => c.trim()).filter(Boolean);
                      if (classes.length === 0) { this.importModalError = '학급을 입력해주세요.'; return; }
                      
+                     // ADDED: Refresh deployed data from Firestore right before importing
+                     this.importModalError = '최신 명단 확인 중...';
+                     try {
+                         const underachieversSnap = await getDoc(doc(db, `schools/${this.schoolId}/commonData`, "underachievers"));
+                         this.deployedUnderachievers = underachieversSnap.exists() ? underachieversSnap.data().data || [] : [];
+                     } catch (e) {
+                         this.importModalError = '최신 명단을 불러오는 데 실패했습니다.';
+                         return;
+                     }
+
+
                      const allUnderachievers = this.deployedUnderachievers;
                      if (!allUnderachievers || allUnderachievers.length === 0) { this.importModalError = '배포된 미도달 학생 명단이 없습니다.'; return; }
 
@@ -2505,14 +2527,24 @@
                 },
 
                 // --- Homeroom Teacher Methods ---
-                searchHomeroomClass(){
+                async searchHomeroomClass(){ // CHANGED: Made async for better UX
                      if(this.role !== '담임교사') return;
-                     this.homeroomMessage = '';
+                     this.homeroomMessage = '데이터 조회 중...';
+                     this.searchedStudents = [];
                      const classInput = this.homeroomClassInput.trim();
-                     if(!classInput){ this.homeroomMessage = '학급 번호를 입력해주세요.'; this.searchedStudents = []; return; }
+                     if(!classInput){ this.homeroomMessage = '학급 번호를 입력해주세요.'; return; }
                      
+                     // ADDED: Refresh data before searching
+                     try {
+                         const underachieversSnap = await getDoc(doc(db, `schools/${this.schoolId}/commonData`, "underachievers"));
+                         this.deployedUnderachievers = underachieversSnap.exists() ? underachieversSnap.data().data || [] : [];
+                     } catch (e) {
+                         this.homeroomMessage = '학생 명단을 불러오는 데 실패했습니다.';
+                         return;
+                     }
+
                      const allStudents = this.deployedUnderachievers;
-                     if (!allStudents || allStudents.length === 0) { this.homeroomMessage = '관리자가 배포한 학생 데이터가 없습니다.'; this.searchedStudents = []; return; }
+                     if (!allStudents || allStudents.length === 0) { this.homeroomMessage = '관리자가 배포한 학생 데이터가 없습니다.'; return; }
 
                      const filtered = allStudents.filter(s => s && s.id && s.id.startsWith(classInput));
                      
@@ -2520,7 +2552,6 @@
                          this.searchedStudents = filtered;
                          this.homeroomMessage = `${classInput}반 미도달 학생 ${filtered.length}명을 조회했습니다.`;
                      } else {
-                         this.searchedStudents = [];
                          this.homeroomMessage = `해당 학급에 미도달 학생이 없습니다.`;
                      }
                 },
@@ -2601,5 +2632,8 @@
         }).mount('#app');
 
     </script>
+
+
 </body>
 </html>
+
