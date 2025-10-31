@@ -1400,25 +1400,35 @@
 
                     // --- Initialization and Auth ---
                     async initApp() {
-                        this.isLoading = true;
                         onAuthStateChanged(auth, async (user) => {
+                            this.isLoading = true;
                             try {
                                 if (user) {
-                                    this.user = user;
-                                    this.isLoggedIn = true;
-                                    await this.loadUserRoleAndSchoolId();
-                                    if (this.role && this.schoolId) {
-                                        await this.loadCommonData();
-                                        if(this.role === '교과교사') {
-                                            await this.loadTeacherPlan();
-                                            if (this.teacherPlan.subjectName) {
-                                                await this.loadGuidanceData();
-                                                this.filterSupplementaryStudents();
-                                            }
-                                        } else if (this.role === '관리자') {
-                                            this.underachievers = JSON.parse(JSON.stringify(this.deployedUnderachievers));
-                                        }
-                                    }
+                                    this.user = user;
+                                    this.isLoggedIn = true;
+                                    await this.loadUserRoleAndSchoolId(); // 역할(role)과 학교ID(schoolId)를 불러옵니다.
+
+                                    // 1. 역할과 학교ID가 모두 있는 경우 (정상적인 대시보드 로드)
+                                    if (this.role && this.schoolId) {
+                                        await this.loadCommonData();
+                                        if(this.role === '교과교사') {
+                                            await this.loadTeacherPlan();
+                                            if (this.teacherPlan.subjectName) {
+                                                await this.loadGuidanceData();
+                                                this.filterSupplementaryStudents();
+                                            }
+                                        } else if (this.role === '관리자') {
+                                            this.underachievers = JSON.parse(JSON.stringify(this.deployedUnderachievers));
+                                        }
+                                    // 2. 역할은 있지만 학교ID가 없는 경우 (학교 ID 입력 모달 강제 표시)
+                                    } else if (this.isLoggedIn && this.role && !this.schoolId) {
+                                        this.schoolIdMode = this.role === '관리자' ? 'create' : 'join';
+                                        this.showSchoolIdModal = true;
+                                    }
+                                    // 3. 역할이 없는 경우 (isLoggedIn: true, role: null)
+                                    // 이 경우, finally에서 isLoading=false가 되면
+                                    // v-if="isLoggedIn && !role && !isLoading" 조건이 충족되어
+                                    // 자동으로 역할 선택 모달이 나타납니다.
                                 } else {
                                     this.user = null;
                                     this.isLoggedIn = false;
@@ -2707,3 +2717,4 @@
 
 </body>
 </html>
+
