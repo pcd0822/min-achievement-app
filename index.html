@@ -1011,10 +1011,6 @@
             alert("Firebase 초기화 중 오류가 발생했습니다. 페이지를 새로고침하거나 관리자에게 문의하세요.");
         }
 
-
-
-
-
         createApp({
             data() {
                 return {
@@ -1340,7 +1336,7 @@
                             if (!allSubjects.has(subject.name)) { allSubjects.set(subject.name, { grade: true, attendance: false }); }
                             else { allSubjects.get(subject.name).grade = true; }
                         });
-                         (student.attendanceSubjects || []).forEach(sName => { // FIXED: s.name -> sName
+                         (student.attendanceSubjects || []).forEach(sName => {
                              if (sName) { 
                                  if (!allSubjects.has(sName)) { 
                                      allSubjects.set(sName, { grade: false, attendance: true }); 
@@ -1383,14 +1379,19 @@
                 // --- Initial Data Helpers ---
                 getInitialTeacherPlan() {
                      return {
-                         aiProvider: 'gemini', apiKey: '', subjectName: '', teacherNames: [''],
+                         subjectName: '', teacherNames: [''],
                          achievements: [{ text: '', statement: '', loading: false }],
                          gradeCalculation: '추정분할점수', conductPrevention: 'X',
                          preventionTarget: '', preventionMethods: [], preventionPeriod: [],
                          preventionSessions: [{ plan: '' }, { plan: '' }, { plan: '' }],
+                         // Supplementary Plan
                          supplementaryMethods: [], supplementaryPeriod: [],
-                         supplementarySessions: [{ plan: '' }, { plan: '' }, { plan: '' }],
+                         supplementarySessions: [],
                          maxSupplementaryHours: 0,
+                         // Additional Learning Plan
+                         additionalMethods: [], additionalPeriod: [],
+                         additionalSessions: [],
+                         maxAdditionalHours: 0,
                     };
                 },
                 getInitialGuidanceData() {
@@ -1435,6 +1436,7 @@
                     const provider = new GoogleAuthProvider();
                     try {
                         await signInWithPopup(auth, provider);
+                        // onAuthStateChanged will handle the rest
                     } catch (error) {
                         console.error("Login failed:", error);
                          if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
@@ -1445,6 +1447,7 @@
                 async logout() {
                      try {
                         await signOut(auth);
+                        // onAuthStateChanged will handle reset
                      } catch (error) { console.error("Logout failed:", error); alert(`로그아웃 실패: ${error.message}`); }
                 },
 
@@ -1507,7 +1510,7 @@
                     this.showSchoolIdModal = false;
                     
                     await this.saveUserRoleAndSchoolId(this.role);
-                    await this.loadCommonData(); // CHANGED: Ensure common data is loaded right after joining a school
+                    await this.loadCommonData();
                     
                     if(this.role === '교과교사') {
                          await this.loadTeacherPlan();
@@ -1562,7 +1565,7 @@
                 async loadCommonData() {
                     if (!db || !this.schoolId) {
                         console.warn("Cannot load common data: DB or schoolId is missing.");
-                        this.curriculumData = []; this.studentData = []; this.emotionalSupportData = []; this.deployedUnderachievers = [];
+                        this.resetAllLocalData(false); // Reset local data if schoolId is missing
                         return;
                     }
                     this.statusMessage = '공용 데이터 로딩 중...';
@@ -1584,18 +1587,24 @@
                         this.curriculumData = curriculumSnap.exists() ? curriculumSnap.data().data || [] : [];
                         this.studentData = studentsSnap.exists() ? studentsSnap.data().data || [] : [];
                         this.emotionalSupportData = emotionalSupportSnap.exists() ? emotionalSupportSnap.data().data || [] : [];
-                        Object.assign(this.moduleConfig, this.$options.data().moduleConfig);
-                        if (moduleConfigSnap.exists()) Object.assign(this.moduleConfig, moduleConfigSnap.data());
-                        Object.assign(this.newsletterForm, this.$options.data().newsletterForm);
-                        Object.assign(this.pledgeForm, this.$options.data().pledgeForm);
+                        
+                        const defaultModuleConfig = this.$options.data().moduleConfig;
+                        this.moduleConfig = moduleConfigSnap.exists() ? { ...defaultModuleConfig, ...moduleConfigSnap.data() } : defaultModuleConfig;
+                        
+                        const defaultNewsletter = this.$options.data().newsletterForm;
+                        const defaultPledge = this.$options.data().pledgeForm;
                         if (formTemplatesSnap.exists()) {
                             const templatesData = formTemplatesSnap.data();
-                            if(templatesData.newsletter) Object.assign(this.newsletterForm, templatesData.newsletter);
-                            if(templatesData.pledge) Object.assign(this.pledgeForm, templatesData.pledge);
+                            this.newsletterForm = templatesData.newsletter ? { ...defaultNewsletter, ...templatesData.newsletter } : defaultNewsletter;
+                            this.pledgeForm = templatesData.pledge ? { ...defaultPledge, ...templatesData.pledge } : defaultPledge;
+                        } else {
+                            this.newsletterForm = defaultNewsletter;
+                            this.pledgeForm = defaultPledge;
                         }
+
                         this.deployedUnderachievers = underachieversSnap.exists() ? underachieversSnap.data().data || [] : [];
 
-                        console.log("Common data loaded for school:", this.schoolId);
+                        console.log("Common data loaded successfully for school:", this.schoolId);
                         this.statusMessage = '공용 데이터 로딩 완료.';
                     } catch (error) {
                         console.error("Error loading common data:", error);
@@ -1682,7 +1691,7 @@
                         await setDoc(docRef, { data: JSON.parse(JSON.stringify(this.underachievers)) });
                          this.deployedUnderachievers = JSON.parse(JSON.stringify(this.underachievers));
                         this.underachieversStatus = "대상자 명단이 Firestore에 배포되었습니다.";
-                        alert('미도달 학생 명단이 성공적으로 배포되었습니다.'); // CHANGED: Add clear user feedback
+                        alert('미도달 학생 명단이 성공적으로 배포되었습니다.');
                     } catch (error) { 
                         console.error("Error deploying underachievers:", error); 
                         this.underachieversStatus = "배포 중 오류 발생: " + error.message; 
@@ -1697,25 +1706,31 @@
                      const planDocRef = doc(db, `schools/${this.schoolId}/teacherData/${this.user.uid}`, "teacherPlan");
                      try {
                          const docSnap = await getDoc(planDocRef);
+                         const defaultPlan = this.getInitialTeacherPlan();
                          if (docSnap.exists()) {
                              const loadedPlan = docSnap.data();
-                             Object.assign(this.teacherPlan, this.getInitialTeacherPlan());
-                             Object.assign(this.teacherPlan, loadedPlan);
-                             
+                             // Merge loaded data into the default structure to ensure all properties exist
+                             this.teacherPlan = { ...defaultPlan, ...loadedPlan };
+
+                             // Ensure arrays are not undefined
                              this.teacherPlan.teacherNames = this.teacherPlan.teacherNames && this.teacherPlan.teacherNames.length > 0 ? this.teacherPlan.teacherNames : [''];
                              this.teacherPlan.achievements = this.teacherPlan.achievements && this.teacherPlan.achievements.length > 0 ? this.teacherPlan.achievements : [{ text: '', statement: '', loading: false }];
                              this.teacherPlan.preventionMethods = this.teacherPlan.preventionMethods || [];
                              this.teacherPlan.preventionSessions = this.teacherPlan.preventionSessions && this.teacherPlan.preventionSessions.length > 0 ? this.teacherPlan.preventionSessions : [{plan:''}];
                              this.teacherPlan.supplementaryMethods = this.teacherPlan.supplementaryMethods || [];
-                             this.teacherPlan.supplementarySessions = this.teacherPlan.supplementarySessions && this.teacherPlan.supplementarySessions.length > 0 ? this.teacherPlan.supplementarySessions : [{plan:''}];
-                             
+                             this.teacherPlan.supplementarySessions = this.teacherPlan.supplementarySessions || [];
+                             this.teacherPlan.additionalMethods = this.teacherPlan.additionalMethods || [];
+                             this.teacherPlan.additionalSessions = this.teacherPlan.additionalSessions || [];
+
                              this.teacherPlan.achievements.forEach(a => a.loading = false);
                              
-                             this.teacherPlan.preventionPeriod = (this.teacherPlan.preventionPeriod || []).map(d => d ? new Date(d.seconds ? d.seconds * 1000 : d) : null).filter(d => d && !isNaN(d.getTime()));
-                             this.teacherPlan.supplementaryPeriod = (this.teacherPlan.supplementaryPeriod || []).map(d => d ? new Date(d.seconds ? d.seconds * 1000 : d) : null).filter(d => d && !isNaN(d.getTime()));
+                             const parseDates = (period) => (period || []).map(d => d ? new Date(d.seconds ? d.seconds * 1000 : d) : null).filter(d => d && !isNaN(d.getTime()));
+                             this.teacherPlan.preventionPeriod = parseDates(this.teacherPlan.preventionPeriod);
+                             this.teacherPlan.supplementaryPeriod = parseDates(this.teacherPlan.supplementaryPeriod);
+                             this.teacherPlan.additionalPeriod = parseDates(this.teacherPlan.additionalPeriod);
                              
                          } else {
-                             this.resetTeacherData(false);
+                             this.teacherPlan = defaultPlan;
                          }
                      } catch (error) { console.error("Error loading teacher plan:", error); this.resetTeacherData(false); }
                       this.updateMaxHours();
@@ -1732,8 +1747,11 @@
                       const planDocRef = doc(db, `schools/${this.schoolId}/teacherData/${this.user.uid}`, "teacherPlan");
                      try {
                           const planToSave = { ...JSON.parse(JSON.stringify(this.teacherPlan)) };
-                           planToSave.preventionPeriod = this.teacherPlan.preventionPeriod.map(d => (d instanceof Date && !isNaN(d.getTime())) ? d.toISOString() : null).filter(Boolean);
-                           planToSave.supplementaryPeriod = this.teacherPlan.supplementaryPeriod.map(d => (d instanceof Date && !isNaN(d.getTime())) ? d.toISOString() : null).filter(Boolean);
+                           const formatDates = (period) => (period || []).map(d => (d instanceof Date && !isNaN(d.getTime())) ? d.toISOString() : null).filter(Boolean);
+                           planToSave.preventionPeriod = formatDates(this.teacherPlan.preventionPeriod);
+                           planToSave.supplementaryPeriod = formatDates(this.teacherPlan.supplementaryPeriod);
+                           planToSave.additionalPeriod = formatDates(this.teacherPlan.additionalPeriod);
+
                            planToSave.achievements = (planToSave.achievements || []).map(({ loading, ...rest }) => rest);
                           await setDoc(planDocRef, planToSave);
                          this.teacherPlanStatus = "계획안이 저장되었습니다.";
@@ -1823,10 +1841,20 @@
                          flatpickr(".flatpickr-range", {
                              mode: "range", dateFormat: "Y-m-d", locale: "ko",
                              onChange: (selectedDates, dateStr, instance) => {
-                                 let headerText = ''; const headerElement = instance.element.closest('.bg-white')?.querySelector('h3'); if(headerElement) headerText = headerElement.textContent;
-                                 const isPrevention = headerText.includes('예방'); const plan = this.teacherPlan; const targetPeriod = isPrevention ? 'preventionPeriod' : 'supplementaryPeriod';
-                                 if (Array.isArray(selectedDates) && selectedDates.every(d => d instanceof Date)) { plan[targetPeriod] = selectedDates; } else { plan[targetPeriod] = []; }
-                                 this.saveTeacherPlan();
+                                 let headerId = instance.element.dataset.planType;
+                                 if (!headerId) return;
+                                 
+                                 const plan = this.teacherPlan;
+                                 const targetPeriod = `${headerId}Period`;
+
+                                 if (plan.hasOwnProperty(targetPeriod)) {
+                                     if (Array.isArray(selectedDates) && selectedDates.every(d => d instanceof Date)) {
+                                         plan[targetPeriod] = selectedDates;
+                                     } else {
+                                         plan[targetPeriod] = [];
+                                     }
+                                     this.saveTeacherPlan();
+                                 }
                              }
                          });
                          flatpickr(".flatpickr-single", {
@@ -2192,18 +2220,22 @@
                 },
                 updateMaxHours() {
                      const subject = this.curriculumData.find(s => s.과목명 === this.teacherPlan.subjectName);
+                     let calculatedHours = 0;
                      if (subject) {
                          const credits = Number(subject.학점);
-                         if (!isNaN(credits) && credits > 0) { this.teacherPlan.maxSupplementaryHours = credits * this.moduleConfig.hoursPerCredit; }
-                         else { this.teacherPlan.maxSupplementaryHours = 0; }
-                         if(this.teacherPlan.supplementarySessions.length > this.teacherPlan.maxSupplementaryHours && this.teacherPlan.maxSupplementaryHours > 0){
-                             this.teacherPlan.supplementarySessions = this.teacherPlan.supplementarySessions.slice(0, this.teacherPlan.maxSupplementaryHours);
-                         } else if (this.teacherPlan.maxSupplementaryHours <= 0) {
-                             this.teacherPlan.supplementarySessions = [];
+                         if (!isNaN(credits) && credits > 0) {
+                             calculatedHours = credits * this.moduleConfig.hoursPerCredit;
                          }
-                     } else {
-                         this.teacherPlan.maxSupplementaryHours = 0;
-                         this.teacherPlan.supplementarySessions = [];
+                     }
+                     this.teacherPlan.maxSupplementaryHours = calculatedHours;
+                     this.teacherPlan.maxAdditionalHours = calculatedHours; // Both are the same
+
+                     // Ensure session arrays don't exceed the new max length
+                     if (this.teacherPlan.supplementarySessions.length > calculatedHours && calculatedHours > 0) {
+                         this.teacherPlan.supplementarySessions = this.teacherPlan.supplementarySessions.slice(0, calculatedHours);
+                     }
+                     if (this.teacherPlan.additionalSessions.length > calculatedHours && calculatedHours > 0) {
+                         this.teacherPlan.additionalSessions = this.teacherPlan.additionalSessions.slice(0, calculatedHours);
                      }
                 },
                 addAchievement() { this.teacherPlan.achievements.push({ text: '', statement: '', loading: false }); },
@@ -2212,52 +2244,67 @@
                 removePreventionSession(index) { this.teacherPlan.preventionSessions.splice(index, 1); },
                 addSupplementarySession() { if (!this.teacherPlan.maxSupplementaryHours) { alert("먼저 과목명을 입력하여 최대 차시를 설정하세요."); return; } if (this.teacherPlan.supplementarySessions.length < this.teacherPlan.maxSupplementaryHours) this.teacherPlan.supplementarySessions.push({ plan: '' }); },
                 removeSupplementarySession(index) { this.teacherPlan.supplementarySessions.splice(index, 1); },
+                addAdditionalSession() { if (!this.teacherPlan.maxAdditionalHours) { alert("먼저 과목명을 입력하여 최대 차시를 설정하세요."); return; } if (this.teacherPlan.additionalSessions.length < this.teacherPlan.maxAdditionalHours) this.teacherPlan.additionalSessions.push({ plan: '' }); },
+                removeAdditionalSession(index) { this.teacherPlan.additionalSessions.splice(index, 1); },
                 addTeacher() { this.teacherPlan.teacherNames.push(''); },
                 removeTeacher(index) { this.teacherPlan.teacherNames.splice(index, 1); },
                 async generateStatement(index) {
-                     this.teacherPlanError = ''; const achievement = this.teacherPlan.achievements[index]; if (!achievement.text) { this.teacherPlanError = '성취기준을 먼저 입력해주세요.'; return; }
-                     if (this.teacherPlan.aiProvider !== 'openai' && !this.teacherPlan.apiKey) { this.teacherPlanError = 'AI API 키를 먼저 입력해주세요.'; return; }
-                     achievement.loading = true; achievement.statement = '';
+                     this.teacherPlanError = '';
+                     const achievement = this.teacherPlan.achievements[index];
+                     if (!achievement.text) {
+                         this.teacherPlanError = '성취기준을 먼저 입력해주세요.';
+                         return;
+                     }
+                     achievement.loading = true;
+                     achievement.statement = '';
+                     
                      const systemPrompt = "당신은 교육 전문가로서 성취기준을 바탕으로 최소 성취수준과 최소 성취수준 학생들의 행동 특성을 설명하는 역할입니다. 입력한 성취기준에 대한 학습자들의 성취수준을 A~E 5단계로 나누었을 때 최하 수준인 E수준을 한 문장으로 진술하세요. 성취수준이란 입력한 성취기준을 학습한 결과로 나타나는 학습자들의 학습 수준을 의미해. 최소 성취수준이므로 간단하고 기초적인 수준으로 입력하되, 부정적인 진술은 하지 말고, 최소한의 노력을 하고 성취기준에 해당하는 내용을 기초적인 수준에서 찾아보았다는 식으로 진술하세요. '학생들은~', '최소 성취수준:' 또는 'E수준:~' 이라는 별도의 설명 구문 없이 바로 성취수준 진술문만 제시해야 합니다. 예를 들어 성취기준이 '논증 요소에 따른 분석을 바탕으로 효과적으로 내용을 조직하여 논증하는 글을 쓴다.'인 경우 최소 성취수준은 '논증 요소에 대한 제한적인 분석을 바탕으로 논증하는 글을 쓴다.'로 진술할 수 있습니다. 예시로 든 진술문의 형식을 유지하면서 최소 성취수준 진술문을 제시해주세요.";
                      const userQuery = achievement.text;
-                     let apiUrl, payload, headers = {}, responseParser;
-                     const provider = this.teacherPlan.aiProvider; const apiKey = this.teacherPlan.apiKey;
-
-                     if (provider === 'gemini') {
-                         apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
-                         headers['Content-Type'] = 'application/json';
-                         payload = { contents: [{ role: "user", parts: [{ text: systemPrompt + "\n\n 성취기준: " + userQuery }] }] };
-                         responseParser = (r) => r.candidates?.[0]?.content?.parts?.[0]?.text;
-                     } else if (provider === 'openai') {
-                         apiUrl = '/.netlify/functions/openai-proxy';
-                         headers['Content-Type'] = 'application/json';
-                         payload = { model: "gpt-3.5-turbo", messages: [{ role: "system", content: systemPrompt },{ role: "user", content: userQuery }] };
-                         responseParser = (r) => r.choices?.[0]?.message?.content;
-                     } else if (provider === 'claude') {
-                         apiUrl = '/.netlify/functions/claude-proxy';
-                         headers = { 'Content-Type': 'application/json' };
-                         payload = { model: "claude-3-sonnet-20240229", max_tokens: 1024, system: systemPrompt, messages: [{ role: "user", content: userQuery }] };
-                         responseParser = (r) => r.content?.[0]?.text;
-                     }
 
                      try {
-                         const response = await fetch(apiUrl, { method: 'POST', headers: headers, body: JSON.stringify(payload) });
-                         if (!response.ok) { const errorBody = await response.json().catch(() => ({})); const errorMessage = errorBody.error?.message || errorBody.message || errorBody.error || response.statusText; throw new Error(`API 요청 실패 (${response.status}): ${errorMessage}`); }
+                         const response = await fetch('/.netlify/functions/openai-proxy', {
+                             method: 'POST',
+                             headers: { 'Content-Type': 'application/json' },
+                             body: JSON.stringify({
+                                 model: "gpt-3.5-turbo",
+                                 messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userQuery }]
+                             })
+                         });
+                         if (!response.ok) {
+                             const errorBody = await response.json().catch(() => ({}));
+                             const errorMessage = errorBody.error?.message || response.statusText;
+                             throw new Error(`API 요청 실패 (${response.status}): ${errorMessage}`);
+                         }
                          const result = await response.json();
-                         const actualResult = result.data || result;
-                         const generatedText = responseParser(actualResult);
+                         const generatedText = result.data?.choices?.[0]?.message?.content;
+                         
                          if (generatedText) {
                              achievement.statement = generatedText.trim().replace(/^(E수준:|최소 성취수준:)\s*/, '');
                              this.saveTeacherPlan();
-                         } else { console.log('API Raw Response:', result); throw new Error('API 응답에서 진술문을 찾을 수 없습니다.'); }
-                     } catch (error) { console.error("AI 진술문 생성 오류:", error); this.teacherPlanError = `진술문 생성 중 오류 발생: ${error.message}.`; }
-                     finally { achievement.loading = false; }
+                         } else {
+                             console.log('API Raw Response:', result);
+                             throw new Error('API 응답에서 진술문을 찾을 수 없습니다.');
+                         }
+                     } catch (error) {
+                         console.error("AI 진술문 생성 오류:", error);
+                         this.teacherPlanError = `진술문 생성 중 오류 발생: ${error.message}.`;
+                     } finally {
+                         achievement.loading = false;
+                     }
                 },
                 generatePlanPreview() {
-                     const plan = this.teacherPlan; const subjectInfo = this.curriculumData.find(s => s.과목명 === plan.subjectName);
-                     if (!subjectInfo) { this.teacherPlanError = '과목명을 찾을 수 없습니다.'; this.previewHtml = `<div id="print-area"><p style='color: red;'>${this.teacherPlanError}</p></div>`; this.showPreviewModal = true; return; }
+                     const plan = this.teacherPlan;
+                     const subjectInfo = this.curriculumData.find(s => s.과목명 === plan.subjectName);
+                     if (!subjectInfo) {
+                         this.teacherPlanError = '과목명을 찾을 수 없습니다. 편제표에 등록된 과목명과 일치하는지 확인해주세요.';
+                         this.previewHtml = `<div id="print-area"><p style='color: red;'>${this.teacherPlanError}</p></div>`;
+                         this.showPreviewModal = true;
+                         return;
+                     }
                      this.teacherPlanError = '';
-                     const localModuleConfig = this.moduleConfig; const supplementaryHours = this.teacherPlan.maxSupplementaryHours;
+
+                     const localModuleConfig = this.moduleConfig;
+                     const supplementaryHours = this.teacherPlan.maxSupplementaryHours;
                      const requiredHours = Math.ceil((supplementaryHours * 2) / 3 * 10) / 10;
                      const preventionPossibleHours = Math.floor(supplementaryHours * (localModuleConfig.preventiveRatio / 100));
                      const emotionalSupportHours = Math.floor(supplementaryHours * (localModuleConfig.emotionalSupportRatio / 100));
@@ -2269,11 +2316,14 @@
                      };
                      
                      let achievementRateHtml = `<p>• 학업 성취율: 학기말 학업 성취율 40% 미만</p>`;
-                     if (plan.gradeCalculation === '고정분할점수') achievementRateHtml += createTable(['성취율', '기준점수'], [['90% 이상', '90'], ['80% 이상 ~ 90% 미만', '80'], ['70% 이상 ~ 80% 미만', '70'], ['60% 이상 ~ 70% 미만', '60'], ['40% 이상 ~ 60% 미만', '40']]);
-                     else achievementRateHtml += `<p style="padding-left: 1em;">- 성취수준 기준점수는 학기말 추정분할점수 산출 결과에 따름</p>`;
+                     if (plan.gradeCalculation === '고정분할점수') {
+                         achievementRateHtml += createTable(['성취율', '기준점수'], [['90% 이상', '90'], ['80% 이상 ~ 90% 미만', '80'], ['70% 이상 ~ 80% 미만', '70'], ['60% 이상 ~ 70% 미만', '60'], ['40% 이상 ~ 60% 미만', '40']]);
+                     } else {
+                         achievementRateHtml += `<p style="padding-left: 1em;">- 성취수준 기준점수는 학기말 추정분할점수 산출 결과에 따름</p>`;
+                     }
                      
                      const overviewTable = createTable(
-                         ['운영 학년', '운영 학기', '보충지도 시수', '이수 인정 기준 시수', '예방지도 인정 가능 시수', '정서 지원 프로그램 인정 가능 시수'],
+                         ['운영 학년', '운영 학기', '보충/추가학습 시수', '이수 인정 기준 시수', '예방지도 인정 가능 시수', '정서 지원 프로그램 인정 가능 시수'],
                          [[subjectInfo.학년, subjectInfo.학기, `${supplementaryHours}시수`, `${requiredHours}시수 (2/3 반올림)`, `${preventionPossibleHours}시수 (일반)`, `${emotionalSupportHours}시수`]]
                      );
                      
@@ -2284,15 +2334,20 @@
                          const pPeriod = (plan.preventionPeriod || []).filter(d => d instanceof Date).map(d => d.toLocaleDateString('ko-KR'));
                          const pPeriodFmt = pPeriod.length === 2 ? `${pPeriod[0]} ~ ${pPeriod[1]}` : (pPeriod.length === 1 ? pPeriod[0] : '미정');
                          const pSessions = plan.preventionSessions.map((s, i) => [`${i + 1}차시`, `<div class="whitespace-pre-wrap text-left">${s.plan || ''}</div>`]);
-                         preventionPlanHtml = `<h3>4. 최소 성취수준 미도달 예방 지도 계획</h3>${createTable(['구분', '내용'], [['대상학생 선정 기준', `<div class="whitespace-pre-wrap text-left">${plan.preventionTarget || ''}</div>`], ['지도 방법', plan.preventionMethods.join(', ')], ['운영 차시', `${plan.preventionSessions.length}차시`], ['운영 기간', pPeriodFmt]])}<h4>차시별 지도 계획</h4>${createTable(['차시', '지도 계획'], pSessions)}`;
-                     } else { preventionPlanHtml = `<h3>4. ...예방 지도 계획</h3><p>- 해당 없음</p>`; }
+                         preventionPlanHtml = `<h3>4. 최소 성취수준 미도달 예방 지도 계획</h3>${createTable(['구분', '내용'], [['대상학생 선정 기준', `<div class="whitespace-pre-wrap text-left">${plan.preventionTarget || ''}</div>`], ['지도 방법', (plan.preventionMethods || []).join(', ')], ['운영 차시', `${(plan.preventionSessions || []).length}차시`], ['운영 기간', pPeriodFmt]])}<h4>차시별 지도 계획</h4>${createTable(['차시', '지도 계획'], pSessions)}`;
+                     } else {
+                         preventionPlanHtml = `<h3>4. 최소 성취수준 미도달 예방 지도 계획</h3><p>- 해당 없음</p>`;
+                     }
                      
-                     const sPeriod = (plan.supplementaryPeriod || []).filter(d => d instanceof Date).map(d => d.toLocaleDateString('ko-KR'));
-                     const sPeriodFmt = sPeriod.length === 2 ? `${sPeriod[0]} ~ ${sPeriod[1]}` : (sPeriod.length === 1 ? sPeriod[0] : '미정');
-                     const sSessions = plan.supplementarySessions.map((s, i) => [`${i + 1}차시`, `<div class="whitespace-pre-wrap text-left">${s.plan || ''}</div>`]);
-                     
-                     const supplementaryPlanHtml = `<h3>5. 보충 지도 운영 계획</h3>${createTable(['구분', '내용'], [['대상학생 선정 기준', '학업성취율 40% 미만'], ['지도 방법', plan.supplementaryMethods.join(', ')], ['운영 차시', `${plan.supplementarySessions.length}차시`], ['운영 기간', sPeriodFmt]])}<h4>차시별 지도 계획</h4>${createTable(['차시', '지도 계획'], sSessions)}`;
-                     const additionalLearningPlanHtml = `<h3>6. 추가 학습 운영 계획</h3>${createTable(['구분', '내용'], [['대상학생 선정 기준', '과목출석률 2/3 미만'], ['지도 방법', plan.supplementaryMethods.join(', ')], ['운영 차시', `${plan.supplementarySessions.length}차시`], ['운영 기간', sPeriodFmt]])}<h4>차시별 지도 계획</h4>${createTable(['차시', '지도 계획'], sSessions)}`;
+                     const createGuidancePlanHtml = (title, target, methods, period, sessions) => {
+                         const sPeriod = (period || []).filter(d => d instanceof Date).map(d => d.toLocaleDateString('ko-KR'));
+                         const sPeriodFmt = sPeriod.length === 2 ? `${sPeriod[0]} ~ ${sPeriod[1]}` : (sPeriod.length === 1 ? sPeriod[0] : '미정');
+                         const sSessions = (sessions || []).map((s, i) => [`${i + 1}차시`, `<div class="whitespace-pre-wrap text-left">${s.plan || ''}</div>`]);
+                         return `<h3>${title}</h3>${createTable(['구분', '내용'], [['대상학생 선정 기준', target], ['지도 방법', (methods || []).join(', ')], ['운영 차시', `${(sessions || []).length}차시`], ['운영 기간', sPeriodFmt]])}<h4>차시별 지도 계획</h4>${createTable(['차시', '지도 계획'], sSessions)}`;
+                     };
+
+                     const supplementaryPlanHtml = createGuidancePlanHtml('5. 보충 지도 운영 계획', '학업성취율 40% 미만', plan.supplementaryMethods, plan.supplementaryPeriod, plan.supplementarySessions);
+                     const additionalLearningPlanHtml = createGuidancePlanHtml('6. 추가 학습 운영 계획', '과목출석률 2/3 미만', plan.additionalMethods, plan.additionalPeriod, plan.additionalSessions);
                      
                      this.previewHtml = `<div id="print-area">
                          <h1>최소 성취수준 보장지도 운영 계획(안)</h1>
@@ -2316,9 +2371,20 @@
 
                 // --- GUIDANCE LOGBOOK METHODS ---
                 addGuidanceStudent(type) {
-                     if (this.role !== '교과교사') return; const data = this.teacherGuidanceData[type]; if (!data) return;
-                     data.error = ''; const studentId = this.newGuidanceStudentId.trim(); if (!studentId) return;
+                     if (this.role !== '교과교사') return;
+                     const data = this.teacherGuidanceData[type];
+                     if (!data) return;
+                     data.error = '';
+                     const studentId = this.newGuidanceStudentId.trim();
+                     if (!studentId) return;
                      if (data.students.some(s => s.id === studentId)) { data.error = '이미 추가된 학생입니다.'; return; }
+                     
+                     // Ensure studentData is loaded
+                     if (!this.studentData || this.studentData.length === 0) {
+                         data.error = '학적 정보가 로드되지 않았습니다. 잠시 후 다시 시도해주세요.';
+                         return;
+                     }
+
                      const studentInfo = this.studentData.find(s => String(s['학번']) === studentId);
                      if (studentInfo) {
                          const studentToAdd = { id: studentId, name: studentInfo['이름'] };
@@ -2338,7 +2404,9 @@
                          data.sessions.forEach(session => { if (session && !session.attendance.hasOwnProperty(studentId)) { session.attendance[studentId] = ''; } });
                          this.newGuidanceStudentId = '';
                          this.saveGuidanceData();
-                     } else { data.error = '학적 정보에 없는 학생입니다. 먼저 학적 정보를 업로드해주세요.'; }
+                     } else {
+                         data.error = '학적 정보에 없는 학생입니다. 학번을 확인하거나 관리자에게 문의하세요.';
+                     }
                 },
                 addGuidanceSession(type) {
                      if (this.role !== '교과교사') return; const data = this.teacherGuidanceData[type]; if (!data) return;
@@ -2454,7 +2522,7 @@
                 closeImportModal() { this.showImportModal = false; this.importClasses = ['']; this.importModalError = ''; },
                 addImportClassInput() { this.importClasses.push(''); },
                 removeImportClassInput(index) { this.importClasses.splice(index, 1); },
-                async importUnderachievers() { // CHANGED: Made async and added data refresh
+                async importUnderachievers() {
                      if (this.role !== '교과교사') return;
                      this.importModalError = '';
                      const subject = this.teacherPlan.subjectName.trim();
@@ -2463,7 +2531,6 @@
                      const classes = this.importClasses.map(c => c.trim()).filter(Boolean);
                      if (classes.length === 0) { this.importModalError = '학급을 입력해주세요.'; return; }
                      
-                     // ADDED: Refresh deployed data from Firestore right before importing
                      this.importModalError = '최신 명단 확인 중...';
                      try {
                          const underachieversSnap = await getDoc(doc(db, `schools/${this.schoolId}/commonData`, "underachievers"));
@@ -2472,7 +2539,6 @@
                          this.importModalError = '최신 명단을 불러오는 데 실패했습니다.';
                          return;
                      }
-
 
                      const allUnderachievers = this.deployedUnderachievers;
                      if (!allUnderachievers || allUnderachievers.length === 0) { this.importModalError = '배포된 미도달 학생 명단이 없습니다.'; return; }
@@ -2527,14 +2593,13 @@
                 },
 
                 // --- Homeroom Teacher Methods ---
-                async searchHomeroomClass(){ // CHANGED: Made async for better UX
+                async searchHomeroomClass(){
                      if(this.role !== '담임교사') return;
                      this.homeroomMessage = '데이터 조회 중...';
                      this.searchedStudents = [];
                      const classInput = this.homeroomClassInput.trim();
                      if(!classInput){ this.homeroomMessage = '학급 번호를 입력해주세요.'; return; }
                      
-                     // ADDED: Refresh data before searching
                      try {
                          const underachieversSnap = await getDoc(doc(db, `schools/${this.schoolId}/commonData`, "underachievers"));
                          this.deployedUnderachievers = underachieversSnap.exists() ? underachieversSnap.data().data || [] : [];
@@ -2558,7 +2623,7 @@
                 
                 // --- Helper functions ---
                 resetRoleSpecificData() {
-                    Object.assign(this.teacherPlan, this.getInitialTeacherPlan());
+                    this.teacherPlan = this.getInitialTeacherPlan();
                     this.teacherGuidanceData = this.getInitialGuidanceData();
                     this.teacherPlanError = ''; this.teacherPlanStatus = ''; this.newGuidanceStudentId = '';
                     this.homeroomClassInput = ''; this.searchedStudents = []; this.homeroomMessage = '';
@@ -2571,14 +2636,14 @@
                     this.curriculumData = []; this.studentData = []; this.emotionalSupportData = [];
                     this.deployedUnderachievers = []; this.underachievers = [];
                     this.resetRoleSpecificData();
-                    Object.assign(this.moduleConfig, this.$options.data().moduleConfig);
-                    Object.assign(this.newsletterForm, this.$options.data().newsletterForm);
-                    Object.assign(this.pledgeForm, this.$options.data().pledgeForm);
+                    this.moduleConfig = this.$options.data().moduleConfig;
+                    this.newsletterForm = this.$options.data().newsletterForm;
+                    this.pledgeForm = this.$options.data().pledgeForm;
                     this.uploadStatus = { curriculum: '', student: '', emotionalSupport: '' };
                     this.statusMessage = ''; this.moduleConfigStatus = ''; this.underachieversStatus = ''; this.adminActionStatus = '';
                 },
                 resetTeacherData(resetGuidance = true) {
-                     Object.assign(this.teacherPlan, this.getInitialTeacherPlan());
+                     this.teacherPlan = this.getInitialTeacherPlan();
                      if (resetGuidance) { this.teacherGuidanceData = this.getInitialGuidanceData(); }
                      this.teacherPlanError = ''; this.teacherPlanStatus = ''; this.newGuidanceStudentId = '';
                 },
@@ -2606,14 +2671,11 @@
                     this.schoolId = newId;
                     await this.saveUserRoleAndSchoolId(this.role);
                     
-                    // 현재 인증 상태를 제외한 모든 로컬 데이터 초기화
                     this.resetAllLocalData(false);
                     
-                    // 역할과 새 schoolId 복원
                     this.role = '관리자';
                     this.schoolId = newId;
 
-                    // 새 schoolId로 데이터 다시 로드
                     await this.loadCommonData();
                     this.underachievers = JSON.parse(JSON.stringify(this.deployedUnderachievers));
                     
@@ -2630,10 +2692,10 @@
             }
 
         }).mount('#app');
-
     </script>
 
 
 </body>
 </html>
+
 
