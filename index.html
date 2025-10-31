@@ -177,7 +177,6 @@
             }
             
             /* 2. 인쇄 불필요 UI 요소 명시적 숨기기 */
-            /* FIX: body > 를 #app > 로 수정 */
             #app > header, 
             #app > main,
             div[v-if="showAttendanceModal"],
@@ -209,7 +208,6 @@
             #print-area-container-in-modal * {
                 visibility: visible !important; /* visibility: visible로 되돌림 */
             }
-            /* (Fix) 자식 요소들의 display 속성을 강제로 block으로 바꾸지 않도록 수정 */
             #print-area-container-in-modal {
                  display: block !important;
             }
@@ -262,8 +260,8 @@
                          <span v-if="schoolId" class="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">ID: {{ schoolId }}</span>
                          <button @click="logout" class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition text-sm">로그아웃</button>
                          <button v-if="role" @click="resetRole" class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition text-sm">역할 재선택</button>
-                         <!-- 1) 학교 ID 수정 버튼 추가 -->
-                         <button v-if="role === '관리자'" @click="openAdminModifyModal" class="ml-2 px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition text-sm">학교 코드 수정 및 발급</button>                    </div>
+                         <button v-if="role === '관리자'" @click="openAdminModifyModal" class="ml-2 px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition text-sm">학교 코드 수정 및 발급</button>
+                    </div>
                     <div v-else>
                          <button @click="login" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition text-sm">Google 로그인</button>
                     </div>
@@ -307,8 +305,7 @@
                 </div>
             </div>
 
-            <!-- NEW: School ID Modal (Show if role selected, but no schoolId) -->
-            <!-- FIX: v-if 조건을 !schoolId 에서 showSchoolIdModal로 변경 -->
+            <!-- School ID Modal (Show if role selected, but no schoolId) -->
             <div v-if="showSchoolIdModal && !isLoading" class="modal-overlay">
                 <div class="modal-content">
                     <h3 v-if="schoolIdMode === 'create'" class="text-2xl font-bold mb-4 text-center">학교 고유 ID 생성</h3>
@@ -321,7 +318,6 @@
                         학교 관리자에게 공유받은 '학교 고유 ID'를 입력하세요.
                     </p>
                     
-                    <!-- FIX: Broken HTML and CSS code removed and replaced with the correct form -->
                     <form @submit.prevent="handleSchoolIdSubmit" class="space-y-4">
                         <div>
                             <label for="school-id-input" class="sr-only">학교 고유 ID</label>
@@ -334,16 +330,18 @@
                             <span v-else>참여하기</span>
                         </button>
                     </form>
-                    <!-- End of FIX -->
-
                 </div>
             </div>
 
              <!-- Main Dashboard (Show only if logged in, role, AND schoolId are selected) -->
-             <div v-if="isLoggedIn && role && schoolId && !isLoading">
+             <div v-if="isLoggedIn && role && !isLoading">
                 <!-- Admin View -->
                  <div v-if="role === '관리자'">
-                      <h2 class="text-3xl font-bold text-gray-800 mb-6">관리자 대시보드 (학교 ID: {{ schoolId }})</h2>
+                      <h2 class="text-3xl font-bold text-gray-800 mb-6">관리자 대시보드 (학교 ID: {{ schoolId || 'null' }})</h2>
+                      <div v-if="!schoolId" class="mb-6 p-4 bg-yellow-100 text-yellow-800 border-l-4 border-yellow-500 rounded-md">
+                          <p class="font-bold">안내</p>
+                          <p>학교 ID가 설정되지 않았습니다. 데이터를 저장하거나 관리하려면 우측 상단의 '학교 코드 수정 및 발급' 버튼을 눌러 ID를 먼저 설정해주세요.</p>
+                      </div>
                        <div class="space-y-8">
                            <!-- 1. 교육과정 편제표 업로드 -->
                            <div class="bg-white p-6 rounded-lg shadow-md">
@@ -523,7 +521,7 @@
                  </div>
 
                 <!-- Teacher View -->
-                 <div v-if="role === '교과교사'">
+                 <div v-if="role === '교과교사' && schoolId">
                        <h2 class="text-3xl font-bold text-gray-800 mb-6">교과교사 대시보드 (학교 ID: {{ schoolId }})</h2>
                        <div class="flex border-b mb-6">
                            <button class="tab-button" :class="{ 'active': teacherTab === 'plan' }" @click="switchTeacherTab('plan')">계획서 작성</button>
@@ -737,7 +735,6 @@
                                    <p v-if="currentGuidanceData.error" class="text-red-500 text-sm mb-4 -mt-2">{{ currentGuidanceData.error }}</p>
                                </div>
                                <div v-else class="mb-4">
-                                    <!-- Re-enabled Import Button -->
                                     <div class="flex space-x-2">
                                         <button @click="showImportModal = true" class="px-4 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 transition">대상자 가져오기</button>
                                         <button @click="resetSupplementaryStudents" class="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition">대상자 초기화</button>
@@ -823,7 +820,7 @@
                  </div>
 
                  <!-- Homeroom Teacher View -->
-                  <div v-if="role === '담임교사'" class="space-y-6">
+                  <div v-if="role === '담임교사' && schoolId" class="space-y-6">
                       <h2 class="text-3xl font-bold text-gray-800">담임교사 대시보드 (학교 ID: {{ schoolId }})</h2>
                       <div class="bg-white p-6 rounded-lg shadow-md">
                           <div class="flex items-end space-x-2">
@@ -959,7 +956,7 @@
 
                 <!-- 학교 ID 수정 -->
                 <div v-if="adminModifyMode === 'schoolId'">
-                    <p class="text-sm text-gray-600 mb-2">현재 학교 ID: <strong class="text-indigo-600">{{ schoolId }}</strong></p>
+                    <p class="text-sm text-gray-600 mb-2">현재 학교 ID: <strong class="text-indigo-600">{{ schoolId || '설정되지 않음' }}</strong></p>
                     <p class="text-sm text-gray-600 mb-2">새로운 학교 ID를 입력(발급)하거나, 다른 학교 ID로 변경할 수 있습니다. <br/> <strong class="text-red-600">주의: 변경 시, 해당 학교 ID의 데이터로 즉시 전환됩니다.</strong></p>
                     <input type="text" v-model="newSchoolIdForModify" placeholder="새 학교 ID 입력" class="w-full p-3 border border-gray-300 rounded-md">
                 </div>
@@ -1052,7 +1049,6 @@
                     adminModifyMode: 'schoolId', // 'schoolId' or 'adminCode'
                     newSchoolIdForModify: '',
                     adminModifyError: '',
-                    // --- End of NEW ---
                     
                     // --- Common Data (Loaded from Firestore) ---
                     moduleConfig: { // Default structure
@@ -1088,7 +1084,6 @@
 
                     // --- Teacher Specific State ---
                     showImportModal: false,
-                    importSubject: '', // This is now auto-filled from teacherPlan.subjectName
                     importClasses: [''],
                     importModalError: '',
                     teacherPlan: this.getInitialTeacherPlan(), // Use helper function
@@ -1419,8 +1414,8 @@
                         if (user) {
                             this.user = user;
                             this.isLoggedIn = true;
-                            await this.loadUserRole(); // This will load role AND schoolId
-                             if (this.role && this.schoolId) { // Must have both
+                            await this.loadUserRoleAndSchoolId(); 
+                             if (this.role && this.schoolId) {
                                  await this.loadCommonData();
                                  if(this.role === '교과교사') {
                                      await this.loadTeacherPlan();
@@ -1429,20 +1424,18 @@
                                          this.filterSupplementaryStudents();
                                      }
                                  } else if (this.role === '관리자') {
-                                     // Load deployed data into local admin list on init
                                      this.underachievers = JSON.parse(JSON.stringify(this.deployedUnderachievers));
                                  }
+                             } else if (this.role === '관리자' && !this.schoolId) {
+                                 // Admin logged in, but no schoolId is set. This is a valid state.
+                                 // Do nothing, the dashboard will show the "ID: null" state.
                              }
-                             // Handled: If role or schoolId is missing, modals will show.
                         } else {
                             this.user = null;
                             this.isLoggedIn = false;
-                            this.role = null;
-                            this.schoolId = null; // Clear schoolId on logout
                             this.resetAllLocalData();
                         }
                         this.isLoading = false;
-                         // Initialize flatpickr only *after* everything is loaded and rendered
                          this.$nextTick(() => { this.initFlatpickr(); });
                     });
                 },
@@ -1451,7 +1444,6 @@
                     try {
                          if (!auth) throw new Error("Firebase Auth not initialized.");
                         await signInWithPopup(auth, provider);
-                        // onAuthStateChanged will handle the rest
                     } catch (error) {
                         console.error("Login failed:", error);
                          if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
@@ -1463,30 +1455,24 @@
                      try {
                          if (!auth) throw new Error("Firebase Auth not initialized.");
                         await signOut(auth);
-                        // onAuthStateChanged will handle resetting state
                      } catch (error) { console.error("Logout failed:", error); alert(`로그아웃 실패: ${error.message}`); }
                 },
 
                 // --- Role Management ---
                 async selectRole(selectedRole) {
-                     if (!this.user) {
-                         alert("사용자 정보가 없습니다. 다시 로그인해주세요.");
-                         return;
-                     }
-                     this.role = selectedRole; // Set role first
+                     if (!this.user) { alert("사용자 정보가 없습니다. 다시 로그인해주세요."); return; }
                      
                      if (selectedRole === '관리자') {
                          this.showAdminCodeInput = true;
                      } else {
                          this.showAdminCodeInput = false;
-                         // Now check if schoolId exists. If not, modal will show.
+                         this.role = selectedRole; // Temporarily set role for logic
                          if (!this.schoolId) {
                              this.schoolIdMode = 'join';
                              this.showSchoolIdModal = true;
                          } else {
-                            // Already have schoolId, proceed
                             this.isLoading = true;
-                            await this.saveUserRole(this.role); // Save updated role
+                            await this.saveUserRoleAndSchoolId(this.role);
                             await this.loadCommonData();
                             if(this.role === '교과교사') {
                                  await this.loadTeacherPlan();
@@ -1504,124 +1490,69 @@
                      if (this.adminCode === '0822') {
                          this.adminCodeError = '';
                          this.showAdminCodeInput = false;
-                         // Admin is verified, now check for schoolId
-                         if (!this.schoolId) {
-                             this.schoolIdMode = 'create';
-                             this.showSchoolIdModal = true;
-                         } else {
-                             // Admin verified and already has schoolId, proceed
-                             this.isLoading = true;
-                             await this.saveUserRole('관리자'); // Save updated role
-                             await this.loadCommonData();
-                             this.underachievers = JSON.parse(JSON.stringify(this.deployedUnderachievers));
-                             this.isLoading = false;
-                             this.$nextTick(() => { this.initFlatpickr(); });
+                         this.role = '관리자';
+                         this.isLoading = true;
+                         await this.saveUserRoleAndSchoolId('관리자');
+                         if (this.schoolId) {
+                            await this.loadCommonData();
+                            this.underachievers = JSON.parse(JSON.stringify(this.deployedUnderachievers));
                          }
+                         this.isLoading = false;
+                         this.$nextTick(() => { this.initFlatpickr(); });
                      } else {
                          this.adminCodeError = '코드가 올바르지 않습니다.';
                      }
                      this.adminCode = '';
                 },
-                // NEW: Handle School ID creation/joining
                 async handleSchoolIdSubmit() {
                     const id = this.newSchoolId.trim();
-                    const invalidChars = /[\s./*#$[\]]/; // Basic check for invalid Firestore path chars
+                    const invalidChars = /[\s./*#$[\]]/;
                     
                     this.schoolIdError = '';
-                    if (!id) {
-                        this.schoolIdError = "학교 고유 ID를 입력해주세요."; return;
-                    }
-                    if (invalidChars.test(id)) {
-                        this.schoolIdError = "공백이나 특수문자 (/, ., *, # 등)는 사용할 수 없습니다."; return;
-                    }
-
-                    // For 'join' mode, we could check if the schoolId exists
-                    // For simplicity, we just save it. Security rules will prevent access if it's wrong.
+                    if (!id) { this.schoolIdError = "학교 고유 ID를 입력해주세요."; return; }
+                    if (invalidChars.test(id)) { this.schoolIdError = "공백이나 특수문자 (/, ., *, # 등)는 사용할 수 없습니다."; return; }
                     
-                    this.schoolId = id; // Set the schoolId
+                    this.schoolId = id;
                     this.isLoading = true;
                     this.showSchoolIdModal = false;
                     
-                    await this.saveUserRole(this.role); // Save both role and new schoolId
-                    await this.loadCommonData(); // Load data for this school
+                    await this.saveUserRoleAndSchoolId(this.role);
+                    await this.loadCommonData();
                     
-                    // Load role-specific data
                     if(this.role === '교과교사') {
                          await this.loadTeacherPlan();
                          if(this.teacherPlan.subjectName){
                              await this.loadGuidanceData();
                              this.filterSupplementaryStudents();
                          }
-                    } else if (this.role === '관리자') {
-                        // Admin just created ID, list will be empty, load defaults
-                         this.underachievers = JSON.parse(JSON.stringify(this.deployedUnderachievers));
                     }
                     
                     this.isLoading = false;
                     this.newSchoolId = '';
                     this.$nextTick(() => { this.initFlatpickr(); });
                 },
-                // --- FUNCTION MODIFIED ---
                 async resetRole() {
-                    // 1. 로컬의 role과 schoolId를 즉시 null로 설정합니다.
                     this.role = null;
-                    this.schoolId = null;
-
-                    // 2. Firestore의 userData 문서에도 role과 schoolId를 null로 저장합니다.
-                    // saveUserRole은 현재 this.schoolId (null)를 사용하므로 올바르게 동작합니다.
-                    await this.saveUserRole(this.role); // this.role은 이미 null입니다.
-
-                    // 3. 역할 선택 UI를 초기 상태로 리셋합니다.
+                    await this.saveUserRoleAndSchoolId(null); // Clear role in DB, keep schoolId
+                    this.resetRoleSpecificData(); // Clear only local teacher/homeroom data
                     this.showAdminCodeInput = false;
                     this.adminCode = '';
                     this.adminCodeError = '';
                     this.statusMessage = '';
-                    this.showSchoolIdModal = false;
-                    this.newSchoolId = '';
-                    this.schoolIdError = '';
-
-                    // 4. 인증 상태(로그인)를 제외한 모든 로컬 데이터를 초기화합니다.
-                    // 이렇게 하면 이전 학교의 공용 데이터(편제표, 학생 명단 등)가 깨끗이 지워집니다.
-                    this.resetAllLocalData(false);
                 },
-                // 1) 학교 ID 수정 모달을 여는 함수 추가
-                openSchoolIdModal() {
-                    this.schoolIdMode = this.role === '관리자' ? 'create' : 'join';
-                    this.newSchoolId = this.schoolId; // 현재 ID로 미리 채우기
-                    this.schoolIdError = '';
-                    this.showSchoolIdModal = true;
-                },
-                async saveUserRole(roleToSave) {
+                async saveUserRoleAndSchoolId(roleToSave) {
                      if (!this.user || !db) return;
-                     // schoolId is now set either by loadUserRole or handleSchoolIdSubmit
-                     if (!this.schoolId) {
-                         // This might happen if user logs in w/o email domain AND hasn't set ID yet
-                         // Try to get it from email one last time
-                         if (this.user.email && this.user.email.includes('@')) {
-                             this.schoolId = this.user.email.split('@')[1];
-                         } else if (this.role) { 
-                             // Role is set, but schoolId is missing. This happens before schoolId modal.
-                             // We just save the role. schoolId will be saved by handleSchoolIdSubmit.
-                             // This logic is getting complex. Let's simplify.
-                             // saveUserRole will *only* save what it knows.
-                         }
-                     }
-                     
-                     // Simplified: saveUserRole saves role AND whatever schoolId is currently in state
                      const userDocRef = doc(db, `userData/${this.user.uid}`);
                      const dataToSave = { 
                          role: roleToSave, 
-                         schoolId: this.schoolId // Save current schoolId (which might be null or set)
+                         schoolId: this.schoolId
                      };
                      
-                     this.statusMessage = '역할 저장 중...';
                      try {
-                         await setDoc(userDocRef, dataToSave);
-                         this.statusMessage = roleToSave ? '역할이 저장되었습니다.' : '역할이 초기화되었습니다.';
-                     } catch (error) { console.error("Error saving role:", error); this.statusMessage = '역할 저장/초기화 실패.'; }
-                     setTimeout(() => this.statusMessage = '', 2000);
+                         await setDoc(userDocRef, dataToSave, { merge: true });
+                     } catch (error) { console.error("Error saving user data:", error); }
                 },
-                 async loadUserRole() {
+                 async loadUserRoleAndSchoolId() {
                      if (!this.user || !db) { this.role = null; this.schoolId = null; return; };
                      const userDocRef = doc(db, `userData/${this.user.uid}`);
                      try {
@@ -1629,19 +1560,19 @@
                          if (userDocSnap.exists()) {
                              const data = userDocSnap.data();
                              this.role = data.role || null;
-                             this.schoolId = data.schoolId || null; // Load the saved schoolId
+                             this.schoolId = data.schoolId || null;
                          } else {
-                             // No userData doc, so both are null
                              this.role = null;
                              this.schoolId = null;
                          }
-                     } catch (error) { console.error("Error loading user role:", error); this.role = null; this.schoolId = null; }
+                     } catch (error) { console.error("Error loading user data:", error); this.role = null; this.schoolId = null; }
                  },
 
                 // --- Data Loading (Common) ---
                 async loadCommonData() {
                     if (!db || !this.schoolId) {
                         console.warn("Cannot load common data: DB or schoolId is missing.");
+                        this.curriculumData = []; this.studentData = []; this.emotionalSupportData = []; this.deployedUnderachievers = [];
                         return;
                     }
                     this.statusMessage = '공용 데이터 로딩 중...';
@@ -1663,10 +1594,8 @@
                         this.curriculumData = curriculumSnap.exists() ? curriculumSnap.data().data || [] : [];
                         this.studentData = studentsSnap.exists() ? studentsSnap.data().data || [] : [];
                         this.emotionalSupportData = emotionalSupportSnap.exists() ? emotionalSupportSnap.data().data || [] : [];
-                        // Reset to default first, then apply loaded config
                         Object.assign(this.moduleConfig, this.$options.data().moduleConfig);
                         if (moduleConfigSnap.exists()) Object.assign(this.moduleConfig, moduleConfigSnap.data());
-                        // Reset forms, then apply
                         Object.assign(this.newsletterForm, this.$options.data().newsletterForm);
                         Object.assign(this.pledgeForm, this.$options.data().pledgeForm);
                         if (formTemplatesSnap.exists()) {
@@ -1680,7 +1609,7 @@
                         this.statusMessage = '공용 데이터 로딩 완료.';
                     } catch (error) {
                         console.error("Error loading common data:", error);
-                        this.statusMessage = '공용 데이터 로딩 중 오류 발생. (보안 규칙 확인 필요)';
+                        this.statusMessage = '공용 데이터 로딩 중 오류 발생.';
                          this.curriculumData = []; this.studentData = []; this.emotionalSupportData = []; this.deployedUnderachievers = [];
                     } finally {
                         this.isLoading = false;
@@ -1693,8 +1622,9 @@
 
                 // --- Data Saving (Admin) ---
                 async uploadFile(event, type) {
-                     if (this.role !== '관리자') { alert("데이터 업로드는 관리자만 가능합니다."); return; }
-                     if (!db || !this.schoolId) { alert("오류: DB 또는 학교 ID가 없습니다."); return; }
+                    if (!this.schoolId) { alert("학교 ID가 설정되지 않았습니다. '학교 코드 수정 및 발급' 메뉴에서 ID를 먼저 설정해주세요."); return; }
+                    if (this.role !== '관리자') { alert("데이터 업로드는 관리자만 가능합니다."); return; }
+                    if (!db) { alert("오류: DB가 없습니다."); return; }
 
                     const file = event.target.files[0];
                     if (!file) return;
@@ -1709,7 +1639,6 @@
                             const worksheet = workbook.Sheets[sheetName];
                             const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
-                            // Use schoolId in path
                             const docRef = doc(db, `schools/${this.schoolId}/commonData`, type);
                             await setDoc(docRef, { data: jsonData });
 
@@ -1718,19 +1647,19 @@
                             if (type === 'emotionalSupport') this.emotionalSupportData = jsonData;
 
                             this.uploadStatus[type] = `${file.name} 업로드 및 저장 완료.`;
-                             this.updateMaxHours(); // Update calculations if curriculum changes
+                             this.updateMaxHours();
                         } catch (error) {
                             console.error(`Error processing/saving ${type} file:`, error);
                             this.uploadStatus[type] = `${file.name} 처리/저장 중 오류 발생: ${error.message}`;
                         } finally {
                             event.target.value = null;
-                            // Keep status message
                         }
                     };
                     reader.readAsArrayBuffer(file);
                 },
                 async saveModuleConfig() {
-                     if (this.role !== '관리자' || !db || !this.schoolId) return;
+                    if (!this.schoolId) { alert("학교 ID가 설정되지 않았습니다. '학교 코드 수정 및 발급' 메뉴에서 ID를 먼저 설정해주세요."); return; }
+                    if (this.role !== '관리자' || !db) return;
                     this.moduleConfigStatus = "운영 모듈 설정 저장 중...";
                     try {
                         const docRef = doc(db, `schools/${this.schoolId}/commonData`, "moduleConfig");
@@ -1741,7 +1670,8 @@
                      setTimeout(() => this.moduleConfigStatus = '', 3000);
                 },
                 async saveFormTemplates(){
-                     if (this.role !== '관리자' || !db || !this.schoolId) return;
+                    if (!this.schoolId) { alert("학교 ID가 설정되지 않았습니다. '학교 코드 수정 및 발급' 메뉴에서 ID를 먼저 설정해주세요."); return; }
+                    if (this.role !== '관리자' || !db) return;
                     this.adminActionStatus = '양식 저장 중...';
                     try {
                         const docRef = doc(db, `schools/${this.schoolId}/commonData`, "formTemplates");
@@ -1755,7 +1685,8 @@
                      setTimeout(() => this.adminActionStatus = '', 3000);
                 },
                 async deployUnderachievers() {
-                     if (this.role !== '관리자' || !db || !this.schoolId) return;
+                    if (!this.schoolId) { alert("학교 ID가 설정되지 않았습니다. '학교 코드 수정 및 발급' 메뉴에서 ID를 먼저 설정해주세요."); return; }
+                    if (this.role !== '관리자' || !db) return;
                     this.underachieversStatus = "미도달 학생 명단 배포 중...";
                     try {
                         const docRef = doc(db, `schools/${this.schoolId}/commonData`, "underachievers");
@@ -1774,11 +1705,9 @@
                          const docSnap = await getDoc(planDocRef);
                          if (docSnap.exists()) {
                              const loadedPlan = docSnap.data();
-                             // Reset to default, then apply loaded
                              Object.assign(this.teacherPlan, this.getInitialTeacherPlan());
                              Object.assign(this.teacherPlan, loadedPlan);
                              
-                             // Ensure array properties exist
                              this.teacherPlan.teacherNames = this.teacherPlan.teacherNames && this.teacherPlan.teacherNames.length > 0 ? this.teacherPlan.teacherNames : [''];
                              this.teacherPlan.achievements = this.teacherPlan.achievements && this.teacherPlan.achievements.length > 0 ? this.teacherPlan.achievements : [{ text: '', statement: '', loading: false }];
                              this.teacherPlan.preventionMethods = this.teacherPlan.preventionMethods || [];
@@ -1786,21 +1715,19 @@
                              this.teacherPlan.supplementaryMethods = this.teacherPlan.supplementaryMethods || [];
                              this.teacherPlan.supplementarySessions = this.teacherPlan.supplementarySessions && this.teacherPlan.supplementarySessions.length > 0 ? this.teacherPlan.supplementarySessions : [{plan:''}];
                              
-                             // Clean up transient state
                              this.teacherPlan.achievements.forEach(a => a.loading = false);
                              
-                             // Convert Firestore Timestamps or ISO strings back to Date objects for flatpickr
                              this.teacherPlan.preventionPeriod = (this.teacherPlan.preventionPeriod || []).map(d => d ? new Date(d.seconds ? d.seconds * 1000 : d) : null).filter(d => d && !isNaN(d.getTime()));
                              this.teacherPlan.supplementaryPeriod = (this.teacherPlan.supplementaryPeriod || []).map(d => d ? new Date(d.seconds ? d.seconds * 1000 : d) : null).filter(d => d && !isNaN(d.getTime()));
                              
                              console.log("Teacher plan loaded.");
                          } else {
                              console.log("No saved teacher plan found, using defaults.");
-                             this.resetTeacherData(false); // Don't reset guidance data
+                             this.resetTeacherData(false);
                          }
                      } catch (error) { console.error("Error loading teacher plan:", error); this.resetTeacherData(false); }
-                      this.updateMaxHours(); // Calculate max hours based on loaded subject
-                      this.$nextTick(() => { this.initFlatpickr(); }); // Re-init flatpickr for loaded dates
+                      this.updateMaxHours();
+                      this.$nextTick(() => { this.initFlatpickr(); });
                  },
                  async saveTeacherPlan() {
                      if (!this.user || !db || !this.schoolId || this.role !== '교과교사') return;
@@ -1813,10 +1740,8 @@
                       const planDocRef = doc(db, `schools/${this.schoolId}/teacherData/${this.user.uid}`, "teacherPlan");
                      try {
                           const planToSave = { ...JSON.parse(JSON.stringify(this.teacherPlan)) };
-                           // Convert Date objects to ISO strings for Firestore
                            planToSave.preventionPeriod = this.teacherPlan.preventionPeriod.map(d => (d instanceof Date && !isNaN(d.getTime())) ? d.toISOString() : null).filter(Boolean);
                            planToSave.supplementaryPeriod = this.teacherPlan.supplementaryPeriod.map(d => (d instanceof Date && !isNaN(d.getTime())) ? d.toISOString() : null).filter(Boolean);
-                           // Remove transient 'loading' state
                            planToSave.achievements = (planToSave.achievements || []).map(({ loading, ...rest }) => rest);
                           await setDoc(planDocRef, planToSave);
                          this.teacherPlanStatus = "계획안이 저장되었습니다.";
@@ -1860,11 +1785,9 @@
                 async saveGuidanceData(){
                      if (!this.user || !db || !this.schoolId || this.role !== '교과교사' || !this.teacherPlan.subjectName) return;
                      const docPath = `schools/${this.schoolId}/teacherData/${this.user.uid}/${this.teacherPlan.subjectName}`;
-                     // console.log("Saving guidance data to:", docPath); // Reduce console noise
                      try {
                          const dataToSave = JSON.parse(JSON.stringify(this.teacherGuidanceData));
                         await setDoc(doc(db, docPath), dataToSave);
-                         // console.log("Guidance data saved for", this.teacherPlan.subjectName);
                      } catch (error) { console.error("Error saving guidance data:", error); }
                 },
                 mergeSessions(defaultSessions, loadedSessions) {
@@ -1872,7 +1795,6 @@
                      const defaultLength = Array.isArray(defaultSessions) ? defaultSessions.length : 10;
                      const mergedLength = Math.max(defaultLength, validLoadedSessions.length);
                      const merged = [];
-                     // Get students from the correct tab
                      const currentStudents = (this.teacherTab === 'preventive' ? this.teacherGuidanceData.preventive?.students : this.teacherGuidanceData.supplementary?.students) || [];
 
                      for (let i = 0; i < mergedLength; i++) {
@@ -1900,31 +1822,26 @@
                      await this.saveTeacherPlan();
                      this.updateMaxHours();
                      await this.loadGuidanceData();
-                     this.filterSupplementaryStudents(); // Re-filter supplementary list based on new subject
+                     this.filterSupplementaryStudents();
                  },
-
 
                 // --- Helper and UI Methods ---
                 initFlatpickr() {
                      this.$nextTick(() => {
-                         // Destroy existing instances to prevent memory leaks
                          document.querySelectorAll('.flatpickr-input').forEach(el => {
                              if (el?._flatpickr) { el._flatpickr.destroy(); }
                          });
-                         // Re-initialize range pickers
                          flatpickr(".flatpickr-range", {
                              mode: "range", dateFormat: "Y-m-d", locale: "ko",
                              onChange: (selectedDates, dateStr, instance) => {
                                  let headerText = ''; const headerElement = instance.element.closest('.bg-white')?.querySelector('h3'); if(headerElement) headerText = headerElement.textContent;
                                  const isPrevention = headerText.includes('예방'); const plan = this.teacherPlan; const targetPeriod = isPrevention ? 'preventionPeriod' : 'supplementaryPeriod';
                                  if (Array.isArray(selectedDates) && selectedDates.every(d => d instanceof Date)) { plan[targetPeriod] = selectedDates; } else { plan[targetPeriod] = []; }
-                                 this.saveTeacherPlan(); // Auto-save plan when dates change
+                                 this.saveTeacherPlan();
                              }
                          });
-                         // Re-initialize single date pickers (in attendance tables)
                          flatpickr(".flatpickr-single", {
                              dateFormat: "Y-m-d", locale: "ko",
-                             // onChange is handled by @change on the input element itself
                          });
                      });
                 },
@@ -1940,12 +1857,10 @@
                     if (this.role !== '관리자') return;
                     const file = event.target.files[0]; if (!file) return; const reader = new FileReader();
                     reader.onload = (e) => {
-                         if (file.size > 1048576) { // 1MB limit
-                            alert("오류: 이미지 파일 크기는 1MB를 초과할 수 없습니다."); return;
-                         }
+                         if (file.size > 1048576) { alert("오류: 이미지 파일 크기는 1MB를 초과할 수 없습니다."); return; }
                         if (formType === 'newsletter') this.newsletterForm[field] = e.target.result;
                         else if (formType === 'pledge') this.pledgeForm[field] = e.target.result;
-                         this.saveFormTemplates(); // Auto-save
+                         this.saveFormTemplates();
                     }; reader.readAsDataURL(file);
                 },
                 previewForm(type, studentsToPrint) {
@@ -1982,7 +1897,6 @@
 
                      const studentDocs = studentsArray.map(student => {
                           if (!student) return '';
-                         // Find the full student object from *either* local admin list or deployed list
                          const fullStudent = this.underachievers.find(s => s.id === student.id) || this.deployedUnderachievers.find(s => s.id === student.id) || student;
 
                          let studentTableHtml = `<h3 style="margin-top: 40px; font-size: 1.2rem; font-weight: bold;">[최소 성취수준 보장지도 대상자 확인]</h3>`;
@@ -2004,7 +1918,6 @@
                          const subjectCount = subjectsMap.size;
                          subjectsMap.forEach((reasons, subjectName) => {
                              if (subjectIndex === 0) {
-                                 // 첫 번째 행: 학번과 이름에 rowspan 적용
                                  studentTableHtml += `<tr>
                                      <td rowspan="${subjectCount}" style="vertical-align: top;">${fullStudent.id}</td>
                                      <td rowspan="${subjectCount}" style="vertical-align: top;">${fullStudent.name}</td>
@@ -2012,7 +1925,6 @@
                                      <td>${Array.from(reasons).join(' & ')}</td>
                                  </tr>`;
                              } else {
-                                 // 두 번째 행부터: 과목과 내역만
                                  studentTableHtml += `<tr>
                                      <td class="text-left">${subjectName}</td>
                                      <td>${Array.from(reasons).join(' & ')}</td>
@@ -2045,11 +1957,9 @@
                      this.previewHtml = `<div id="print-area">${allPreviewsHtml}</div>`;
                      this.showPreviewModal = true;
                 },
-                 // Admin-specific preview function
                  previewFormAdmin(type) {
                      this.previewForm(type, this.underachievers.length > 0 ? this.underachievers : []);
                  },
-                 // Homeroom teacher preview function
                  printHomeroomStudentForm(student, type) {
                      if(this.role !== '담임교사') return;
                      if (!this.newsletterForm.title || !this.pledgeForm.content) { alert("공용 양식이 아직 로드되지 않았습니다. 잠시 후 다시 시도하세요."); return; }
@@ -2061,68 +1971,21 @@
                      this.previewForm(type, [fullStudent]);
                  },
                  printPreviewModalContent() {
-                     // Native browser print
                      window.print();
                  },
-
                  closePreviewModal() {
                      this.showPreviewModal = false;
                      this.previewHtml = '';
-                     // 관련 상태 메시지도 함께 초기화합니다.
                      this.adminActionStatus = '';
                      this.teacherPlanError = '';
                      this.teacherPlanStatus = '';
                  },
-                
-                // This function is kept as a fallback, but window.print() is preferred
-                async printPreview() {
-                     const modalPrintContent = document.getElementById('print-area-container-in-modal');
-                     if (!modalPrintContent) { alert("미리보기 내용을 찾을 수 없습니다."); return; }
-                     
-                     // Create a temporary container for html2canvas
-                     const printContainer = document.getElementById('print-area-container');
-                     printContainer.innerHTML = modalPrintContent.innerHTML;
-                     printContainer.style.position = 'absolute';
-                     printContainer.style.left = '-9999px';
-                     printContainer.style.width = '210mm';
-                     printContainer.classList.remove('hidden');
-                     
-                     const printContent = printContainer.querySelector('#print-area');
-                     if (!printContent) { alert("인쇄할 영역(#print-area)을 찾을 수 없습니다."); printContainer.innerHTML = ''; printContainer.classList.add('hidden'); printContainer.style = ''; return; }
-
-                     const statusVar = this.role === '관리자' ? 'adminActionStatus' : 'teacherPlanStatus';
-                     this[statusVar] = 'PDF 생성 중...';
-                     
-                     const cleanup = () => { printContainer.innerHTML = ''; printContainer.classList.add('hidden'); printContainer.style = ''; };
-
-                     try {
-                         const canvas = await html2canvas(printContent, { scale: 2, useCORS: true, width: printContent.offsetWidth, windowWidth: printContent.scrollWidth });
-                         const imgData = canvas.toDataURL('image/png');
-                         const { jsPDF } = window.jspdf;
-                         const pdf = new jsPDF('p', 'mm', 'a4');
-                         const pdfPageWidth = pdf.internal.pageSize.getWidth(); const pdfPageHeight = pdf.internal.pageSize.getHeight();
-                         const margin = 10; const contentWidth = pdfPageWidth - margin * 2;
-                         const imgRatio = canvas.height / canvas.width; const pdfImgWidth = contentWidth; const pdfImgHeight = pdfImgWidth * imgRatio;
-                         let position = 0; let heightLeft = pdfImgHeight; const pageContentHeight = pdfPageHeight - margin * 2;
-                         pdf.addImage(imgData, 'PNG', margin, margin + position, pdfImgWidth, pdfImgHeight);
-                         heightLeft -= pageContentHeight;
-                         while (heightLeft > 0) {
-                             position -= pageContentHeight; pdf.addPage();
-                             pdf.addImage(imgData, 'PNG', margin, margin + position, pdfImgWidth, pdfImgHeight);
-                             heightLeft -= pageContentHeight;
-                         }
-                         pdf.save(`보장지도_문서_${new Date().toISOString().slice(0, 10)}.pdf`);
-                         this[statusVar] = 'PDF 생성 완료.';
-                     } catch (error) { console.error("PDF generation error:", error); this[statusVar] = `PDF 생성 오류: ${error.message}`; }
-                     finally { cleanup(); setTimeout(() => { if (this[statusVar] === 'PDF 생성 완료.') this[statusVar] = '' }, 3000); }
-                },
                 processGradeFiles(event) {
                      if (this.role !== '관리자') return;
                      this.fileProcessingError = '';
                      const files = event.target.files;
                      if (!files || files.length === 0) return;
                      
-                     // Keep track of attendance-only students from the *current* local list
                      const attendanceOnly = this.underachievers.filter(s =>
                          (!s.gradeSubjects || s.gradeSubjects.length === 0) && (s.attendanceSubjects && s.attendanceSubjects.length > 0)
                      );
@@ -2144,7 +2007,6 @@
                                  if (!classInfoRow || !classInfoRow[0]) throw new Error(`'${file.name}' 파일의 3행 A열에서 학급 정보를 찾을 수 없습니다.`);
                                  const classInfo = String(classInfoRow[0]);
 
-                                 // FIX: Regex updated to ignore '학년도'
                                  const gradeMatch = classInfo.match(/(\d+)\s*학년(?!도)/);
                                  const classNumMatch = classInfo.match(/(\d{1,2})\s*반/);
 
@@ -2204,7 +2066,7 @@
                                          }
                                      });
                                      processedUnderachievers.sort((a,b) => a.id.localeCompare(b.id));
-                                     this.underachievers = processedUnderachievers; // Update admin's local list
+                                     this.underachievers = processedUnderachievers;
                                      if (event && event.target) event.target.value = null;
                                  }
                              }
@@ -2324,12 +2186,8 @@
                 switchTeacherTab(tab) {
                     this.teacherTab = tab;
                      this.$nextTick(() => { this.initFlatpickr(); });
-                     if (this.teacherPlan.subjectName) {
-                         // No need to reload, data is already loaded
-                         // this.loadGuidanceData(); // This might reset unsaved changes
-                     }
                      if (tab === 'supplementary') {
-                         this.filterSupplementaryStudents(); // Filter list when switching
+                         this.filterSupplementaryStudents();
                      }
                 },
                 filterSupplementaryStudents() {
@@ -2345,10 +2203,8 @@
                          return gradeMatch || attendanceMatch;
                      });
 
-                     const newSupplementaryStudents = [];
                      const currentSuppStudents = this.teacherGuidanceData.supplementary?.students || [];
                      
-                     // Re-filter the *current* list to *only* include those from the deployed list
                      const deployedIds = new Set(subjectSpecificUnderachievers.map(s => s.id));
                      const existingStudentsToKeep = currentSuppStudents.filter(s => deployedIds.has(s.id));
                      existingStudentsToKeep.forEach(s => {
@@ -2360,14 +2216,13 @@
                              if (gradeMatch && attendanceMatch) reason = '학업성취율&과목출석률';
                              else if (gradeMatch) reason = '학업성취율';
                              else if (attendanceMatch) reason = '과목출석률';
-                             s.reason = reason; // Update reason
+                             s.reason = reason;
                          }
                      });
 
                      existingStudentsToKeep.sort((a, b) => a.id.localeCompare(b.id));
                      this.teacherGuidanceData.supplementary.students = existingStudentsToKeep;
                      
-                     // Clean up attendance object
                      this.teacherGuidanceData.supplementary.sessions.forEach(session => {
                          if (!session) return;
                          const newAttendance = {};
@@ -2378,8 +2233,6 @@
                          });
                          session.attendance = newAttendance;
                      });
-                     // Don't save here, this is a filter, not an import action
-                     // this.saveGuidanceData();
                 },
                 updateMaxHours() {
                      const subject = this.curriculumData.find(s => s.과목명 === this.teacherPlan.subjectName);
@@ -2435,7 +2288,7 @@
                          const response = await fetch(apiUrl, { method: 'POST', headers: headers, body: JSON.stringify(payload) });
                          if (!response.ok) { const errorBody = await response.json().catch(() => ({})); const errorMessage = errorBody.error?.message || errorBody.message || errorBody.error || response.statusText; throw new Error(`API 요청 실패 (${response.status}): ${errorMessage}`); }
                          const result = await response.json();
-                         const actualResult = result.data || result; // Handle proxy structure
+                         const actualResult = result.data || result;
                          const generatedText = responseParser(actualResult);
                          if (generatedText) {
                              achievement.statement = generatedText.trim().replace(/^(E수준:|최소 성취수준:)\s*/, '');
@@ -2513,7 +2366,6 @@
                      const studentInfo = this.studentData.find(s => String(s['학번']) === studentId);
                      if (studentInfo) {
                          const studentToAdd = { id: studentId, name: studentInfo['이름'] };
-                         // If supplementary, find their reason
                          if (type === 'supplementary') {
                              const deployed = this.deployedUnderachievers.find(s => s.id === studentId);
                              if (deployed) {
@@ -2573,6 +2425,11 @@
                     const scrollAmount = container.clientWidth * 0.8;
                     container.scrollBy({ left: direction === 'left' ? -scrollAmount : scrollAmount, behavior: 'smooth' });
                 },
+                async generatePdfFromHtml(htmlContent, orientation = 'p', filename = 'document.pdf') {
+                    this.previewHtml = htmlContent;
+                    this.showPreviewModal = true;
+                    this.adminActionStatus = '미리보기 생성 완료. 인쇄 버튼을 눌러 PDF로 저장하세요.';
+                },
                 async generateCompletionStatusPdf(type) {
                      const data = this.teacherGuidanceData[type];
                      if (!data || !this.role) return;
@@ -2623,7 +2480,7 @@
                          ${completionStatusTable}
                      </div>`;
                      
-                     await this.generatePdfFromHtml(pdfHtml, 'l', `${title}_이수현황표_${new Date().toISOString().slice(0, 10)}.pdf`);
+                     await this.generatePdfFromHtml(pdfHtml, 'l', `${title}_이수현황표.pdf`);
                 },
                 async generateAttendancePdf(type) {
                      const data = this.teacherGuidanceData[type];
@@ -2659,7 +2516,7 @@
                          ${attendanceTable}
                      </div>`;
                      
-                     await this.generatePdfFromHtml(pdfHtml, 'l', `${title}_출석부_${new Date().toISOString().slice(0, 10)}.pdf`);
+                     await this.generatePdfFromHtml(pdfHtml, 'l', `${title}_출석부.pdf`);
                 },
                 async generateLessonLogPdf(type) {
                      const data = this.teacherGuidanceData[type];
@@ -2699,9 +2556,9 @@
                          ${lessonLogHtml.length > 0 ? lessonLogHtml : '<p style="text-align: center;">저장된 수업일지가 없습니다.</p>'}
                      </div>`;
                      
-                     await this.generatePdfFromHtml(pdfHtml, 'p', `${title}_수업일지_${new Date().toISOString().slice(0, 10)}.pdf`);
+                     await this.generatePdfFromHtml(pdfHtml, 'p', `${title}_수업일지.pdf`);
                 },
-                closeImportModal() { this.showImportModal = false; this.importSubject = ''; this.importClasses = ['']; this.importModalError = ''; },
+                closeImportModal() { this.showImportModal = false; this.importClasses = ['']; this.importModalError = ''; },
                 addImportClassInput() { this.importClasses.push(''); },
                 removeImportClassInput(index) { this.importClasses.splice(index, 1); },
                 importUnderachievers() {
@@ -2709,7 +2566,6 @@
                      this.importModalError = '';
                      const subject = this.teacherPlan.subjectName.trim();
                      if (!subject) { this.importModalError = '먼저 과목명을 입력하고 저장해주세요.'; return; }
-                     // this.importSubject = subject; // This line is not needed
                      
                      const classes = this.importClasses.map(c => c.trim()).filter(Boolean);
                      if (classes.length === 0) { this.importModalError = '학급을 입력해주세요.'; return; }
@@ -2779,69 +2635,46 @@
                      const filtered = allStudents.filter(s => s && s.id && s.id.startsWith(classInput));
                      
                      if(filtered.length > 0){
-                         this.searchedStudents = filtered; // Triggers computed prop
+                         this.searchedStudents = filtered;
                          this.homeroomMessage = `${classInput}반 미도달 학생 ${filtered.length}명을 조회했습니다.`;
                      } else {
-                         this.searchedStudents = []; // Triggers computed prop
+                         this.searchedStudents = [];
                          this.homeroomMessage = `해당 학급에 미도달 학생이 없습니다.`;
                      }
                 },
-                // This method remains a placeholder
-                getSubjectCompletionStatus(studentId, subjectName){
-                     if(this.role !== '담임교사') return { status: 'N/A', color: 'text-gray-500'};
-                     // Real implementation would require querying *other* teachers' data,
-                     // which is complex and requires broader read permissions.
-                     return { status: '확인필요', color: 'text-gray-500'};
-                },
                 
                 // --- Helper functions ---
-                // (NEW HELPER FUNCTION - resetAllLocalData와 resetRole에서 공통 사용)
                 resetRoleSpecificData() {
-                    // 교과교사 데이터 초기화
                     Object.assign(this.teacherPlan, this.getInitialTeacherPlan());
                     this.teacherGuidanceData = this.getInitialGuidanceData();
                     this.teacherPlanError = '';
                     this.teacherPlanStatus = '';
                     this.newGuidanceStudentId = '';
-
-                    // 담임교사 데이터 초기화
                     this.homeroomClassInput = '';
                     this.searchedStudents = [];
                     this.homeroomMessage = '';
                     console.log("Role-specific data reset.");
                 },
-
                 resetAllLocalData(resetAuth = true) {
-                    // (로그아웃 시 호출됨)
                     if (resetAuth) {
                         this.user = null; this.isLoggedIn = false;
                     }
-                    // role과 schoolId도 초기화
                     this.role = null;
                     this.schoolId = null;
-
-                    // 공용 데이터 초기화
                     this.curriculumData = [];
                     this.studentData = [];
                     this.emotionalSupportData = [];
                     this.deployedUnderachievers = [];
-                    this.underachievers = []; // 관리자 로컬 리스트
-
-                    // 역할별 데이터 초기화 (헬퍼 함수 호출)
+                    this.underachievers = [];
                     this.resetRoleSpecificData();
-                    
-                    // 모듈 및 양식 폼 초기화
                     Object.assign(this.moduleConfig, this.$options.data().moduleConfig);
                     Object.assign(this.newsletterForm, this.$options.data().newsletterForm);
                     Object.assign(this.pledgeForm, this.$options.data().pledgeForm);
-
-                    // UI 상태 메시지 초기화
                     this.uploadStatus = { curriculum: '', student: '', emotionalSupport: '' };
                     this.statusMessage = '';
                     this.moduleConfigStatus = '';
                     this.underachieversStatus = '';
                     this.adminActionStatus = '';
-                    
                     console.log("All local data reset.");
                 },
                 resetTeacherData(resetGuidance = true) {
@@ -2856,59 +2689,36 @@
                 // --- NEW Admin Modify Modal Methods ---
                 openAdminModifyModal() {
                     if (this.role !== '관리자') return;
-                    this.newSchoolIdForModify = this.schoolId; // 현재 ID로 미리 채우기
+                    this.newSchoolIdForModify = this.schoolId;
                     this.adminModifyMode = 'schoolId';
                     this.adminModifyError = '';
                     this.showAdminModifyModal = true;
                 },
-                // --- FUNCTION MODIFIED ---
                 async saveAdminSchoolIdModification() {
                     this.adminModifyError = '';
-                    const id = this.newSchoolIdForModify.trim();
+                    const newId = this.newSchoolIdForModify.trim();
                     const invalidChars = /[\s./*#$[\]]/;
 
-                    if (!id) {
-                        this.adminModifyError = "학교 고유 ID를 입력해주세요."; return;
-                    }
-                    if (invalidChars.test(id)) {
-                        this.adminModifyError = "공백이나 특수문자 (/, ., *, # 등)는 사용할 수 없습니다."; return;
-                    }
-
-                    if (id === this.schoolId) {
-                        this.showAdminModifyModal = false;
-                        this.newSchoolIdForModify = ''; // 입력 필드 초기화
-                        return;
-                    }
+                    if (!newId) { this.adminModifyError = "학교 고유 ID를 입력해주세요."; return; }
+                    if (invalidChars.test(newId)) { this.adminModifyError = "공백이나 특수문자 (/, ., *, # 등)는 사용할 수 없습니다."; return; }
+                    if (newId === this.schoolId) { this.showAdminModifyModal = false; return; }
 
                     this.isLoading = true;
                     this.showAdminModifyModal = false;
 
-                    // 1. 변경할 role과 schoolId를 임시 변수에 백업합니다.
-                    const newSchoolId = id;
-                    const currentRole = this.role;
-
-                    // 2. 새 ID로 로컬 상태를 먼저 설정합니다.
-                    this.schoolId = newSchoolId;
+                    this.schoolId = newId;
+                    await this.saveUserRoleAndSchoolId(this.role);
                     
-                    // 3. Firestore에 새 schoolId를 포함한 사용자 정보를 저장합니다.
-                    await this.saveUserRole(currentRole); 
+                    this.resetAllLocalData(false); // Clear all local data except auth
+                    
+                    this.role = '관리자'; // Restore role
+                    this.schoolId = newId; // Restore new schoolId
 
-                    // 4. 인증 상태를 제외한 모든 로컬 데이터를 초기화합니다.
-                    // 이 과정에서 role과 schoolId가 일시적으로 null이 되지만, 백업해두었으므로 안전합니다.
-                    this.resetAllLocalData(false); 
-
-                    // 5. 백업해둔 role과 schoolId를 복원합니다.
-                    this.role = currentRole;
-                    this.schoolId = newSchoolId;
-
-                    // 6. 새 학교 ID의 공용 데이터를 로드합니다.
                     await this.loadCommonData();
-                    
-                    // 7. 관리자 로컬 목록을 새 학교의 데이터로 동기화합니다.
                     this.underachievers = JSON.parse(JSON.stringify(this.deployedUnderachievers));
                     
                     this.isLoading = false;
-                    this.newSchoolIdForModify = ''; // 8. 모달 입력 필드를 비웁니다.
+                    this.newSchoolIdForModify = '';
                     this.$nextTick(() => { this.initFlatpickr(); });
                 },
             },
@@ -2916,11 +2726,11 @@
             // --- Mounted Hook ---
             mounted() {
                  if (auth) {
-                    this.initApp(); // Start the authentication listener
+                    this.initApp();
                  }
             }
 
-        }).mount('#app'); // Mount the app
+        }).mount('#app');
 
     </script>
 </body>
