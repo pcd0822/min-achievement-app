@@ -1497,17 +1497,22 @@
                             this.showAdminCodeInput = false;
                             this.role = '관리자';
                             this.isLoading = true;
-                            await this.saveUserRoleAndSchoolId('관리자');
-                            if (this.schoolId) {
-                                await this.loadCommonData();
-                                this.underachievers = JSON.parse(JSON.stringify(this.deployedUnderachievers));
+                            try {
+                                await this.saveUserRoleAndSchoolId('관리자');
+                                if (this.schoolId) {
+                                    await this.loadCommonData();
+                                    this.underachievers = JSON.parse(JSON.stringify(this.deployedUnderachievers));
+                                } else {
+                                    this.schoolIdMode = 'create';
+                                    this.showSchoolIdModal = true;
+                                }
+                            } catch (error) {
+                                console.error("관리자 코드 제출 중 오류 발생:", error);
+                                alert("데이터 로딩 중 오류가 발생했습니다: " + error.message);
+                            } finally {
                                 this.isLoading = false;
-                            } else {
-                                this.schoolIdMode = 'create';
-                                this.showSchoolIdModal = true;
-                                this.isLoading = false;
+                                this.$nextTick(() => { this.initFlatpickr(); });
                             }
-                            this.$nextTick(() => { this.initFlatpickr(); });
                         } else {
                             this.adminCodeError = '코드가 올바르지 않습니다.';
                         }
@@ -1535,15 +1540,25 @@
                             
                             if(this.role === '교과교사') {
                                 console.log("교과교사 데이터 로딩 시작");
-                                await this.loadTeacherPlan();
-                                console.log("교과교사 계획안 로딩 완료");
-                                if(this.teacherPlan.subjectName){
-                                    console.log("과목명 존재, 지도 자료 로딩 시작:", this.teacherPlan.subjectName);
-                                    await this.loadGuidanceData();
-                                    this.filterSupplementaryStudents();
-                                    console.log("지도 자료 로딩 완료");
-                                } else {
-                                    console.log("과목명 없음, 지도 자료 로딩 건너뜀");
+                                try {
+                                    await this.loadTeacherPlan();
+                                    console.log("교과교사 계획안 로딩 완료");
+                                    if(this.teacherPlan && this.teacherPlan.subjectName){
+                                        console.log("과목명 존재, 지도 자료 로딩 시작:", this.teacherPlan.subjectName);
+                                        try {
+                                            await this.loadGuidanceData();
+                                            this.filterSupplementaryStudents();
+                                            console.log("지도 자료 로딩 완료");
+                                        } catch (guidanceError) {
+                                            console.error("지도 자료 로딩 중 오류:", guidanceError);
+                                            // 지도 자료 로딩 실패해도 계속 진행
+                                        }
+                                    } else {
+                                        console.log("과목명 없음, 지도 자료 로딩 건너뜀");
+                                    }
+                                } catch (teacherError) {
+                                    console.error("교과교사 계획안 로딩 중 오류:", teacherError);
+                                    // 계획안 로딩 실패해도 기본값 사용하고 계속 진행
                                 }
                             }
                             
@@ -1774,7 +1789,8 @@
                         }
                         } catch (error) { 
                             console.error("Error loading teacher plan:", error); 
-                            this.resetTeacherData(false);
+                            // 에러 발생 시 기본값으로 초기화
+                            this.teacherPlan = this.getInitialTeacherPlan();
                         }
                         this.updateMaxHours();
                         this.$nextTick(() => { this.initFlatpickr(); });
