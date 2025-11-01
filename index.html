@@ -276,14 +276,6 @@
                  <p class="text-gray-600">데이터 로딩 중...</p>
              </div>
 
-             <!-- Login Button -->
-              <div v-if="!isLoggedIn && !isLoading" class="text-center mt-10">
-                  <button @click="login" class="px-8 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition text-lg shadow-md">
-                      Google 계정으로 로그인
-                  </button>
-                   <p class="mt-4 text-gray-600">로그인 후 서비스를 이용해주세요.</p>
-              </div>
-
 
             <!-- Role Selection Modal (Show if logged in but no role) -->
             <div v-if="isLoggedIn && !role && !isLoading" class="modal-overlay">
@@ -1490,6 +1482,17 @@
                             // 내리는 결정을 신뢰할 수 있음을 의미합니다.
                             this.redirectResultProcessed = true;
                             console.log("Redirect processing is complete. Flag set to true.");
+                            
+                            // 리디렉션 결과 처리 후, 사용자가 없으면 명시적으로 로딩 상태를 해제합니다.
+                            // 이렇게 하면 onAuthStateChanged가 초기에 null user로 early return했을 경우에도
+                            // isLoading이 false로 설정되어 역할 선택 모달이 표시될 수 있습니다.
+                            const currentUser = auth.currentUser;
+                            if (!currentUser) {
+                                console.log("No user after redirect processing. Setting isLoading to false.");
+                                this.isLoading = false;
+                                this.user = null;
+                                this.isLoggedIn = false;
+                            }
                         }
                     },
                     async login() {
@@ -2761,3 +2764,4 @@
 
 </body>
 </html>
+
