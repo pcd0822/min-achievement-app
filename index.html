@@ -1428,6 +1428,7 @@
                                 this.authStateChangedCalled = true;
                             } else {
                                 console.log("getRedirectResult returned null - no redirect result");
+                                this.authStateChangedCalled = true;
                             }
                         } catch (error) {
                             console.error("Login redirect error:", error);
