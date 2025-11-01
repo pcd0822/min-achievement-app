@@ -1622,7 +1622,48 @@
                             ]);
 
                             this.curriculumData = curriculumSnap.exists() ? curriculumSnap.data().data || [] : [];
-                            this.studentData = studentsSnap.exists() ? studentsSnap.data().data || [] : [];
+                            
+                            // studentData 로딩 및 디버깅 (기존 'student' 문서와 새 'students' 문서 모두 확인)
+                            let studentDataLoaded = false;
+                            if (studentsSnap.exists()) {
+                                const studentsDataObj = studentsSnap.data();
+                                console.log("학적 정보 문서 ('students') 존재함:", {
+                                    hasDataField: 'data' in studentsDataObj,
+                                    dataType: typeof studentsDataObj.data,
+                                    dataIsArray: Array.isArray(studentsDataObj.data),
+                                    dataLength: Array.isArray(studentsDataObj.data) ? studentsSnap.data().data.length : 'not array'
+                                });
+                                this.studentData = studentsSnap.data().data || [];
+                                studentDataLoaded = true;
+                            } else {
+                                // 기존에 'student'로 저장된 문서 확인 (하위 호환성)
+                                console.log("'students' 문서가 없음. 기존 'student' 문서 확인 중...");
+                                try {
+                                    const studentSnap = await getDoc(doc(db, commonDataBasePath, "student"));
+                                    if (studentSnap.exists()) {
+                                        console.log("기존 'student' 문서 발견 및 로드 완료");
+                                        this.studentData = studentSnap.data().data || [];
+                                        studentDataLoaded = true;
+                                        // 자동 마이그레이션: 'students'로 복사
+                                        await setDoc(doc(db, commonDataBasePath, "students"), { data: this.studentData });
+                                        console.log("자동 마이그레이션 완료: 'student' → 'students'");
+                                    }
+                                } catch (migrationError) {
+                                    console.error("기존 문서 확인 중 오류:", migrationError);
+                                }
+                            }
+                            
+                            if (!studentDataLoaded) {
+                                console.warn("학적 정보 문서가 존재하지 않습니다:", `schools/${this.schoolId}/commonData/students` + " 또는 " + `schools/${this.schoolId}/commonData/student`);
+                                this.studentData = [];
+                            }
+                            
+                            console.log("로드된 studentData:", {
+                                length: this.studentData.length,
+                                firstItem: this.studentData.length > 0 ? this.studentData[0] : null,
+                                schoolId: this.schoolId
+                            });
+                            
                             this.emotionalSupportData = emotionalSupportSnap.exists() ? emotionalSupportSnap.data().data || [] : [];
                             
                             const defaultModuleConfig = this.$options.data().moduleConfig;
@@ -1672,7 +1713,14 @@
                                 const worksheet = workbook.Sheets[sheetName];
                                 const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
-                                const docRef = doc(db, `schools/${this.schoolId}/commonData`, type);
+                                // 문서 이름 매핑 (일관성 유지)
+                                const docNameMap = {
+                                    'curriculum': 'curriculum',
+                                    'student': 'students',  // 'student'를 'students'로 매핑
+                                    'emotionalSupport': 'emotionalSupport'
+                                };
+                                const docName = docNameMap[type] || type;
+                                const docRef = doc(db, `schools/${this.schoolId}/commonData`, docName);
                                 await setDoc(docRef, { data: jsonData });
 
                                 if (type === 'curriculum') this.curriculumData = jsonData;
