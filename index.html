@@ -55,6 +55,7 @@
           <div v-else class="flex items-center space-x-3">
             <span class="text-gray-700 text-sm">{{ user?.email }}</span>
             <button @click="logout" class="bg-gray-500 hover:bg-gray-600 text-white px-3 py-2 rounded text-sm">로그아웃</button>
+            <button @click="resetRole" class="bg-yellow-600 text-white px-3 py-1 rounded hover:bg-yellow-700 text-sm">역할 재선택</button>
           </div>
         </div>
       </div>
@@ -214,6 +215,14 @@
           }
         },
 
+        async resetRole() {
+          if (!this.user) return;
+            const ref = doc(db, "userData", this.user.uid);
+            await setDoc(ref, { role: null }, { merge: true });
+            this.role = null;
+            alert("역할이 초기화되었습니다. 다시 선택할 수 있습니다.");
+        }
+
         async submitAdminCode() {
           if (this.adminCode === '0822') {
             this.role = '관리자';
@@ -262,3 +271,4 @@
   </script>
 </body>
 </html>
+
