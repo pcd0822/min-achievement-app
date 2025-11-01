@@ -278,7 +278,7 @@
 
 
             <!-- Role Selection Modal (Show if logged in but no role) -->
-            <div v-if="isLoggedIn && !role && !isLoading" class="modal-overlay">
+            <div v-if="isLoggedIn && !role && !isLoading && !showSchoolIdModal" class="modal-overlay">
                 <div class="modal-content">
                     <h3 class="text-2xl font-bold mb-6 text-center">역할 선택</h3>
                     <div class="space-y-4">
@@ -301,11 +301,11 @@
             <!-- School ID Modal (Show if role selected, but no schoolId) -->
             <div v-if="showSchoolIdModal && !isLoading" class="modal-overlay">
                 <div class="modal-content">
-                    <h3 v-if="schoolIdMode === 'create'" class="text-2xl font-bold mb-4 text-center">학교 고유 ID 생성</h3>
+                    <h3 v-if="schoolIdMode === 'create'" class="text-2xl font-bold mb-4 text-center">학교 고유 ID 생성/입력</h3>
                     <h3 v-else class="text-2xl font-bold mb-4 text-center">학교 고유 ID 입력</h3>
 
                     <p v-if="schoolIdMode === 'create'" class="text-sm text-gray-600 mb-4">
-                        관리자 인증이 완료되었습니다. 이 학교에서 사용할 고유 ID를 생성하세요. 이 ID는 교사들에게 공유해야 합니다. (예: `korea_high_2025`)
+                        관리자 인증이 완료되었습니다. 기존에 생성한 학교코드가 있는 경우 해당 코드를 입력하시면 됩니다. 새로 생성하실 경우 이 학교에서 사용할 고유 ID를 생성하세요. 이 ID는 교사들에게 공유해야 합니다. (예: `korea_high_2025`)
                     </p>
                     <p v-else class="text-sm text-gray-600 mb-4">
                         학교 관리자에게 공유받은 '학교 고유 ID'를 입력하세요.
@@ -533,7 +533,7 @@
                                        <option value="claude">Claude</option>
                                    </select>
                                </div>
-                               <div v-if="teacherPlan.aiProvider !== 'openai'">
+                               <div v-if="teacherPlan.aiProvider && teacherPlan.aiProvider !== 'openai'">
                                    <label for="apiKey" class="block text-sm font-medium text-gray-700">{{ teacherPlan.aiProvider.toUpperCase() }} API Key</label>
                                    <input type="password" id="apiKey" v-model="teacherPlan.apiKey" placeholder="선택한 AI 모델의 API 키를 입력하세요" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
                                </div>
@@ -1479,16 +1479,22 @@
                         console.log("selectRole called with:", selectedRole);
                         if (!this.user) { alert("사용자 정보가 없습니다. 다시 로그인해주세요."); return; }
                         
+                        // 이전 상태 초기화
+                        this.showAdminCodeInput = false;
+                        this.adminCodeError = '';
+                        this.schoolIdError = '';
+                        
                         if (selectedRole === '관리자') {
                             console.log("관리자 선택됨, 코드 입력창 표시");
                             this.showAdminCodeInput = true;
+                            console.log("showAdminCodeInput 설정됨:", this.showAdminCodeInput);
                         } else {
                             console.log("교과교사/담임교사 선택됨:", selectedRole);
-                            this.showAdminCodeInput = false;
                             this.role = selectedRole;
                             // 교과교사/담임교사는 항상 학교 ID 모달 표시
                             this.schoolIdMode = 'join';
                             this.showSchoolIdModal = true;
+                            console.log("role 설정됨:", this.role, "showSchoolIdModal:", this.showSchoolIdModal);
                         }
                     },
                     async submitAdminCode() {
@@ -1744,7 +1750,7 @@
                     // --- Data Loading/Saving (Teacher) ---
                     async loadTeacherPlan() {
                         if (!this.user || !db || !this.schoolId || this.role !== '교과교사') return;
-                        const planDocRef = doc(db, `schools/${this.schoolId}/teacherData/${this.user.uid}/teacherPlan`, 'planDocument');
+                        const planDocRef = doc(db, `schools/${this.schoolId}/teacherData/${this.user.uid}/teacherPlan`);
                         try {
                             const docSnap = await getDoc(planDocRef);
                             const defaultPlan = this.getInitialTeacherPlan();
@@ -1783,7 +1789,7 @@
                             return;
                         }
                         this.teacherPlanStatus = "계획안 저장 중...";
-                        const planDocRef = doc(db, `schools/${this.schoolId}/teacherData/${this.user.uid}/teacherPlan`, 'planDocument');
+                        const planDocRef = doc(db, `schools/${this.schoolId}/teacherData/${this.user.uid}/teacherPlan`);
                         try {
                             const planToSave = { ...JSON.parse(JSON.stringify(this.teacherPlan)) };
                             const formatDates = (period) => (period || []).map(d => (d instanceof Date && !isNaN(d.getTime())) ? d.toISOString() : null).filter(Boolean);
@@ -1802,9 +1808,9 @@
                             this.teacherGuidanceData = this.getInitialGuidanceData();
                             return;
                         }
-                        const docRef = doc(db, `schools/${this.schoolId}/teacherData/${this.user.uid}/guidanceData`, this.teacherPlan.subjectName);
+                        const docPath = `schools/${this.schoolId}/teacherData/${this.user.uid}/${this.teacherPlan.subjectName}`;
                         try {
-                            const docSnap = await getDoc(docRef);
+                            const docSnap = await getDoc(doc(db, docPath));
                             if (docSnap.exists()) {
                                 const fetchedData = docSnap.data();
                                 const defaultGuidance = this.getInitialGuidanceData();
@@ -1830,10 +1836,10 @@
                     },
                     async saveGuidanceData(){
                         if (!this.user || !db || !this.schoolId || this.role !== '교과교사' || !this.teacherPlan.subjectName) return;
-                        const docRef = doc(db, `schools/${this.schoolId}/teacherData/${this.user.uid}/guidanceData`, this.teacherPlan.subjectName);
+                        const docPath = `schools/${this.schoolId}/teacherData/${this.user.uid}/${this.teacherPlan.subjectName}`;
                         try {
                             const dataToSave = JSON.parse(JSON.stringify(this.teacherGuidanceData));
-                            await setDoc(docRef, dataToSave);
+                            await setDoc(doc(db, docPath), dataToSave);
                         } catch (error) { console.error("Error saving guidance data:", error); }
                     },
                     mergeSessions(defaultSessions, loadedSessions) {
