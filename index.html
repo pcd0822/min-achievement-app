@@ -277,8 +277,8 @@
              </div>
 
 
-            <!-- Role Selection Modal (Show if logged in but no role and no other modal is showing) -->
-            <div v-if="isLoggedIn && !role && !isLoading && !showSchoolIdModal && !showAdminCodeInput" class="modal-overlay">
+            <!-- Role Selection Modal (Show if logged in but no role) -->
+            <div v-if="isLoggedIn && !role && !isLoading" class="modal-overlay">
                 <div class="modal-content">
                     <h3 class="text-2xl font-bold mb-6 text-center">역할 선택</h3>
                     <div class="space-y-4">
@@ -1569,7 +1569,6 @@
                         // DB 저장은 사용자가 새 역할과 학교ID를 선택할 때만 수행
                         this.resetRoleSpecificData();
                         this.showAdminCodeInput = false;
-                        this.showSchoolIdModal = false;
                         this.adminCode = '';
                         this.adminCodeError = '';
                         this.statusMessage = '';
