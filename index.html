@@ -1511,6 +1511,7 @@
                                 alert("데이터 로딩 중 오류가 발생했습니다: " + error.message);
                             } finally {
                                 this.isLoading = false;
+                                console.log("관리자 코드 제출 완료 - role:", this.role, "schoolId:", this.schoolId, "isLoading:", this.isLoading, "isLoggedIn:", this.isLoggedIn);
                                 this.$nextTick(() => { this.initFlatpickr(); });
                             }
                         } else {
@@ -1560,6 +1561,10 @@
                                     console.error("교과교사 계획안 로딩 중 오류:", teacherError);
                                     // 계획안 로딩 실패해도 기본값 사용하고 계속 진행
                                 }
+                            } else if(this.role === '관리자') {
+                                console.log("관리자 데이터 설정");
+                                this.underachievers = JSON.parse(JSON.stringify(this.deployedUnderachievers));
+                                console.log("관리자 데이터 설정 완료");
                             }
                             
                             console.log("모든 데이터 로딩 완료");
@@ -1569,11 +1574,16 @@
                         } finally {
                             this.isLoading = false;
                             this.newSchoolId = '';
-                            console.log("최종 상태 확인 - role:", this.role, "schoolId:", this.schoolId, "isLoading:", this.isLoading);
+                            console.log("최종 상태 확인 - role:", this.role, "schoolId:", this.schoolId, "isLoading:", this.isLoading, "isLoggedIn:", this.isLoggedIn);
                             this.$nextTick(() => { 
                                 this.initFlatpickr();
                                 // 상태 강제 갱신
-                                console.log("Vue 상태 갱신 완료");
+                                console.log("Vue 상태 갱신 완료 - 대시보드 표시 조건:", {
+                                    isLoggedIn: this.isLoggedIn,
+                                    role: this.role,
+                                    isLoading: this.isLoading,
+                                    condition: this.isLoggedIn && this.role && !this.isLoading
+                                });
                             });
                             console.log("로딩 상태 해제 완료");
                         }
