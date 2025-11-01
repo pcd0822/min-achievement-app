@@ -263,7 +263,7 @@
                          <button v-if="role === '관리자'" @click="openAdminModifyModal" class="ml-2 px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition text-sm">학교 코드 수정 및 발급</button>
                     </div>
                     <div v-else>
-                         <button @click="login" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition text-sm">Google 로그인</button>
+                         <button @click="login" @mousedown="console.log('Login button mousedown')" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition text-sm">Google 로그인</button>
                     </div>
                 </div>
             </div>
@@ -278,7 +278,7 @@
 
              <!-- Login Button -->
               <div v-if="!isLoggedIn && !isLoading" class="text-center mt-10">
-                  <button @click="login" class="px-8 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition text-lg shadow-md">
+                  <button @click="login" @mousedown="console.log('Main login button mousedown')" class="px-8 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition text-lg shadow-md">
                       Google 계정으로 로그인
                   </button>
                    <p class="mt-4 text-gray-600">로그인 후 서비스를 이용해주세요.</p>
@@ -1442,10 +1442,13 @@
                             // 초기 로드 시 user가 null이면 아무것도 하지 않음
                             if (isInitialLoad && !user) {
                                 console.log("Initial load with no user, skipping");
+                                console.log("Setting isInitialLoad to false, isLoading to false");
                                 isInitialLoad = false;
                                 this.isLoading = false;
+                                console.log("After setting: isLoading should be false");
                                 return;
                             }
+                            console.log("Not initial load or user exists, setting isInitialLoad to false");
                             isInitialLoad = false;
                             
                             this.isLoading = true;
