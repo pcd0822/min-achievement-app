@@ -1435,7 +1435,10 @@
                         }
                         
                         onAuthStateChanged(auth, async (user) => {
-                            console.log("Auth state changed, user:", user ? user.email : 'null', "isInitialLoad:", isInitialLoad);
+                            console.log("=== Auth state changed ===");
+                            console.log("user:", user ? user.email : 'null');
+                            console.log("isInitialLoad:", isInitialLoad);
+                            console.log("current isLoggedIn:", this.isLoggedIn);
                             // 초기 로드 시 user가 null이면 아무것도 하지 않음
                             if (isInitialLoad && !user) {
                                 console.log("Initial load with no user, skipping");
@@ -1448,6 +1451,7 @@
                             this.isLoading = true;
                             try {
                                 if (user) {
+                                    console.log("User exists, setting up auth state");
                                     this.user = user;
                                     this.isLoggedIn = true;
                                     await this.loadUserRoleAndSchoolId(); // 역할(role)과 학교ID(schoolId)를 불러옵니다.
@@ -1455,6 +1459,7 @@
 
                                     // 1. 역할과 학교ID가 모두 있는 경우 (정상적인 대시보드 로드)
                                     if (this.role && this.schoolId) {
+                                        console.log("경로 1: 역할과 schoolId 모두 있음");
                                         await this.loadCommonData();
                                         if(this.role === '교과교사') {
                                             await this.loadTeacherPlan();
@@ -1467,6 +1472,7 @@
                                         }
                                     // 2. 역할은 있지만 학교ID가 없는 경우 (학교 ID 입력 모달 강제 표시)
                                     } else if (this.isLoggedIn && this.role && !this.schoolId) {
+                                        console.log("경로 2: 역할은 있지만 schoolId 없음");
                                         this.schoolIdMode = this.role === '관리자' ? 'create' : 'join';
                                         this.showSchoolIdModal = true;
                                     }
@@ -1474,15 +1480,29 @@
                                     // 이 경우, finally에서 isLoading=false가 되면
                                     // v-if="isLoggedIn && !role && !isLoading" 조건이 충족되어
                                     // 자동으로 역할 선택 모달이 나타납니다.
+                                    else {
+                                        console.log("경로 3: 역할 없음, 역할 선택 모달 표시 예정");
+                                    }
                                 } else {
+                                    console.log("User is null, resetting all data");
                                     this.user = null;
                                     this.isLoggedIn = false;
                                     this.resetAllLocalData();
                                 }
                             } catch (error) {
                                 console.error("Authentication state change process failed:", error);
-                                this.resetAllLocalData();
+                                // 에러 발생 시에도 사용자가 로그인되어 있다면 역할만 리셋
+                                if (this.user && this.isLoggedIn) {
+                                    console.log("Error but user is still logged in, resetting only role");
+                                    this.role = null;
+                                    this.schoolId = null;
+                                    this.resetRoleSpecificData();
+                                } else {
+                                    console.log("Error and no user, resetting everything");
+                                    this.resetAllLocalData();
+                                }
                             } finally {
+                                console.log("=== Finally block, setting isLoading to false ===");
                                 this.isLoading = false;
                                 this.$nextTick(() => {
                                     this.initFlatpickr();
