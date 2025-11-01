@@ -1549,13 +1549,23 @@
                             } else {
                                 console.log("schoolId 있음, 데이터 로드");
                                 this.isLoading = true;
+                                console.log("selectRole: saveUserRoleAndSchoolId 호출 직전");
                                 await this.saveUserRoleAndSchoolId(this.role);
+                                console.log("selectRole: saveUserRoleAndSchoolId 완료, loadCommonData 호출 직전");
                                 await this.loadCommonData();
+                                console.log("selectRole: loadCommonData 완료");
                                 if(this.role === '교과교사') {
+                                    console.log("selectRole: 교과교사 확인, loadTeacherPlan 호출 직전");
                                     await this.loadTeacherPlan();
+                                    console.log("selectRole: loadTeacherPlan 완료");
                                     if(this.teacherPlan.subjectName){
+                                        console.log("selectRole: 과목명 있음, loadGuidanceData 호출 직전");
                                         await this.loadGuidanceData();
+                                        console.log("selectRole: loadGuidanceData 완료, filterSupplementaryStudents 호출");
                                         this.filterSupplementaryStudents();
+                                        console.log("selectRole: filterSupplementaryStudents 완료");
+                                    } else {
+                                        console.log("selectRole: 과목명 없음, loadGuidanceData 스킵");
                                     }
                                 }
                                 console.log("selectRole: 데이터 로드 완료, isLoading false");
@@ -1625,15 +1635,21 @@
                         this.statusMessage = '';
                     },
                     async saveUserRoleAndSchoolId(roleToSave) {
-                        if (!this.user || !db) return;
+                        console.log("saveUserRoleAndSchoolId called with role:", roleToSave, "schoolId:", this.schoolId);
+                        if (!this.user || !db) {
+                            console.log("saveUserRoleAndSchoolId: user or db 없음, 리턴");
+                            return;
+                        }
                         const userDocRef = doc(db, `userData/${this.user.uid}`);
                         const dataToSave = { 
                             role: roleToSave, 
                             schoolId: this.schoolId
                         };
+                        console.log("saveUserRoleAndSchoolId: 저장할 데이터", dataToSave);
                         
                         try {
                             await setDoc(userDocRef, dataToSave, { merge: true });
+                            console.log("saveUserRoleAndSchoolId: 저장 성공");
                         } catch (error) { console.error("Error saving user data:", error); }
                     },
                     async loadUserRoleAndSchoolId() {
