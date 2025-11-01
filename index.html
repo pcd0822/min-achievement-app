@@ -1558,6 +1558,7 @@
                                         this.filterSupplementaryStudents();
                                     }
                                 }
+                                console.log("selectRole: 데이터 로드 완료, isLoading false");
                                 this.isLoading = false;
                                 this.$nextTick(() => { this.initFlatpickr(); });
                             }
@@ -1653,13 +1654,14 @@
 
                     // --- Data Loading (Common) ---
                     async loadCommonData() {
+                        console.log("loadCommonData called");
                         if (!db || !this.schoolId) {
                             console.warn("Cannot load common data: DB or schoolId is missing.");
                             this.resetAllLocalData(false); // Reset local data if schoolId is missing
                             return;
                         }
+                        console.log("Loading common data for schoolId:", this.schoolId);
                         this.statusMessage = '공용 데이터 로딩 중...';
-                        this.isLoading = true;
                         try {
                             const commonDataBasePath = `schools/${this.schoolId}/commonData`;
                             const [
@@ -1701,7 +1703,6 @@
                             this.statusMessage = '공용 데이터 로딩 중 오류 발생.';
                             this.curriculumData = []; this.studentData = []; this.emotionalSupportData = []; this.deployedUnderachievers = [];
                         } finally {
-                            // isLoading is handled in initApp's finally block
                             setTimeout(() => this.statusMessage = '', 2000);
                             if (this.role) {
                                 this.$nextTick(() => { this.initFlatpickr(); });
@@ -1792,7 +1793,11 @@
 
                     // --- Data Loading/Saving (Teacher) ---
                     async loadTeacherPlan() {
-                        if (!this.user || !db || !this.schoolId || this.role !== '교과교사') return;
+                        console.log("loadTeacherPlan called");
+                        if (!this.user || !db || !this.schoolId || this.role !== '교과교사') {
+                            console.log("loadTeacherPlan: 조건 불충족, 리턴");
+                            return;
+                        }
                         const planDocRef = doc(db, `schools/${this.schoolId}/teacherData/${this.user.uid}`, "teacherPlan");
                         try {
                             const docSnap = await getDoc(planDocRef);
@@ -1847,11 +1852,14 @@
                         setTimeout(() => this.teacherPlanStatus = '', 3000);
                     },
                     async loadGuidanceData(){
+                        console.log("loadGuidanceData called");
                         if (!this.user || !db || !this.schoolId || this.role !== '교과교사' || !this.teacherPlan.subjectName) {
+                            console.log("loadGuidanceData: 조건 불충족, 초기 데이터로 리턴");
                             this.teacherGuidanceData = this.getInitialGuidanceData();
                             return;
                         }
                         const docPath = `schools/${this.schoolId}/teacherData/${this.user.uid}/${this.teacherPlan.subjectName}`;
+                        console.log("loadGuidanceData: loading from", docPath);
                         try {
                             const docSnap = await getDoc(doc(db, docPath));
                             if (docSnap.exists()) {
@@ -1867,7 +1875,9 @@
                                     sessions: this.mergeSessions(defaultGuidance.supplementary.sessions, fetchedData.supplementary?.sessions),
                                     error: fetchedData.supplementary?.error || ''
                                 };
+                                console.log("loadGuidanceData: 데이터 로드 완료");
                             } else {
+                                console.log("loadGuidanceData: 문서 없음, 초기 데이터");
                                 this.teacherGuidanceData = this.getInitialGuidanceData();
                             }
                         } catch (error) {
