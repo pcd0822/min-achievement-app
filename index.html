@@ -985,7 +985,7 @@
         import { createApp } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js'
         // Firebase SDK Imports
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc, collection, query, where, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
         
         // --- Firebase Configuration ---
@@ -1400,6 +1400,21 @@
 
                     // --- Initialization and Auth ---
                     async initApp() {
+                        try {
+                            const result = await getRedirectResult(auth);
+                            if (result) {
+                                // Google 로그인에서 성공적으로 돌아온 경우입니다.
+                                // onAuthStateChanged가 이어서 user 객체를 받아 처리합니다.
+                                console.log("Login redirect result handled.", result.user);
+                            }
+                        } catch (error) {
+                            console.error("Login redirect error:", error);
+                            if (error.code === 'auth/account-exists-with-different-credential') {
+                                alert("이미 다른 방식(예: 이메일/비밀번호)으로 가입된 이메일입니다.");
+                            } else {
+                                alert("로그인 중 오류가 발생했습니다: " + error.message);
+                            }
+                        }
                         onAuthStateChanged(auth, async (user) => {
                             this.isLoading = true;
                             try {
@@ -1448,12 +1463,11 @@
                     async login() {
                         const provider = new GoogleAuthProvider();
                         try {
-                            await signInWithPopup(auth, provider);
+                            await signInWithRedirect(auth, provider);
                             // onAuthStateChanged will handle the rest
                         } catch (error) {
-                            console.error("Login failed:", error);
-                            if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
-                                alert(`로그인 실패: ${error.message}`);
+                            console.error("Login redirect failed:", error);
+                            alert(`로그인 리디렉션 실패: ${error.message}`);
                             }
                         }
                     },
@@ -2724,6 +2738,7 @@
 
 </body>
 </html>
+
 
 
 
