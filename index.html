@@ -276,6 +276,14 @@
                  <p class="text-gray-600">데이터 로딩 중...</p>
              </div>
 
+            <!-- [수정] 화면 중앙의 중복 로그인 버튼 제거 -->
+             <!-- 로그인 안내 메시지만 남겨둡니다. -->
+              <div v-if="!isLoggedIn && !isLoading" class="text-center mt-10">
+                   <p class="text-gray-600">서비스를 이용하시려면 우측 상단의 버튼으로 로그인해주세요.</p>
+              </div>
+
+            <!-- Role Selection Modal (Show if logged in but no role) -->
+            <div v-if="isLoggedIn && !role && !isLoading" class="modal-overlay">
 
             <!-- Role Selection Modal (Show if logged in but no role) -->
             <div v-if="isLoggedIn && !role && !isLoading" class="modal-overlay">
@@ -972,7 +980,7 @@
         <div id="print-area-container" class="hidden"></div>
 
     </div>
-    <script type="module">
+        <script type="module">
         // Vue 3 CDN
         import { createApp } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js'
         // Firebase SDK Imports
@@ -991,7 +999,7 @@
             measurementId: "G-4GT4CZRPXB"
         };
 
-        // --- [수정] Initialize Firebase and then mount Vue App ---
+        // --- Initialize Firebase and then mount Vue App ---
         try {
             const firebaseApp = initializeApp(firebaseConfig);
             const auth = getAuth(firebaseApp);
@@ -1006,9 +1014,9 @@
                         user: null,
                         isLoggedIn: false,
                         isLoading: true,
-                        redirectResultProcessed: false, // [수정] 리디렉션 처리 완료 플래그
+                        redirectResultProcessed: false, // 리디렉션 처리 완료 플래그
 
-                        // --- Role Management State ---
+                        // ... (이하 data 속성은 기존과 동일) ...
                         role: null,
                         schoolId: null,
                         showAdminCodeInput: false,
@@ -1018,8 +1026,6 @@
                         schoolIdMode: 'join',
                         newSchoolId: '',
                         schoolIdError: '',
-
-                        // --- UI State ---
                         teacherTab: 'plan',
                         adminFormTab: 'newsletter',
                         uploadStatus: { curriculum: '', student: '', emotionalSupport: '' },
@@ -1028,14 +1034,10 @@
                         underachieversStatus: '',
                         teacherPlanStatus: '',
                         adminActionStatus: '',
-
-                        // --- Admin Modify Modal State ---
                         showAdminModifyModal: false,
                         adminModifyMode: 'schoolId',
                         newSchoolIdForModify: '',
                         adminModifyError: '',
-                        
-                        // --- Common Data (Loaded from Firestore) ---
                         moduleConfig: {
                             hoursPerCredit: 1,
                             preventiveRatio: 50,
@@ -1058,16 +1060,12 @@
                         studentData: [],
                         emotionalSupportData: [],
                         deployedUnderachievers: [],
-
-                        // --- Admin Specific Local State ---
                         underachievers: [],
                         fileProcessingError: '',
                         showAttendanceModal: false,
                         newAttendanceStudent: { id: '', subjects: [''] },
                         attendanceModalError: '',
                         showExportOptions: false,
-
-                        // --- Teacher Specific State ---
                         showImportModal: false,
                         importClasses: [''],
                         importModalError: '',
@@ -1090,18 +1088,15 @@
                             supplementary: { students: [], sessions: Array.from({ length: 10 }, () => ({ date: '', time: '', isSaved: false, place: '', content: '', attendance: {} })), error: ''}
                         },
                         newGuidanceStudentId: '',
-
-                        // --- Homeroom Teacher State ---
                         homeroomClassInput: '',
                         searchedStudents: [],
                         homeroomMessage: '',
-
-                        // --- Preview Modal State ---
                         showPreviewModal: false,
                         previewHtml: '',
                     }
                 },
 
+                // ... (이하 computed 속성은 기존과 동일) ...
                 computed: {
                     statusText() {
                         return this.teacherPlanError || this.adminActionStatus || this.moduleConfigStatus || this.underachieversStatus || this.teacherPlanStatus || '';
@@ -1385,7 +1380,7 @@
                         return {
                             subjectName: '', teacherNames: [''],
                             achievements: [{ text: '', statement: '', loading: false }],
-                            gradeCalculation: '추정분hal점수', conductPrevention: 'X',
+                            gradeCalculation: '추정분할점수', conductPrevention: 'X',
                             preventionTarget: '', preventionMethods: [], preventionPeriod: [],
                             preventionSessions: [{ plan: '' }, { plan: '' }, { plan: '' }],
                             supplementaryMethods: [], supplementaryPeriod: [],
@@ -1406,29 +1401,29 @@
 
                     // --- [핵심 수정] Initialization and Auth ---
                     async initApp() {
-                        console.log("initApp called");
+                        console.log("initApp: 초기화 시작");
 
-                        // onAuthStateChanged 리스너를 먼저 설정합니다.
+                        // 1. onAuthStateChanged 리스너를 먼저 설정합니다.
+                        // 이 리스너는 앱의 인증 상태에 대한 최종적인 진실 공급원(source of truth) 역할을 합니다.
                         onAuthStateChanged(auth, async (user) => {
-                            console.log("onAuthStateChanged triggered with user:", user ? user.email : null);
+                            console.log("onAuthStateChanged: 상태 변경 감지됨. User:", user ? user.email : "null");
 
-                            // 리디렉션 처리가 완료될 때까지 초기 null user 상태를 무시합니다.
+                            // 리디렉션 처리 중에는 초기 'null' 사용자 상태를 무시합니다.
                             if (!this.redirectResultProcessed && !user) {
-                                console.log("Initial auth state is null, but redirect is not processed yet. Waiting...");
+                                console.log("onAuthStateChanged: 아직 리디렉션 처리 전이므로 초기 null 상태는 무시합니다.");
                                 return;
                             }
 
                             this.isLoading = true;
                             try {
                                 if (user) {
-                                    console.log("User is present. Setting up session.");
+                                    console.log("onAuthStateChanged: 사용자가 로그인되었습니다. 세션을 설정합니다.");
                                     this.user = user;
                                     this.isLoggedIn = true;
                                     await this.loadUserRoleAndSchoolId();
-                                    console.log("Loaded role:", this.role, "and schoolId:", this.schoolId);
 
                                     if (this.role && this.schoolId) {
-                                        console.log("Role and schoolId exist. Loading all data.");
+                                        console.log("onAuthStateChanged: 역할과 학교 ID가 모두 존재하여 전체 데이터를 로드합니다.");
                                         await this.loadCommonData();
                                         if (this.role === '교과교사') {
                                             await this.loadTeacherPlan();
@@ -1440,23 +1435,21 @@
                                             this.underachievers = JSON.parse(JSON.stringify(this.deployedUnderachievers));
                                         }
                                     } else if (this.isLoggedIn && this.role && !this.schoolId) {
-                                        console.log("Role exists, but schoolId is missing. Showing schoolId modal.");
+                                        console.log("onAuthStateChanged: 역할은 있으나 학교 ID가 없어 모달을 표시합니다.");
                                         this.schoolIdMode = this.role === '관리자' ? 'create' : 'join';
                                         this.showSchoolIdModal = true;
-                                    } else {
-                                        console.log("No role assigned. Role selection modal will be shown.");
                                     }
                                 } else {
-                                    console.log("User is null. Resetting application state.");
+                                    console.log("onAuthStateChanged: 사용자가 로그아웃되었거나 없습니다. 앱 상태를 초기화합니다.");
                                     this.user = null;
                                     this.isLoggedIn = false;
                                     this.resetAllLocalData();
                                 }
                             } catch (error) {
-                                console.error("Error during auth state change processing:", error);
-                                this.resetAllLocalData(); // 에러 발생 시 안전하게 초기화
+                                console.error("onAuthStateChanged: 처리 중 오류 발생:", error);
+                                this.resetAllLocalData();
                             } finally {
-                                console.log("Auth processing finished. Setting isLoading to false.");
+                                console.log("onAuthStateChanged: 모든 처리가 완료되었습니다. isLoading을 false로 설정합니다.");
                                 this.isLoading = false;
                                 this.$nextTick(() => {
                                     this.initFlatpickr();
@@ -1464,44 +1457,31 @@
                             }
                         });
 
-                        // 리디렉션 결과 처리를 시작하고, 완료되면 플래그를 설정합니다.
+                        // 2. 앱 로드 시 단 한 번, 리디렉션 결과를 처리합니다.
                         try {
-                            console.log("Checking for redirect result...");
+                            console.log("initApp: getRedirectResult를 호출하여 리디렉션 결과를 확인합니다.");
                             const result = await getRedirectResult(auth);
                             if (result) {
-                                console.log("Redirect result found and processed for user:", result.user.email);
-                                // onAuthStateChanged가 result.user와 함께 다시 호출되므로 여기서 별도 처리는 불필요
+                                console.log("initApp: 리디렉션 결과가 성공적으로 처리되었습니다. User:", result.user.email);
+                                // 실제 사용자 상태 설정은 위의 onAuthStateChanged 리스너가 담당합니다.
                             } else {
-                                console.log("No redirect result to process.");
+                                console.log("initApp: 처리할 리디렉션 결과가 없습니다.");
                             }
                         } catch (error) {
-                            console.error("Error processing redirect result:", error);
+                            console.error("initApp: getRedirectResult 처리 중 오류 발생:", error);
                             alert("로그인 처리 중 오류가 발생했습니다: " + error.message);
                         } finally {
-                            // getRedirectResult 처리가 성공하든 실패하든, 이제 onAuthStateChanged가
-                            // 내리는 결정을 신뢰할 수 있음을 의미합니다.
+                            // 3. 리디렉션 처리가 성공하든 실패하든, 완료되었음을 플래그로 표시합니다.
+                            // 이 플래그는 onAuthStateChanged가 '로그아웃' 상태를 안전하게 처리하도록 보장합니다.
                             this.redirectResultProcessed = true;
-                            console.log("Redirect processing is complete. Flag set to true.");
-                            
-                            // 리디렉션 결과 처리 후, 사용자가 없으면 명시적으로 로딩 상태를 해제합니다.
-                            // 이렇게 하면 onAuthStateChanged가 초기에 null user로 early return했을 경우에도
-                            // isLoading이 false로 설정되어 역할 선택 모달이 표시될 수 있습니다.
-                            const currentUser = auth.currentUser;
-                            if (!currentUser) {
-                                console.log("No user after redirect processing. Setting isLoading to false.");
-                                this.isLoading = false;
-                                this.user = null;
-                                this.isLoggedIn = false;
-                            }
+                            console.log("initApp: 리디렉션 처리가 완료되었습니다. (redirectResultProcessed = true)");
                         }
                     },
+
                     async login() {
-                        console.log("Login button clicked");
                         const provider = new GoogleAuthProvider();
                         try {
-                            console.log("Attempting signInWithRedirect...");
                             await signInWithRedirect(auth, provider);
-                            console.log("signInWithRedirect completed");
                         } catch (error) {
                             console.error("Login redirect failed:", error);
                             alert(`로그인 리디렉션 실패: ${error.message}`);
@@ -1513,7 +1493,7 @@
                         } catch (error) { console.error("Logout failed:", error); alert(`로그아웃 실패: ${error.message}`); }
                     },
 
-                    // --- Role Management ---
+                    // ... (이하 methods는 기존과 동일) ...
                     async selectRole(selectedRole) {
                         console.log("selectRole called with:", selectedRole);
                         if (!this.user) { alert("사용자 정보가 없습니다. 다시 로그인해주세요."); return; }
@@ -1627,8 +1607,6 @@
                             }
                         } catch (error) { console.error("Error loading user data:", error); this.role = null; this.schoolId = null; }
                     },
-
-                    // --- Data Loading (Common) ---
                     async loadCommonData() {
                         if (!db || !this.schoolId) {
                             this.resetAllLocalData(false);
@@ -1681,8 +1659,6 @@
                             }
                         }
                     },
-
-                    // --- Data Saving (Admin) ---
                     async uploadFile(event, type) {
                         if (!this.schoolId) { alert("학교 ID가 설정되지 않았습니다. '학교 코드 수정 및 발급' 메뉴에서 ID를 먼저 설정해주세요."); event.target.value = null; return; }
                         if (this.role !== '관리자' || !db) { event.target.value = null; return; }
@@ -1762,8 +1738,6 @@
                         }
                         setTimeout(() => this.underachieversStatus = '', 3000);
                     },
-
-                    // --- Data Loading/Saving (Teacher) ---
                     async loadTeacherPlan() {
                         if (!this.user || !db || !this.schoolId || this.role !== '교과교사') return;
                         const planDocRef = doc(db, `schools/${this.schoolId}/teacherData/${this.user.uid}`, "teacherPlan");
@@ -1892,8 +1866,6 @@
                         await this.loadGuidanceData();
                         this.filterSupplementaryStudents();
                     },
-
-                    // --- Helper and UI Methods ---
                     initFlatpickr() {
                         this.$nextTick(() => {
                             document.querySelectorAll('.flatpickr-input').forEach(el => {
@@ -2226,8 +2198,6 @@
                         }
                         this.showExportOptions = false;
                     },
-
-                    // --- Teacher Methods ---
                     switchTeacherTab(tab) {
                         this.teacherTab = tab;
                         this.$nextTick(() => { this.initFlatpickr(); });
@@ -2428,8 +2398,6 @@
                         </div>`;
                         this.showPreviewModal = true;
                     },
-
-                    // --- GUIDANCE LOGBOOK METHODS ---
                     addGuidanceStudent(type) {
                         if (this.role !== '교과교사') return;
                         const data = this.teacherGuidanceData[type];
@@ -2650,8 +2618,6 @@
                             this.saveGuidanceData();
                         }
                     },
-
-                    // --- Homeroom Teacher Methods ---
                     async searchHomeroomClass(){
                         if(this.role !== '담임교사') return;
                         this.homeroomMessage = '데이터 조회 중...';
@@ -2679,8 +2645,6 @@
                             this.homeroomMessage = `해당 학급에 미도달 학생이 없습니다.`;
                         }
                     },
-                    
-                    // --- Helper functions ---
                     resetRoleSpecificData() {
                         this.teacherPlan = this.getInitialTeacherPlan();
                         this.teacherGuidanceData = this.getInitialGuidanceData();
@@ -2706,8 +2670,6 @@
                         if (resetGuidance) { this.teacherGuidanceData = this.getInitialGuidanceData(); }
                         this.teacherPlanError = ''; this.teacherPlanStatus = ''; this.newGuidanceStudentId = '';
                     },
-
-                    // --- Admin Modify Modal Methods ---
                     openAdminModifyModal() {
                         if (this.role !== '관리자') return;
                         this.newSchoolIdForModify = this.schoolId;
@@ -2764,4 +2726,5 @@
 
 </body>
 </html>
+
 
