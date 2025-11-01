@@ -977,7 +977,7 @@
         import { createApp } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js'
         // Firebase SDK Imports
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc, collection, query, where, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
         
         // --- Firebase Configuration ---
@@ -1006,7 +1006,6 @@
                         user: null,
                         isLoggedIn: false,
                         isLoading: true,
-                        redirectResultProcessed: false, // [수정] 리디렉션 처리 완료 플래그
 
                         // --- Role Management State ---
                         role: null,
@@ -1407,17 +1406,8 @@
                     // --- [핵심 수정] Initialization and Auth ---
                     async initApp() {
                         console.log("initApp called");
-
-                        // onAuthStateChanged 리스너를 먼저 설정합니다.
                         onAuthStateChanged(auth, async (user) => {
                             console.log("onAuthStateChanged triggered with user:", user ? user.email : null);
-
-                            // 리디렉션 처리가 완료될 때까지 초기 null user 상태를 무시합니다.
-                            if (!this.redirectResultProcessed && !user) {
-                                console.log("Initial auth state is null, but redirect is not processed yet. Waiting...");
-                                return;
-                            }
-
                             this.isLoading = true;
                             try {
                                 if (user) {
@@ -1454,7 +1444,7 @@
                                 }
                             } catch (error) {
                                 console.error("Error during auth state change processing:", error);
-                                this.resetAllLocalData(); // 에러 발생 시 안전하게 초기화
+                                this.resetAllLocalData();
                             } finally {
                                 console.log("Auth processing finished. Setting isLoading to false.");
                                 this.isLoading = false;
@@ -1463,48 +1453,18 @@
                                 });
                             }
                         });
-
-                        // 리디렉션 결과 처리를 시작하고, 완료되면 플래그를 설정합니다.
-                        try {
-                            console.log("Checking for redirect result...");
-                            const result = await getRedirectResult(auth);
-                            if (result) {
-                                console.log("Redirect result found and processed for user:", result.user.email);
-                                // onAuthStateChanged가 result.user와 함께 다시 호출되므로 여기서 별도 처리는 불필요
-                            } else {
-                                console.log("No redirect result to process.");
-                            }
-                        } catch (error) {
-                            console.error("Error processing redirect result:", error);
-                            alert("로그인 처리 중 오류가 발생했습니다: " + error.message);
-                        } finally {
-                            // getRedirectResult 처리가 성공하든 실패하든, 이제 onAuthStateChanged가
-                            // 내리는 결정을 신뢰할 수 있음을 의미합니다.
-                            this.redirectResultProcessed = true;
-                            console.log("Redirect processing is complete. Flag set to true.");
-                            
-                            // 리디렉션 결과 처리 후, 사용자가 없으면 명시적으로 로딩 상태를 해제합니다.
-                            // 이렇게 하면 onAuthStateChanged가 초기에 null user로 early return했을 경우에도
-                            // isLoading이 false로 설정되어 역할 선택 모달이 표시될 수 있습니다.
-                            const currentUser = auth.currentUser;
-                            if (!currentUser) {
-                                console.log("No user after redirect processing. Setting isLoading to false.");
-                                this.isLoading = false;
-                                this.user = null;
-                                this.isLoggedIn = false;
-                            }
-                        }
                     },
                     async login() {
-                        console.log("Login button clicked");
                         const provider = new GoogleAuthProvider();
                         try {
-                            console.log("Attempting signInWithRedirect...");
-                            await signInWithRedirect(auth, provider);
-                            console.log("signInWithRedirect completed");
+                            const result = await signInWithPopup(auth, provider);
+                            this.user = result.user;
+                            this.isLoggedIn = true;
+                            console.log("로그인 성공:", this.user.email);
+                            await this.loadUserRoleAndSchoolId();
                         } catch (error) {
-                            console.error("Login redirect failed:", error);
-                            alert(`로그인 리디렉션 실패: ${error.message}`);
+                            console.error("로그인 실패:", error);
+                            alert("Google 로그인 실패: " + error.message);
                         }
                     },
                     async logout() {
