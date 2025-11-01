@@ -278,7 +278,7 @@
 
 
             <!-- Role Selection Modal (Show if logged in but no role) -->
-            <div v-if="isLoggedIn && !role && !isLoading" class="modal-overlay">
+            <div v-if="isLoggedIn && !role && !isLoading && !showSchoolIdModal" class="modal-overlay">
                 <div class="modal-content">
                     <h3 class="text-2xl font-bold mb-6 text-center">역할 선택</h3>
                     <div class="space-y-4">
@@ -301,11 +301,11 @@
             <!-- School ID Modal (Show if role selected, but no schoolId) -->
             <div v-if="showSchoolIdModal && !isLoading" class="modal-overlay">
                 <div class="modal-content">
-                    <h3 v-if="schoolIdMode === 'create'" class="text-2xl font-bold mb-4 text-center">학교 고유 ID 생성</h3>
-                    <h3 v-else class="text-2xl font-bold mb-4 text-center">학교 고유 ID 입력</h3>
+                    <h3 class="text-2xl font-bold mb-4 text-center">학교코드 생성/입력 모달</h3>
 
                     <p v-if="schoolIdMode === 'create'" class="text-sm text-gray-600 mb-4">
-                        관리자 인증이 완료되었습니다. 이 학교에서 사용할 고유 ID를 생성하세요. 이 ID는 교사들에게 공유해야 합니다. (예: `korea_high_2025`)
+                        관리자 인증이 완료되었습니다. 이 학교에서 사용할 고유 ID를 생성하세요. 이 ID는 교사들에게 공유해야 합니다. (예: `korea_high_2025`)<br>
+                        <strong class="text-indigo-600">기존에 생성한 학교코드가 있는 경우, 해당 코드를 입력하시면 됩니다.</strong>
                     </p>
                     <p v-else class="text-sm text-gray-600 mb-4">
                         학교 관리자에게 공유받은 '학교 고유 ID'를 입력하세요.
@@ -1010,6 +1010,7 @@
 
                         // --- Role Management State ---
                         role: null,
+                        pendingRole: null, // 역할 선택 후 학교ID 입력 대기 중인 역할
                         schoolId: null,
                         showAdminCodeInput: false,
                         adminCode: '',
@@ -1481,12 +1482,14 @@
                         
                         if (selectedRole === '관리자') {
                             console.log("관리자 선택됨, 코드 입력창 표시");
+                            this.pendingRole = '관리자';
                             this.showAdminCodeInput = true;
                         } else {
                             console.log("교과교사/담임교사 선택됨:", selectedRole);
                             this.showAdminCodeInput = false;
-                            this.role = selectedRole;
+                            this.pendingRole = selectedRole;
                             // 교과교사/담임교사는 항상 학교 ID 모달 표시
+                            // role은 학교ID 입력 후에 설정됨
                             this.schoolIdMode = 'join';
                             this.showSchoolIdModal = true;
                         }
@@ -1495,19 +1498,23 @@
                         if (this.adminCode === '0822') {
                             this.adminCodeError = '';
                             this.showAdminCodeInput = false;
-                            this.role = '관리자';
+                            // role은 학교ID 처리 후에 설정됨
+                            // pendingRole은 이미 '관리자'로 설정되어 있음
                             this.isLoading = true;
-                            await this.saveUserRoleAndSchoolId('관리자');
                             if (this.schoolId) {
+                                // 학교ID가 이미 있으면 바로 역할 설정 및 데이터 로드
+                                this.role = '관리자';
+                                await this.saveUserRoleAndSchoolId('관리자');
                                 await this.loadCommonData();
                                 this.underachievers = JSON.parse(JSON.stringify(this.deployedUnderachievers));
                                 this.isLoading = false;
+                                this.$nextTick(() => { this.initFlatpickr(); });
                             } else {
+                                // 학교ID가 없으면 모달 표시
                                 this.schoolIdMode = 'create';
                                 this.showSchoolIdModal = true;
                                 this.isLoading = false;
                             }
-                            this.$nextTick(() => { this.initFlatpickr(); });
                         } else {
                             this.adminCodeError = '코드가 올바르지 않습니다.';
                         }
@@ -1520,6 +1527,12 @@
                         this.schoolIdError = '';
                         if (!id) { this.schoolIdError = "학교 고유 ID를 입력해주세요."; return; }
                         if (invalidChars.test(id)) { this.schoolIdError = "공백이나 특수문자 (/, ., *, # 등)는 사용할 수 없습니다."; return; }
+                        
+                        // pendingRole을 role로 설정
+                        if (this.pendingRole) {
+                            this.role = this.pendingRole;
+                            this.pendingRole = null;
+                        }
                         
                         this.schoolId = id;
                         this.isLoading = true;
@@ -1565,6 +1578,7 @@
                     },
                     async resetRole() {
                         this.role = null;
+                        this.pendingRole = null;
                         this.schoolId = null; // 메모리에서만 초기화 (DB에는 저장하지 않음)
                         // DB 저장은 사용자가 새 역할과 학교ID를 선택할 때만 수행
                         this.resetRoleSpecificData();
