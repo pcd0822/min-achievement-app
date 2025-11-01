@@ -1491,10 +1491,21 @@
                                         console.log("경로 3: 역할 없음, 역할 선택 모달 표시 예정");
                                     }
                                 } else {
-                                    console.log("User is null, resetting all data");
-                                    this.user = null;
-                                    this.isLoggedIn = false;
-                                    this.resetAllLocalData();
+                                    // user가 null이고 이미 로그인되어 있지 않은 경우에만 초기화
+                                    // (로그아웃 시나리오)
+                                    if (!this.isLoggedIn) {
+                                        console.log("User is null and not logged in, resetting all data");
+                                        this.user = null;
+                                        this.isLoggedIn = false;
+                                        this.resetAllLocalData();
+                                    } else {
+                                        console.log("User is null but isLoggedIn is true, keeping state");
+                                        // 이 경우는 이미 로그인된 상태인데 인증 상태가 변경된 경우
+                                        // Firebase 세션이 만료되었을 수 있으므로 로그아웃 처리
+                                        this.user = null;
+                                        this.isLoggedIn = false;
+                                        this.resetAllLocalData();
+                                    }
                                 }
                             } catch (error) {
                                 console.error("Authentication state change process failed:", error);
