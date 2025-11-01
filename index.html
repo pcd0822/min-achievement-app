@@ -1418,12 +1418,16 @@
                     async initApp() {
                         console.log("initApp called");
                         try {
+                            console.log("Calling getRedirectResult...");
                             const result = await getRedirectResult(auth);
+                            console.log("getRedirectResult returned:", result);
                             if (result) {
                                 // Google 로그인에서 성공적으로 돌아온 경우입니다.
                                 // onAuthStateChanged가 이어서 user 객체를 받아 처리합니다.
                                 console.log("Login redirect result handled.", result.user);
                                 this.authStateChangedCalled = true;
+                            } else {
+                                console.log("getRedirectResult returned null - no redirect result");
                             }
                         } catch (error) {
                             console.error("Login redirect error:", error);
