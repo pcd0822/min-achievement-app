@@ -1968,6 +1968,21 @@
                         } catch (error) { console.error("Error saving teacher plan:", error); this.teacherPlanStatus = "계획안 저장 실패: " + error.message; }
                         setTimeout(() => this.teacherPlanStatus = '', 3000);
                     },
+                    // 과목명을 안전한 문서 ID로 변환
+                    encodeSubjectName(subjectName) {
+                        if (!subjectName) return '';
+                        // URL 인코딩하여 특수문자와 한글을 안전하게 처리
+                        return encodeURIComponent(subjectName);
+                    },
+                    // 문서 ID를 과목명으로 디코딩
+                    decodeSubjectName(encodedName) {
+                        if (!encodedName) return '';
+                        try {
+                            return decodeURIComponent(encodedName);
+                        } catch (e) {
+                            return encodedName; // 디코딩 실패 시 원본 반환
+                        }
+                    },
                     async loadGuidanceData(){
                         if (!this.user || !db || !this.schoolId || this.role !== '교과교사') {
                             console.warn("loadGuidanceData: 로드 조건 불만족", {
@@ -1984,9 +1999,12 @@
                             this.teacherGuidanceData = this.getInitialGuidanceData();
                             return;
                         }
-                        const docPath = `schools/${this.schoolId}/teacherData/${this.user.uid}/${this.teacherPlan.subjectName}`;
+                        const encodedSubjectName = this.encodeSubjectName(this.teacherPlan.subjectName);
+                        // Firestore 경로는 컬렉션-문서-컬렉션-문서 형태(짝수 세그먼트)여야 함
+                        // schools/{schoolId}/teacherData/{uid}/guidance/{subjectName} 형태로 변경
+                        const docPath = `schools/${this.schoolId}/teacherData/${this.user.uid}/guidance/${encodedSubjectName}`;
                         try {
-                            console.log("loadGuidanceData: 로드 시도", { docPath });
+                            console.log("loadGuidanceData: 로드 시도", { docPath, subjectName: this.teacherPlan.subjectName, encodedSubjectName });
                             const docSnap = await getDoc(doc(db, docPath));
                             if (docSnap.exists()) {
                                 const fetchedData = docSnap.data();
@@ -2050,8 +2068,13 @@
                             console.warn("saveGuidanceData: 과목명이 없어 저장하지 않음");
                             return;
                         }
-                        const docPath = `schools/${this.schoolId}/teacherData/${this.user.uid}/${this.teacherPlan.subjectName}`;
+                        // 과목명을 안전한 문서 ID로 인코딩
+                        const encodedSubjectName = this.encodeSubjectName(this.teacherPlan.subjectName);
+                        // Firestore 경로는 컬렉션-문서-컬렉션-문서 형태(짝수 세그먼트)여야 함
+                        // schools/{schoolId}/teacherData/{uid}/guidance/{subjectName} 형태로 변경
+                        const docPath = `schools/${this.schoolId}/teacherData/${this.user.uid}/guidance/${encodedSubjectName}`;
                         try {
+                            console.log("saveGuidanceData: 저장 시도", { docPath, subjectName: this.teacherPlan.subjectName, encodedSubjectName });
                             // 현재 상태의 전체 teacherGuidanceData 저장
                             const dataToSave = JSON.parse(JSON.stringify(this.teacherGuidanceData));
                             
