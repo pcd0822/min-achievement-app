@@ -186,9 +186,10 @@
         .overflow-x-auto table tbody td[class*="left-0"] {
             left: 0 !important;
         }
+        /* 이름 열을 학번 열에 붙이기 위해 border width만큼 조정 */
         .overflow-x-auto table thead th[class*="left-[80px]"],
         .overflow-x-auto table tbody td[class*="left-[80px]"] {
-            left: 80px !important;
+            left: 79px !important;
         }
 
         /* 인쇄 전용 스타일 (안정적인 버전으로 수정) */
@@ -753,8 +754,8 @@
                                        <table class="min-w-full text-sm">
                                            <thead>
                                                <tr class="text-center">
-                                                   <th class="sticky left-0 bg-gray-100 z-20 p-2 border-y border-l border-r border-gray-300 w-[80px] align-top">학번</th>
-                                                   <th class="sticky left-[80px] bg-gray-100 z-20 p-2 border-y border-r border-gray-300 w-[96px] whitespace-nowrap align-top">이름</th>
+                                                   <th class="sticky left-0 bg-gray-100 z-20 p-2 border-y border-l border-gray-300 w-[80px] align-top">학번</th>
+                                                   <th class="sticky left-[80px] bg-gray-100 z-20 p-2 border-y border-l border-r border-gray-300 w-[96px] whitespace-nowrap align-top">이름</th>
                                                    <th v-for="(session, index) in currentGuidanceData.sessions" :key="index" class="p-2 border border-gray-300 min-w-[150px] align-top">
                                                        <div class="flex items-center justify-center space-x-2 mb-2">
                                                            <p class="font-bold">{{ index + 1 }}차시</p>
@@ -770,8 +771,8 @@
                                            </thead>
                                            <tbody>
                                                <tr v-for="student in currentGuidanceData.students" :key="student.id" class="text-center">
-                                                   <td class="sticky left-0 bg-white z-20 p-2 border-l border-r border-b border-gray-300 align-top">{{ student.id }}</td>
-                                                   <td class="sticky left-[80px] bg-white z-20 p-2 border-r border-b border-gray-300 font-semibold whitespace-nowrap align-top">{{ student.name }}</td>
+                                                   <td class="sticky left-0 bg-white z-20 p-2 border-l border-b border-gray-300 align-top">{{ student.id }}</td>
+                                                   <td class="sticky left-[80px] bg-white z-20 p-2 border-l border-r border-b border-gray-300 font-semibold whitespace-nowrap align-top">{{ student.name }}</td>
                                                    <td v-for="(session, index) in currentGuidanceData.sessions" :key="index" class="p-2 border border-gray-300 align-top">
                                                        <select class="w-full p-1 border rounded text-xs" v-model="session.attendance[student.id]" :disabled="session.isSaved" @change="saveGuidanceData">
                                                            <option value="">선택</option>
@@ -1482,6 +1483,18 @@
                     },
                     async logout() {
                         try {
+                            // 로그아웃 전 데이터 저장 (교과교사인 경우)
+                            if (this.role === '교과교사' && this.schoolId && this.user) {
+                                try {
+                                    if (this.teacherPlan.subjectName) {
+                                        await this.saveTeacherPlan();
+                                        await this.saveGuidanceData();
+                                    }
+                                } catch (saveError) {
+                                    console.error("Logout 전 데이터 저장 중 오류:", saveError);
+                                    // 저장 실패해도 로그아웃은 진행
+                                }
+                            }
                             await signOut(auth);
                         } catch (error) { console.error("Logout failed:", error); alert(`로그아웃 실패: ${error.message}`); }
                     },
@@ -1635,17 +1648,31 @@
                             const commonDataBasePath = `schools/${this.schoolId}/commonData`;
                             const [
                                 curriculumSnap, studentsSnap, emotionalSupportSnap,
-                                moduleConfigSnap, formTemplatesSnap, underachieversSnap
+                                moduleConfigSnap, formTemplatesSnap, underachieversSnap, underachieversProcessedSnap
                             ] = await Promise.all([
                                 getDoc(doc(db, commonDataBasePath, "curriculum")),
                                 getDoc(doc(db, commonDataBasePath, "students")),
                                 getDoc(doc(db, commonDataBasePath, "emotionalSupport")),
                                 getDoc(doc(db, commonDataBasePath, "moduleConfig")),
                                 getDoc(doc(db, commonDataBasePath, "formTemplates")),
-                                getDoc(doc(db, commonDataBasePath, "underachievers"))
+                                getDoc(doc(db, commonDataBasePath, "underachievers")),
+                                getDoc(doc(db, commonDataBasePath, "underachieversProcessed"))
                             ]);
 
                             this.curriculumData = curriculumSnap.exists() ? curriculumSnap.data().data || [] : [];
+                            
+                            // 업로드 상태 표시 (관리자인 경우)
+                            if (this.role === '관리자') {
+                                if (curriculumSnap.exists() && curriculumSnap.data().data && curriculumSnap.data().data.length > 0) {
+                                    this.uploadStatus.curriculum = `✓ 교육과정 편제표 업로드 완료 (${curriculumSnap.data().data.length}개 항목)`;
+                                }
+                                if (studentsSnap.exists() && studentsSnap.data().data && studentsSnap.data().data.length > 0) {
+                                    this.uploadStatus.student = `✓ 학적 정보 업로드 완료 (${studentsSnap.data().data.length}명)`;
+                                }
+                                if (emotionalSupportSnap.exists() && emotionalSupportSnap.data().data && emotionalSupportSnap.data().data.length > 0) {
+                                    this.uploadStatus.emotionalSupport = `✓ 정서지원프로그램 이수시간 업로드 완료 (${emotionalSupportSnap.data().data.length}명)`;
+                                }
+                            }
                             
                             // studentData 로딩 및 디버깅 (기존 'student' 문서와 새 'students' 문서 모두 확인)
                             let studentDataLoaded = false;
@@ -1705,8 +1732,19 @@
                             }
 
                             this.deployedUnderachievers = underachieversSnap.exists() ? underachieversSnap.data().data || [] : [];
-
-                            this.statusMessage = '공용 데이터 로딩 완료.';
+                            
+                            // 관리자인 경우, 처리된 미도달 대상자 목록 불러오기
+                            if (this.role === '관리자' && underachieversProcessedSnap.exists()) {
+                                const processedData = underachieversProcessedSnap.data().data || [];
+                                if (processedData.length > 0) {
+                                    this.underachievers = JSON.parse(JSON.stringify(processedData));
+                                    this.statusMessage = `공용 데이터 로딩 완료. (저장된 미도달 대상자 ${processedData.length}명 불러옴)`;
+                                } else {
+                                    this.statusMessage = '공용 데이터 로딩 완료.';
+                                }
+                            } else {
+                                this.statusMessage = '공용 데이터 로딩 완료.';
+                            }
                         } catch (error) {
                             console.error("Error loading common data:", error);
                             this.statusMessage = '공용 데이터 로딩 중 오류 발생.';
@@ -1751,8 +1789,12 @@
                                 if (type === 'student') this.studentData = jsonData;
                                 if (type === 'emotionalSupport') this.emotionalSupportData = jsonData;
 
-                                this.uploadStatus[type] = `${file.name} 업로드 및 저장 완료.`;
+                                this.uploadStatus[type] = `✓ ${file.name} 업로드 및 저장 완료 (${new Date().toLocaleString('ko-KR')})`;
                                 this.updateMaxHours();
+                                // 성공 알림
+                                setTimeout(() => {
+                                    alert(`${type === 'curriculum' ? '교육과정 편제표' : type === 'student' ? '학적 정보' : '정서지원프로그램 이수시간'} 파일이 성공적으로 업로드 및 저장되었습니다.`);
+                                }, 100);
                             } catch (error) {
                                 console.error(`Error processing/saving ${type} file:`, error);
                                 this.uploadStatus[type] = `${file.name} 처리/저장 중 오류 발생: ${error.message}`;
@@ -2194,6 +2236,22 @@
                                         });
                                         processedUnderachievers.sort((a,b) => a.id.localeCompare(b.id));
                                         this.underachievers = processedUnderachievers;
+                                        
+                                        // Firestore에 저장 (로그아웃 후에도 유지)
+                                        if (this.schoolId && db && this.role === '관리자') {
+                                            (async () => {
+                                                try {
+                                                    const docRef = doc(db, `schools/${this.schoolId}/commonData`, "underachieversProcessed");
+                                                    await setDoc(docRef, { data: JSON.parse(JSON.stringify(processedUnderachievers)) });
+                                                    this.fileProcessingError = '';
+                                                    alert(`성적 파일 처리 완료: ${totalFiles}개 파일에서 ${processedUnderachievers.length}명의 미도달 학생이 확인되었습니다. 데이터가 저장되었습니다.`);
+                                                } catch (saveError) {
+                                                    console.error("Error saving processed underachievers:", saveError);
+                                                    this.fileProcessingError = `처리 완료되었으나 저장 중 오류 발생: ${saveError.message}`;
+                                                }
+                                            })();
+                                        }
+                                        
                                         if (event && event.target) event.target.value = null;
                                     }
                                 }
@@ -2539,6 +2597,7 @@
                         const initialAttendance = {};
                         data.students.forEach(s => { if (s) initialAttendance[s.id] = ''; });
                         data.sessions.push({ date: '', time: '', isSaved: false, place: '', content: '', attendance: initialAttendance });
+                        this.saveGuidanceData();
                         this.$nextTick(() => { this.initFlatpickr(); });
                     },
                     isSessionReadyToSave(session) {
@@ -2813,6 +2872,22 @@
 
                 mounted() {
                     this.initApp();
+                    
+                    // 교과교사 데이터 자동 저장 (30초마다)
+                    setInterval(() => {
+                        if (this.role === '교과교사' && this.schoolId && this.user && this.teacherPlan.subjectName) {
+                            // 조용히 저장 (에러가 있어도 로그만 출력)
+                            this.saveTeacherPlan().catch(err => console.log("자동 저장 오류 (teacherPlan):", err));
+                            this.saveGuidanceData().catch(err => console.log("자동 저장 오류 (guidanceData):", err));
+                        }
+                    }, 30000); // 30초마다
+                },
+                beforeUnmount() {
+                    // 컴포넌트가 언마운트되기 전 마지막 저장
+                    if (this.role === '교과교사' && this.schoolId && this.user && this.teacherPlan.subjectName) {
+                        this.saveTeacherPlan().catch(err => console.log("마지막 저장 오류 (teacherPlan):", err));
+                        this.saveGuidanceData().catch(err => console.log("마지막 저장 오류 (guidanceData):", err));
+                    }
                 }
 
             }).mount('#app');
