@@ -1486,13 +1486,20 @@
                             // 로그아웃 전 데이터 저장 (교과교사인 경우)
                             if (this.role === '교과교사' && this.schoolId && this.user) {
                                 try {
+                                    // 계획서 저장
                                     if (this.teacherPlan.subjectName) {
                                         await this.saveTeacherPlan();
-                                        await this.saveGuidanceData();
+                                        console.log("로그아웃: 계획서 저장 완료");
                                     }
+                                    
+                                    // 출석부 및 수업일지 저장 (과목명이 없어도 저장 시도)
+                                    // teacherGuidanceData에는 과목명과 관계없이 데이터가 있을 수 있음
+                                    await this.saveGuidanceData();
+                                    console.log("로그아웃: 출석부 데이터 저장 완료");
                                 } catch (saveError) {
                                     console.error("Logout 전 데이터 저장 중 오류:", saveError);
-                                    // 저장 실패해도 로그아웃은 진행
+                                    // 저장 실패해도 로그아웃은 진행하되, 사용자에게 알림
+                                    alert(`데이터 저장 중 오류가 발생했습니다: ${saveError.message}. 로그아웃은 진행됩니다.`);
                                 }
                             }
                             await signOut(auth);
@@ -1911,27 +1918,63 @@
                         setTimeout(() => this.teacherPlanStatus = '', 3000);
                     },
                     async loadGuidanceData(){
-                        if (!this.user || !db || !this.schoolId || this.role !== '교과교사' || !this.teacherPlan.subjectName) {
+                        if (!this.user || !db || !this.schoolId || this.role !== '교과교사') {
+                            console.warn("loadGuidanceData: 로드 조건 불만족", {
+                                hasUser: !!this.user,
+                                hasDb: !!db,
+                                hasSchoolId: !!this.schoolId,
+                                role: this.role
+                            });
+                            this.teacherGuidanceData = this.getInitialGuidanceData();
+                            return;
+                        }
+                        if (!this.teacherPlan.subjectName) {
+                            console.warn("loadGuidanceData: 과목명이 없어 초기 데이터 사용");
                             this.teacherGuidanceData = this.getInitialGuidanceData();
                             return;
                         }
                         const docPath = `schools/${this.schoolId}/teacherData/${this.user.uid}/${this.teacherPlan.subjectName}`;
                         try {
+                            console.log("loadGuidanceData: 로드 시도", { docPath });
                             const docSnap = await getDoc(doc(db, docPath));
                             if (docSnap.exists()) {
                                 const fetchedData = docSnap.data();
+                                console.log("loadGuidanceData: 데이터 발견", {
+                                    hasPreventive: !!fetchedData.preventive,
+                                    hasSupplementary: !!fetchedData.supplementary,
+                                    preventiveStudents: fetchedData.preventive?.students?.length || 0,
+                                    supplementaryStudents: fetchedData.supplementary?.students?.length || 0
+                                });
                                 const defaultGuidance = this.getInitialGuidanceData();
-                                this.teacherGuidanceData.preventive = {
-                                    students: fetchedData.preventive?.students || [],
-                                    sessions: this.mergeSessions(defaultGuidance.preventive.sessions, fetchedData.preventive?.sessions),
-                                    error: fetchedData.preventive?.error || ''
-                                };
-                                this.teacherGuidanceData.supplementary = {
-                                    students: fetchedData.supplementary?.students || [],
-                                    sessions: this.mergeSessions(defaultGuidance.supplementary.sessions, fetchedData.supplementary?.sessions),
-                                    error: fetchedData.supplementary?.error || ''
-                                };
+                                
+                                // preventive 데이터 로드
+                                if (fetchedData.preventive) {
+                                    this.teacherGuidanceData.preventive = {
+                                        students: Array.isArray(fetchedData.preventive.students) ? fetchedData.preventive.students : [],
+                                        sessions: this.mergeSessions(defaultGuidance.preventive.sessions, fetchedData.preventive.sessions),
+                                        error: fetchedData.preventive.error || ''
+                                    };
+                                } else {
+                                    this.teacherGuidanceData.preventive = defaultGuidance.preventive;
+                                }
+                                
+                                // supplementary 데이터 로드
+                                if (fetchedData.supplementary) {
+                                    this.teacherGuidanceData.supplementary = {
+                                        students: Array.isArray(fetchedData.supplementary.students) ? fetchedData.supplementary.students : [],
+                                        sessions: this.mergeSessions(defaultGuidance.supplementary.sessions, fetchedData.supplementary.sessions),
+                                        error: fetchedData.supplementary.error || ''
+                                    };
+                                } else {
+                                    this.teacherGuidanceData.supplementary = defaultGuidance.supplementary;
+                                }
+                                
+                                console.log("loadGuidanceData: 로드 완료", {
+                                    preventiveStudents: this.teacherGuidanceData.preventive.students.length,
+                                    supplementaryStudents: this.teacherGuidanceData.supplementary.students.length
+                                });
                             } else {
+                                console.log("loadGuidanceData: 문서 없음, 초기 데이터 사용");
                                 this.teacherGuidanceData = this.getInitialGuidanceData();
                             }
                         } catch (error) {
@@ -1942,12 +1985,48 @@
                         }
                     },
                     async saveGuidanceData(){
-                        if (!this.user || !db || !this.schoolId || this.role !== '교과교사' || !this.teacherPlan.subjectName) return;
+                        if (!this.user || !db || !this.schoolId || this.role !== '교과교사') {
+                            console.warn("saveGuidanceData: 저장 조건 불만족", {
+                                hasUser: !!this.user,
+                                hasDb: !!db,
+                                hasSchoolId: !!this.schoolId,
+                                role: this.role
+                            });
+                            return;
+                        }
+                        // 과목명이 없으면 저장하지 않음 (과목명은 문서 경로에 필요)
+                        if (!this.teacherPlan.subjectName) {
+                            console.warn("saveGuidanceData: 과목명이 없어 저장하지 않음");
+                            return;
+                        }
                         const docPath = `schools/${this.schoolId}/teacherData/${this.user.uid}/${this.teacherPlan.subjectName}`;
                         try {
+                            // 현재 상태의 전체 teacherGuidanceData 저장
                             const dataToSave = JSON.parse(JSON.stringify(this.teacherGuidanceData));
+                            
+                            // preventive와 supplementary 데이터가 제대로 있는지 확인
+                            if (!dataToSave.preventive) {
+                                dataToSave.preventive = this.getInitialGuidanceData().preventive;
+                            }
+                            if (!dataToSave.supplementary) {
+                                dataToSave.supplementary = this.getInitialGuidanceData().supplementary;
+                            }
+                            
+                            console.log("saveGuidanceData: 저장 중", {
+                                docPath,
+                                preventiveStudents: dataToSave.preventive?.students?.length || 0,
+                                supplementaryStudents: dataToSave.supplementary?.students?.length || 0,
+                                preventiveSessions: dataToSave.preventive?.sessions?.length || 0,
+                                supplementarySessions: dataToSave.supplementary?.sessions?.length || 0
+                            });
+                            
                             await setDoc(doc(db, docPath), dataToSave);
-                        } catch (error) { console.error("Error saving guidance data:", error); }
+                            console.log("saveGuidanceData: 저장 완료");
+                        } catch (error) { 
+                            console.error("Error saving guidance data:", error);
+                            // 사용자에게 알림 (선택사항, 필요시 주석 해제)
+                            // alert(`출석부 데이터 저장 중 오류가 발생했습니다: ${error.message}`);
+                        }
                     },
                     mergeSessions(defaultSessions, loadedSessions) {
                         const validLoadedSessions = Array.isArray(loadedSessions) ? loadedSessions : [];
