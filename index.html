@@ -167,6 +167,30 @@
         .scroll-arrow.left { left: -1.25rem; }
         .scroll-arrow.right { right: -1.25rem; }
 
+        /* 출석부 테이블 정렬 개선 */
+        .overflow-x-auto table {
+            border-collapse: separate;
+            border-spacing: 0;
+            table-layout: auto;
+        }
+        .overflow-x-auto table thead th,
+        .overflow-x-auto table tbody td {
+            vertical-align: top;
+        }
+        .overflow-x-auto table thead th.sticky,
+        .overflow-x-auto table tbody td.sticky {
+            vertical-align: top;
+        }
+        /* sticky 셀의 정확한 위치 설정 */
+        .overflow-x-auto table thead th[class*="left-0"],
+        .overflow-x-auto table tbody td[class*="left-0"] {
+            left: 0 !important;
+        }
+        .overflow-x-auto table thead th[class*="left-[80px]"],
+        .overflow-x-auto table tbody td[class*="left-[80px]"] {
+            left: 80px !important;
+        }
+
         /* 인쇄 전용 스타일 (안정적인 버전으로 수정) */
         @media print {
             /* 1. 기본 인쇄 설정 */
@@ -726,12 +750,12 @@
                                <div class="relative">
                                    <button @click="scrollAttendance('left', $event)" class="scroll-arrow left">‹</button>
                                    <div class="overflow-x-auto">
-                                       <table class="min-w-full text-sm border-collapse">
+                                       <table class="min-w-full text-sm">
                                            <thead>
                                                <tr class="text-center">
-                                                   <th class="sticky left-0 bg-gray-100 z-20 p-2 border-y border-l border-r border-gray-300 w-[80px]">학번</th>
-                                                   <th class="sticky left-[80px] bg-gray-100 z-20 p-2 border-y border-r border-gray-300 w-[96px] whitespace-nowrap">이름</th>
-                                                   <th v-for="(session, index) in currentGuidanceData.sessions" :key="index" class="p-2 border border-gray-300 min-w-[150px]">
+                                                   <th class="sticky left-0 bg-gray-100 z-20 p-2 border-y border-l border-r border-gray-300 w-[80px] align-top">학번</th>
+                                                   <th class="sticky left-[80px] bg-gray-100 z-20 p-2 border-y border-r border-gray-300 w-[96px] whitespace-nowrap align-top">이름</th>
+                                                   <th v-for="(session, index) in currentGuidanceData.sessions" :key="index" class="p-2 border border-gray-300 min-w-[150px] align-top">
                                                        <div class="flex items-center justify-center space-x-2 mb-2">
                                                            <p class="font-bold">{{ index + 1 }}차시</p>
                                                            <button v-if="session.isSaved" @click="toggleSaveSession(session)" title="수정" class="p-1 hover:bg-gray-200 rounded">
@@ -746,9 +770,9 @@
                                            </thead>
                                            <tbody>
                                                <tr v-for="student in currentGuidanceData.students" :key="student.id" class="text-center">
-                                                   <td class="sticky left-0 bg-white z-20 p-2 border-l border-r border-b border-gray-300">{{ student.id }}</td>
-                                                   <td class="sticky left-[80px] bg-white z-20 p-2 border-r border-b border-gray-300 font-semibold whitespace-nowrap">{{ student.name }}</td>
-                                                   <td v-for="(session, index) in currentGuidanceData.sessions" :key="index" class="p-2 border border-gray-300">
+                                                   <td class="sticky left-0 bg-white z-20 p-2 border-l border-r border-b border-gray-300 align-top">{{ student.id }}</td>
+                                                   <td class="sticky left-[80px] bg-white z-20 p-2 border-r border-b border-gray-300 font-semibold whitespace-nowrap align-top">{{ student.name }}</td>
+                                                   <td v-for="(session, index) in currentGuidanceData.sessions" :key="index" class="p-2 border border-gray-300 align-top">
                                                        <select class="w-full p-1 border rounded text-xs" v-model="session.attendance[student.id]" :disabled="session.isSaved" @change="saveGuidanceData">
                                                            <option value="">선택</option>
                                                            <option v-for="rh in moduleConfig.recognizedHours" :key="rh.name" :value="rh.name">{{ rh.name }}</option>
