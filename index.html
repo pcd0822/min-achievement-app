@@ -2439,18 +2439,52 @@
                             });
                             if (!response.ok) {
                                 const errorBody = await response.json().catch(() => ({}));
-                                const errorMessage = errorBody.error?.message || response.statusText;
-                                throw new Error(`API 요청 실패 (${response.status}): ${errorMessage}`);
+                                console.error('API Error Response:', errorBody);
+                                const errorMessage = errorBody.error?.message || errorBody.message || response.statusText;
+                                
+                                // 구체적인 에러 메시지 제공
+                                if (response.status === 401) {
+                                    throw new Error(`API 인증 실패 (401): API 키가 유효하지 않거나 설정되지 않았을 수 있습니다.`);
+                                } else if (response.status === 404) {
+                                    throw new Error(`API 엔드포인트를 찾을 수 없습니다 (404): Netlify Functions가 배포되지 않았을 수 있습니다.`);
+                                } else if (response.status === 500) {
+                                    throw new Error(`서버 오류 (500): ${errorMessage}`);
+                                } else {
+                                    throw new Error(`API 요청 실패 (${response.status}): ${errorMessage}`);
+                                }
                             }
                             const result = await response.json();
-                            const generatedText = result.data?.choices?.[0]?.message?.content;
+                            console.log('API Raw Response:', result); // 디버깅용
+                            
+                            // 다양한 응답 구조 지원
+                            let generatedText = null;
+                            
+                            // 프록시가 반환하는 OpenAI API 직접 응답 구조 (가장 일반적): result.choices?.[0]?.message?.content
+                            if (result.choices?.[0]?.message?.content) {
+                                generatedText = result.choices[0].message.content;
+                            }
+                            // 래퍼가 있는 경우: result.data?.choices?.[0]?.message?.content
+                            else if (result.data?.choices?.[0]?.message?.content) {
+                                generatedText = result.data.choices[0].message.content;
+                            }
+                            // Netlify Functions 래퍼 구조: result.content 또는 result.message
+                            else if (result.content) {
+                                generatedText = result.content;
+                            }
+                            else if (result.message) {
+                                generatedText = result.message;
+                            }
+                            // 에러 응답 구조
+                            else if (result.error) {
+                                throw new Error(result.error.message || result.error || 'API 오류가 발생했습니다.');
+                            }
                             
                             if (generatedText) {
                                 achievement.statement = generatedText.trim().replace(/^(E수준:|최소 성취수준:)\s*/, '');
                                 this.saveTeacherPlan();
                             } else {
-                                console.log('API Raw Response:', result);
-                                throw new Error('API 응답에서 진술문을 찾을 수 없습니다.');
+                                console.error('API Response 구조:', JSON.stringify(result, null, 2));
+                                throw new Error(`API 응답에서 진술문을 찾을 수 없습니다. 응답 구조: ${JSON.stringify(result)}`);
                             }
                         } catch (error) {
                             console.error("AI 진술문 생성 오류:", error);
