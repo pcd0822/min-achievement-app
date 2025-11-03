@@ -820,7 +820,17 @@
                                    </div>
                                    <button @click="scrollAttendance('right', $event)" class="scroll-arrow right">›</button>
                                </div>
-                               <button @click="addGuidanceSession(teacherTab)" class="mt-4 px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 text-sm">+ 차시 추가</button>
+                               <div class="mt-4 flex items-center justify-between">
+                                   <button @click="addGuidanceSession(teacherTab)" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 text-sm">+ 차시 추가</button>
+                                   <div class="flex items-center space-x-2">
+                                       <button @click="saveGuidanceDataManually" class="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition font-semibold">
+                                           출석부 저장
+                                       </button>
+                                       <p v-if="guidanceDataStatus" class="text-sm font-medium" :class="guidanceDataStatus.includes('완료') ? 'text-green-600' : 'text-red-600'">
+                                           {{ guidanceDataStatus }}
+                                       </p>
+                                   </div>
+                               </div>
                            </div>
 
                            <!-- 수업일지 -->
@@ -848,6 +858,11 @@
                                        </div>
                                    </div>
                                    <p v-if="savedGuidanceSessions.length === 0" class="text-center text-gray-500">저장된 수업일지가 없습니다.</p>
+                               </div>
+                               <div class="mt-4 flex justify-end">
+                                   <button @click="saveGuidanceDataManually" class="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition font-semibold">
+                                       수업일지 저장
+                                   </button>
                                </div>
                            </div>
                        </div>
@@ -1073,6 +1088,7 @@
                         underachieversStatus: '',
                         teacherPlanStatus: '',
                         adminActionStatus: '',
+                        guidanceDataStatus: '', // 출석부/수업일지 저장 상태
 
                         // --- Admin Modify Modal State ---
                         showAdminModifyModal: false,
@@ -1524,10 +1540,13 @@
                                         console.log("로그아웃: 계획서 저장 완료");
                                     }
                                     
-                                    // 출석부 및 수업일지 저장 (과목명이 없어도 저장 시도)
-                                    // teacherGuidanceData에는 과목명과 관계없이 데이터가 있을 수 있음
-                                    await this.saveGuidanceData();
-                                    console.log("로그아웃: 출석부 데이터 저장 완료");
+                                    // 출석부 및 수업일지 저장
+                                    const saveResult = await this.saveGuidanceData();
+                                    if (saveResult && saveResult.success) {
+                                        console.log("로그아웃: 출석부 데이터 저장 완료");
+                                    } else {
+                                        console.warn("로그아웃: 출석부 데이터 저장 실패", saveResult?.message);
+                                    }
                                 } catch (saveError) {
                                     console.error("Logout 전 데이터 저장 중 오류:", saveError);
                                     // 저장 실패해도 로그아웃은 진행하되, 사용자에게 알림
@@ -2054,10 +2073,36 @@
                             
                             await setDoc(doc(db, docPath), dataToSave);
                             console.log("saveGuidanceData: 저장 완료");
+                            return { success: true, message: '출석부 및 수업일지가 저장되었습니다.' };
                         } catch (error) { 
                             console.error("Error saving guidance data:", error);
-                            // 사용자에게 알림 (선택사항, 필요시 주석 해제)
-                            // alert(`출석부 데이터 저장 중 오류가 발생했습니다: ${error.message}`);
+                            return { success: false, message: `저장 중 오류 발생: ${error.message}` };
+                        }
+                    },
+                    async saveGuidanceDataManually() {
+                        if (!this.user || !db || !this.schoolId || this.role !== '교과교사') {
+                            this.guidanceDataStatus = '저장할 수 없습니다: 권한이 없거나 로그인되지 않았습니다.';
+                            setTimeout(() => this.guidanceDataStatus = '', 5000);
+                            return;
+                        }
+                        if (!this.teacherPlan.subjectName) {
+                            this.guidanceDataStatus = '과목명을 먼저 입력해주세요.';
+                            setTimeout(() => this.guidanceDataStatus = '', 5000);
+                            return;
+                        }
+                        this.guidanceDataStatus = '저장 중...';
+                        const result = await this.saveGuidanceData();
+                        if (result) {
+                            if (result.success) {
+                                this.guidanceDataStatus = '✓ 저장 완료';
+                                setTimeout(() => this.guidanceDataStatus = '', 3000);
+                            } else {
+                                this.guidanceDataStatus = result.message;
+                                setTimeout(() => this.guidanceDataStatus = '', 5000);
+                            }
+                        } else {
+                            this.guidanceDataStatus = '저장에 실패했습니다.';
+                            setTimeout(() => this.guidanceDataStatus = '', 5000);
                         }
                     },
                     mergeSessions(defaultSessions, loadedSessions) {
@@ -3023,7 +3068,11 @@
                         if (this.role === '교과교사' && this.schoolId && this.user && this.teacherPlan.subjectName) {
                             // 조용히 저장 (에러가 있어도 로그만 출력)
                             this.saveTeacherPlan().catch(err => console.log("자동 저장 오류 (teacherPlan):", err));
-                            this.saveGuidanceData().catch(err => console.log("자동 저장 오류 (guidanceData):", err));
+                            this.saveGuidanceData().then(result => {
+                                if (result && !result.success) {
+                                    console.log("자동 저장 오류 (guidanceData):", result.message);
+                                }
+                            }).catch(err => console.log("자동 저장 오류 (guidanceData):", err));
                         }
                     }, 30000); // 30초마다
                 },
@@ -3031,7 +3080,11 @@
                     // 컴포넌트가 언마운트되기 전 마지막 저장
                     if (this.role === '교과교사' && this.schoolId && this.user && this.teacherPlan.subjectName) {
                         this.saveTeacherPlan().catch(err => console.log("마지막 저장 오류 (teacherPlan):", err));
-                        this.saveGuidanceData().catch(err => console.log("마지막 저장 오류 (guidanceData):", err));
+                        this.saveGuidanceData().then(result => {
+                            if (result && !result.success) {
+                                console.log("마지막 저장 오류 (guidanceData):", result.message);
+                            }
+                        }).catch(err => console.log("마지막 저장 오류 (guidanceData):", err));
                     }
                 }
 
