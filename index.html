@@ -2998,8 +2998,9 @@
                             // 먼저 출석부 데이터를 저장 (최신 상태 반영)
                             await this.saveGuidanceData();
                             
-                            // 이수현황 데이터를 별도 컬렉션에 저장
+                            // 이수현황 데이터를 교과교사의 teacherData 하위에 저장 (권한 문제 해결)
                             const subjectName = this.teacherPlan.subjectName;
+                            const encodedSubjectName = this.encodeSubjectName(subjectName);
                             const completionData = {};
                             
                             // 현재 이수현황 상태를 계산하여 저장
@@ -3009,25 +3010,21 @@
                                 const studentId = String(student.id);
                                 const status = this.guidanceCompletionStatus[studentId];
                                 if (status && status.completionStatus) {
-                                    if (!completionData[subjectName]) {
-                                        completionData[subjectName] = {};
-                                    }
-                                    completionData[subjectName][studentId] = status.completionStatus;
+                                    completionData[studentId] = {
+                                        completionStatus: status.completionStatus,
+                                        total: status.total || 0,
+                                        lastUpdated: new Date().toISOString()
+                                    };
                                 }
                             });
                             
-                            // 공용 데이터 컬렉션에 저장
-                            const completionDocRef = doc(db, `schools/${this.schoolId}/commonData`, 'completionStatus');
-                            const existingData = await getDoc(completionDocRef);
-                            const existingCompletionData = existingData.exists() ? existingData.data().data || {} : {};
-                            
-                            // 현재 과목의 데이터만 업데이트
-                            if (!existingCompletionData[subjectName]) {
-                                existingCompletionData[subjectName] = {};
-                            }
-                            existingCompletionData[subjectName] = { ...existingCompletionData[subjectName], ...completionData[subjectName] };
-                            
-                            await setDoc(completionDocRef, { data: existingCompletionData }, { merge: true });
+                            // 교과교사의 teacherData/completionStatus/{subjectName} 경로에 저장
+                            const completionDocRef = doc(db, `schools/${this.schoolId}/teacherData/${this.user.uid}/completionStatus`, encodedSubjectName);
+                            await setDoc(completionDocRef, { 
+                                subjectName: subjectName,
+                                data: completionData,
+                                lastUpdated: new Date().toISOString()
+                            }, { merge: true });
                             
                             alert('이수현황 데이터가 담임교사 대시보드로 전송되었습니다.');
                             console.log('이수현황 데이터 전송 완료:', completionData);
@@ -3180,28 +3177,39 @@
                         this.allTeacherCompletionData = {};
                         
                         try {
-                            // 먼저 공용 데이터에서 전송된 이수현황 데이터 확인
-                            const completionDocRef = doc(db, `schools/${this.schoolId}/commonData`, 'completionStatus');
-                            const completionSnap = await getDoc(completionDocRef);
-                            if (completionSnap.exists()) {
-                                const completionData = completionSnap.data().data || {};
-                                // 전송된 데이터를 먼저 로드
-                                Object.keys(completionData).forEach(subjectName => {
-                                    if (completionData[subjectName]) {
-                                        if (!this.allTeacherCompletionData[subjectName]) {
-                                            this.allTeacherCompletionData[subjectName] = {};
-                                        }
-                                        this.allTeacherCompletionData[subjectName] = { ...this.allTeacherCompletionData[subjectName], ...completionData[subjectName] };
-                                    }
-                                });
-                            }
-                            
-                            // 모든 교과교사의 guidance 데이터를 불러오기
+                            // 모든 교과교사의 teacherData를 불러오기
                             const teacherDataRef = collection(db, `schools/${this.schoolId}/teacherData`);
                             const teacherDataSnap = await getDocs(teacherDataRef);
                             
                             for (const teacherDoc of teacherDataSnap.docs) {
                                 const uid = teacherDoc.id;
+                                
+                                // 먼저 전송된 이수현황 데이터 확인 (completionStatus 컬렉션)
+                                try {
+                                    const completionStatusRef = collection(teacherDoc.ref, 'completionStatus');
+                                    const completionStatusSnap = await getDocs(completionStatusRef);
+                                    
+                                    completionStatusSnap.docs.forEach(completionDoc => {
+                                        const completionData = completionDoc.data();
+                                        const subjectName = completionData.subjectName || this.decodeSubjectName(completionDoc.id);
+                                        const studentData = completionData.data || {};
+                                        
+                                        if (!this.allTeacherCompletionData[subjectName]) {
+                                            this.allTeacherCompletionData[subjectName] = {};
+                                        }
+                                        
+                                        // 전송된 이수현황 데이터를 우선적으로 사용
+                                        Object.keys(studentData).forEach(studentId => {
+                                            if (studentData[studentId] && studentData[studentId].completionStatus) {
+                                                this.allTeacherCompletionData[subjectName][studentId] = studentData[studentId].completionStatus;
+                                            }
+                                        });
+                                    });
+                                } catch (e) {
+                                    console.log('completionStatus 컬렉션 읽기 실패 (무시 가능):', e);
+                                }
+                                
+                                // guidance 데이터를 불러오기
                                 const guidanceRef = collection(teacherDoc.ref, 'guidance');
                                 const guidanceSnap = await getDocs(guidanceRef);
                                 
