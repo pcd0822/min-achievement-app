@@ -3027,27 +3027,39 @@
                                 }
                             });
                             
-                            // commonData/completionStatus에 저장 (담임교사가 읽을 수 있도록)
-                            // 구조: { subjectName: { studentId: completionStatus } }
-                            const commonCompletionDocRef = doc(db, `schools/${this.schoolId}/commonData`, 'completionStatus');
-                            const existingDoc = await getDoc(commonCompletionDocRef);
-                            const existingData = existingDoc.exists() ? existingDoc.data().data || {} : {};
-                            
-                            // 현재 과목의 데이터만 업데이트
-                            if (!existingData[subjectName]) {
-                                existingData[subjectName] = {};
-                            }
-                            
-                            // 학생별 이수현황 업데이트
-                            Object.keys(completionData).forEach(studentId => {
-                                const normalizedStudentId = String(studentId);
-                                existingData[subjectName][normalizedStudentId] = completionData[studentId].completionStatus;
-                            });
-                            
-                            await setDoc(commonCompletionDocRef, { 
-                                data: existingData,
+                            // 교과교사의 teacherData/completionStatus에 저장 (자신의 데이터는 쓰기 가능)
+                            // 구조: { subjectName, data: { studentId: { completionStatus, total, lastUpdated } } }
+                            const completionDocRef = doc(db, `schools/${this.schoolId}/teacherData/${this.user.uid}/completionStatus`, encodedSubjectName);
+                            await setDoc(completionDocRef, { 
+                                subjectName: subjectName,
+                                data: completionData,
                                 lastUpdated: new Date().toISOString()
                             }, { merge: true });
+                            
+                            // commonData에도 저장 시도 (권한이 있으면, 없어도 무시)
+                            try {
+                                const commonCompletionDocRef = doc(db, `schools/${this.schoolId}/commonData`, 'completionStatus');
+                                const existingDoc = await getDoc(commonCompletionDocRef);
+                                const existingData = existingDoc.exists() ? existingDoc.data().data || {} : {};
+                                
+                                // 현재 과목의 데이터만 업데이트
+                                if (!existingData[subjectName]) {
+                                    existingData[subjectName] = {};
+                                }
+                                
+                                // 학생별 이수현황 업데이트
+                                Object.keys(completionData).forEach(studentId => {
+                                    const normalizedStudentId = String(studentId);
+                                    existingData[subjectName][normalizedStudentId] = completionData[studentId].completionStatus;
+                                });
+                                
+                                await setDoc(commonCompletionDocRef, { 
+                                    data: existingData,
+                                    lastUpdated: new Date().toISOString()
+                                }, { merge: true });
+                            } catch (commonDataError) {
+                                console.log('commonData 저장 실패 (권한 없음 가능, 무시):', commonDataError);
+                            }
                             
                             alert('이수현황 데이터가 담임교사 대시보드로 전송되었습니다.');
                             console.log('이수현황 데이터 전송 완료:', {
@@ -3206,7 +3218,7 @@
                         this.allTeacherCompletionData = {};
                         
                         try {
-                            // 먼저 commonData/completionStatus에서 전송된 데이터 확인
+                            // 먼저 commonData/completionStatus에서 전송된 데이터 확인 (권한이 있으면)
                             try {
                                 const commonCompletionDocRef = doc(db, `schools/${this.schoolId}/commonData`, 'completionStatus');
                                 const commonCompletionSnap = await getDoc(commonCompletionDocRef);
@@ -3239,6 +3251,40 @@
                                 
                                 for (const teacherDoc of teacherDataSnap.docs) {
                                     const uid = teacherDoc.id;
+                                    
+                                    // 먼저 전송된 이수현황 데이터 확인 (completionStatus 컬렉션)
+                                    try {
+                                        const completionStatusRef = collection(teacherDoc.ref, 'completionStatus');
+                                        const completionStatusSnap = await getDocs(completionStatusRef);
+                                        
+                                        completionStatusSnap.docs.forEach(completionDoc => {
+                                            const completionDocData = completionDoc.data();
+                                            const docSubjectName = completionDocData.subjectName || this.decodeSubjectName(completionDoc.id);
+                                            const studentData = completionDocData.data || {};
+                                            
+                                            if (!this.allTeacherCompletionData[docSubjectName]) {
+                                                this.allTeacherCompletionData[docSubjectName] = {};
+                                            }
+                                            
+                                            // 전송된 이수현황 데이터를 우선적으로 사용
+                                            Object.keys(studentData).forEach(studentId => {
+                                                const normalizedStudentId = String(studentId);
+                                                const completionInfo = studentData[studentId];
+                                                if (completionInfo) {
+                                                    // completionStatus가 객체인 경우와 문자열인 경우 모두 처리
+                                                    const completionStatus = typeof completionInfo === 'string' 
+                                                        ? completionInfo 
+                                                        : (completionInfo.completionStatus || completionInfo);
+                                                    if (completionStatus === '이수' || completionStatus === '미이수') {
+                                                        this.allTeacherCompletionData[docSubjectName][normalizedStudentId] = completionStatus;
+                                                        console.log(`전송된 데이터 로드 (teacherData): ${docSubjectName} - ${normalizedStudentId} - ${completionStatus}`);
+                                                    }
+                                                }
+                                            });
+                                        });
+                                    } catch (e) {
+                                        console.log(`교과교사 ${uid}의 completionStatus 컬렉션 읽기 실패 (권한 없음 가능):`, e);
+                                    }
                                     
                                     // guidance 데이터를 불러오기
                                     const guidanceRef = collection(teacherDoc.ref, 'guidance');
