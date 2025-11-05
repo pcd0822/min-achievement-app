@@ -94,6 +94,7 @@
             min-height: 40px;
             height: auto;
             line-height: 1.5;
+            box-sizing: border-box;
         }
           #print-area th {
               background-color: #f2f2f2;
@@ -101,6 +102,15 @@
               min-height: 45px;
               vertical-align: middle;
           }
+        /* 모든 행의 높이를 균일하게 설정 */
+        #print-area tbody tr {
+            height: auto;
+            min-height: 40px;
+        }
+        #print-area tbody td {
+            height: auto;
+            min-height: 40px;
+        }
          /* 테이블 내 텍스트 왼쪽 정렬용 */
          #print-area .text-left {
              text-align: left;
@@ -1836,6 +1846,11 @@
                             } else {
                                 this.statusMessage = '공용 데이터 로딩 완료.';
                             }
+                            
+                            // 담임교사인 경우 이수 현황 데이터도 미리 로드
+                            if (this.role === '담임교사') {
+                                await this.loadAllTeacherCompletionData();
+                            }
                         } catch (error) {
                             console.error("Error loading common data:", error);
                             this.statusMessage = '공용 데이터 로딩 중 오류 발생.';
@@ -2107,7 +2122,13 @@
                         // schools/{schoolId}/teacherData/{uid}/guidance/{subjectName} 형태로 변경
                         const docPath = `schools/${this.schoolId}/teacherData/${this.user.uid}/guidance/${encodedSubjectName}`;
                         try {
-                            console.log("saveGuidanceData: 저장 시도", { docPath, subjectName: this.teacherPlan.subjectName, encodedSubjectName });
+                            console.log("saveGuidanceData: 저장 시도", { 
+                                docPath, 
+                                subjectName: this.teacherPlan.subjectName, 
+                                encodedSubjectName,
+                                supplementaryStudentsCount: this.teacherGuidanceData.supplementary?.students?.length || 0,
+                                supplementarySessionsCount: this.teacherGuidanceData.supplementary?.sessions?.length || 0
+                            });
                             // 현재 상태의 전체 teacherGuidanceData 저장
                             const dataToSave = JSON.parse(JSON.stringify(this.teacherGuidanceData));
                             
@@ -2119,6 +2140,8 @@
                                 dataToSave.supplementary = this.getInitialGuidanceData().supplementary;
                             }
                             
+                            // 저장할 데이터에 isSaved 플래그가 있는지 확인하고 로그
+                            const savedSessionsCount = dataToSave.supplementary?.sessions?.filter(s => s?.isSaved).length || 0;
                             console.log("saveGuidanceData: 저장 중", {
                                 docPath,
                                 preventiveStudents: dataToSave.preventive?.students?.length || 0,
@@ -2753,12 +2776,15 @@
                         const createTable = (headers, rows) => {
                             const ths = headers.map(h => `<th style="min-height: 45px; height: auto; vertical-align: middle;">${h}</th>`).join('');
                             const trs = rows.map(row => { 
+                                // 각 행의 최대 높이를 계산하기 위해 모든 셀의 내용을 확인
                                 const tds = row.map((cell, i) => {
                                     const isTextCell = headers[i] === '성취기준' || headers[i] === '지도 계획' || headers[i] === '내용';
-                                    const cellStyle = `min-height: 40px; height: auto; vertical-align: top; ${isTextCell ? 'text-align: left;' : ''}`;
+                                    // 모든 셀에 동일한 최소 높이와 스타일 적용
+                                    const cellStyle = `min-height: 40px; height: auto; vertical-align: top; ${isTextCell ? 'text-align: left;' : 'text-align: center;'}`;
                                     return `<td class="${isTextCell ? 'text-left' : ''}" style="${cellStyle}">${cell}</td>`;
                                 }).join(''); 
-                                return `<tr style="height: auto;">${tds}</tr>`;
+                                // 행에 명시적으로 높이 자동 설정
+                                return `<tr style="height: auto; min-height: 40px;">${tds}</tr>`;
                             }).join('');
                             return `<table style="table-layout: auto; width: 100%; border-collapse: collapse;"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table>`;
                         };
@@ -3219,7 +3245,10 @@
                                 }
                             }
                             
-                            console.log('담임교사 대시보드: 모든 교과교사 이수 현황 데이터 로드 완료', this.allTeacherCompletionData);
+                            console.log('담임교사 대시보드: 모든 교과교사 이수 현황 데이터 로드 완료', {
+                                subjectsCount: Object.keys(this.allTeacherCompletionData).length,
+                                data: this.allTeacherCompletionData
+                            });
                         } catch (error) {
                             console.error('교과교사 이수 현황 데이터 불러오기 오류:', error);
                         }
