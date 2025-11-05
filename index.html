@@ -2116,19 +2116,25 @@
                         }
                     },
                     async saveGuidanceData(){
-                        if (!this.user || !db || !this.schoolId || this.role !== '교과교사') {
+                        if (!this.user || !db || !this.schoolId) {
                             console.warn("saveGuidanceData: 저장 조건 불만족", {
                                 hasUser: !!this.user,
                                 hasDb: !!db,
                                 hasSchoolId: !!this.schoolId,
                                 role: this.role
                             });
-                            return;
+                            return { success: false, message: '저장 조건을 만족하지 않습니다.' };
+                        }
+                        
+                        // 역할 검증 (교과교사만 저장 가능)
+                        if (this.role !== '교과교사') {
+                            console.warn("saveGuidanceData: 역할 불일치", { role: this.role });
+                            return { success: false, message: '교과교사만 저장할 수 있습니다.' };
                         }
                         // 과목명이 없으면 저장하지 않음 (과목명은 문서 경로에 필요)
                         if (!this.teacherPlan.subjectName) {
                             console.warn("saveGuidanceData: 과목명이 없어 저장하지 않음");
-                            return;
+                            return { success: false, message: '과목명을 입력해주세요.' };
                         }
                         // 과목명을 안전한 문서 ID로 인코딩
                         const encodedSubjectName = this.encodeSubjectName(this.teacherPlan.subjectName);
@@ -2169,7 +2175,18 @@
                             return { success: true, message: '출석부 및 수업일지가 저장되었습니다.' };
                         } catch (error) { 
                             console.error("Error saving guidance data:", error);
-                            return { success: false, message: `저장 중 오류 발생: ${error.message}` };
+                            console.error("저장 오류 상세:", {
+                                code: error.code,
+                                message: error.message,
+                                stack: error.stack,
+                                docPath: docPath,
+                                user: this.user,
+                                role: this.role,
+                                schoolId: this.schoolId,
+                                subjectName: this.teacherPlan.subjectName,
+                                encodedSubjectName: encodedSubjectName
+                            });
+                            return { success: false, message: `저장 중 오류 발생: ${error.message || error.code || '알 수 없는 오류'}` };
                         }
                     },
                     async saveGuidanceDataManually(type = 'attendance') {
@@ -3029,37 +3046,14 @@
                             
                             // 교과교사의 teacherData/completionStatus에 저장 (자신의 데이터는 쓰기 가능)
                             // 구조: { subjectName, data: { studentId: { completionStatus, total, lastUpdated } } }
+                            // 담임교사는 Firestore 규칙을 통해 이 데이터를 읽을 수 있음
                             const completionDocRef = doc(db, `schools/${this.schoolId}/teacherData/${this.user.uid}/completionStatus`, encodedSubjectName);
                             await setDoc(completionDocRef, { 
                                 subjectName: subjectName,
                                 data: completionData,
-                                lastUpdated: new Date().toISOString()
+                                lastUpdated: new Date().toISOString(),
+                                sentToHomeroom: true // 담임교사 대시보드로 전송됨을 표시
                             }, { merge: true });
-                            
-                            // commonData에도 저장 시도 (권한이 있으면, 없어도 무시)
-                            try {
-                                const commonCompletionDocRef = doc(db, `schools/${this.schoolId}/commonData`, 'completionStatus');
-                                const existingDoc = await getDoc(commonCompletionDocRef);
-                                const existingData = existingDoc.exists() ? existingDoc.data().data || {} : {};
-                                
-                                // 현재 과목의 데이터만 업데이트
-                                if (!existingData[subjectName]) {
-                                    existingData[subjectName] = {};
-                                }
-                                
-                                // 학생별 이수현황 업데이트
-                                Object.keys(completionData).forEach(studentId => {
-                                    const normalizedStudentId = String(studentId);
-                                    existingData[subjectName][normalizedStudentId] = completionData[studentId].completionStatus;
-                                });
-                                
-                                await setDoc(commonCompletionDocRef, { 
-                                    data: existingData,
-                                    lastUpdated: new Date().toISOString()
-                                }, { merge: true });
-                            } catch (commonDataError) {
-                                console.log('commonData 저장 실패 (권한 없음 가능, 무시):', commonDataError);
-                            }
                             
                             alert('이수현황 데이터가 담임교사 대시보드로 전송되었습니다.');
                             console.log('이수현황 데이터 전송 완료:', {
@@ -3071,7 +3065,15 @@
                             });
                         } catch (error) {
                             console.error('이수현황 데이터 전송 오류:', error);
-                            alert(`이수현황 데이터 전송 중 오류가 발생했습니다: ${error.message}`);
+                            console.error('오류 상세:', {
+                                code: error.code,
+                                message: error.message,
+                                stack: error.stack,
+                                path: `schools/${this.schoolId}/teacherData/${this.user.uid}/completionStatus/${encodedSubjectName}`,
+                                user: this.user,
+                                role: this.role
+                            });
+                            alert(`이수현황 데이터 전송 중 오류가 발생했습니다: ${error.message || error.code || '알 수 없는 오류'}`);
                         }
                     },
                     async generateAttendancePdf(type) {
