@@ -621,7 +621,10 @@
                                    </div>
                                    <div>
                                        <label class="block text-sm font-medium text-gray-700">예방지도 운영 기간</label>
-                                       <input type="text" class="flatpickr-range mt-1 block w-full p-2 border rounded-md" data-plan-type="prevention" :value="teacherPlan.preventionPeriod | formatRangeDate">
+                                       <input type="text" class="flatpickr-range mt-1 block w-full p-2 border rounded-md" data-plan-type="prevention" :value="formatDateRange(teacherPlan.preventionPeriod)" @input="updatePeriodFromInput('prevention', $event)">
+                                       <p v-if="teacherPlan.preventionPeriod && teacherPlan.preventionPeriod.length >= 2" class="mt-1 text-sm text-gray-600">
+                                           {{ formatDateRange(teacherPlan.preventionPeriod) }}
+                                       </p>
                                    </div>
                                    <div>
                                        <label class="block text-sm font-medium text-gray-700">차시별 지도 계획</label>
@@ -648,7 +651,10 @@
                                </div>
                                <div>
                                    <label class="block text-sm font-medium text-gray-700">보충지도 운영 기간</label>
-                                   <input type="text" class="flatpickr-range mt-1 block w-full p-2 border rounded-md" data-plan-type="supplementary" :value="teacherPlan.supplementaryPeriod | formatRangeDate">
+                                   <input type="text" class="flatpickr-range mt-1 block w-full p-2 border rounded-md" data-plan-type="supplementary" :value="formatDateRange(teacherPlan.supplementaryPeriod)" @input="updatePeriodFromInput('supplementary', $event)">
+                                   <p v-if="teacherPlan.supplementaryPeriod && teacherPlan.supplementaryPeriod.length >= 2" class="mt-1 text-sm text-gray-600">
+                                       {{ formatDateRange(teacherPlan.supplementaryPeriod) }}
+                                   </p>
                                </div>
                                <div>
                                    <label class="block text-sm font-medium text-gray-700">차시별 지도 계획 (최대 {{ teacherPlan.maxSupplementaryHours }}차시)</label>
@@ -674,7 +680,10 @@
                                </div>
                                <div>
                                    <label class="block text-sm font-medium text-gray-700">추가학습 운영 기간</label>
-                                   <input type="text" class="flatpickr-range mt-1 block w-full p-2 border rounded-md" data-plan-type="additional" :value="teacherPlan.additionalPeriod | formatRangeDate">
+                                   <input type="text" class="flatpickr-range mt-1 block w-full p-2 border rounded-md" data-plan-type="additional" :value="formatDateRange(teacherPlan.additionalPeriod)" @input="updatePeriodFromInput('additional', $event)">
+                                   <p v-if="teacherPlan.additionalPeriod && teacherPlan.additionalPeriod.length >= 2" class="mt-1 text-sm text-gray-600">
+                                       {{ formatDateRange(teacherPlan.additionalPeriod) }}
+                                   </p>
                                </div>
                                <div>
                                    <label class="block text-sm font-medium text-gray-700">차시별 지도 계획 (최대 {{ teacherPlan.maxAdditionalHours }}차시)</label>
@@ -823,7 +832,7 @@
                                <div class="mt-4 flex items-center justify-between">
                                    <button @click="addGuidanceSession(teacherTab)" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 text-sm">+ 차시 추가</button>
                                    <div class="flex items-center space-x-2">
-                                       <button @click="saveGuidanceDataManually" class="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition font-semibold">
+                                       <button @click="saveGuidanceDataManually('attendance')" class="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition font-semibold">
                                            출석부 저장
                                        </button>
                                        <p v-if="guidanceDataStatus" class="text-sm font-medium" :class="guidanceDataStatus.includes('완료') ? 'text-green-600' : 'text-red-600'">
@@ -859,10 +868,13 @@
                                    </div>
                                    <p v-if="savedGuidanceSessions.length === 0" class="text-center text-gray-500">저장된 수업일지가 없습니다.</p>
                                </div>
-                               <div class="mt-4 flex justify-end">
-                                   <button @click="saveGuidanceDataManually" class="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition font-semibold">
+                               <div class="mt-4 flex items-center justify-end space-x-2">
+                                   <button @click="saveGuidanceDataManually('lessonLog')" class="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition font-semibold">
                                        수업일지 저장
                                    </button>
+                                   <p v-if="lessonLogDataStatus" class="text-sm font-medium" :class="lessonLogDataStatus.includes('완료') ? 'text-green-600' : 'text-red-600'">
+                                       {{ lessonLogDataStatus }}
+                                   </p>
                                </div>
                            </div>
                        </div>
@@ -1039,7 +1051,7 @@
         // Firebase SDK Imports
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc, collection, query, where, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, query, where, getDocs, writeBatch, collectionGroup } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
         
         // --- Firebase Configuration ---
         const firebaseConfig = {
@@ -1088,7 +1100,9 @@
                         underachieversStatus: '',
                         teacherPlanStatus: '',
                         adminActionStatus: '',
-                        guidanceDataStatus: '', // 출석부/수업일지 저장 상태
+                        guidanceDataStatus: '', // 출석부 저장 상태
+                        lessonLogDataStatus: '', // 수업일지 저장 상태
+                        allTeacherCompletionData: {}, // 담임교사 대시보드용: 모든 교과교사의 이수 현황 데이터 {subjectName: {studentId: completionStatus}}
 
                         // --- Admin Modify Modal State ---
                         showAdminModifyModal: false,
@@ -1416,7 +1430,17 @@
                                 if (reasons.grade && reasons.attendance) reason = '학업성취율&과목출석률';
                                 else if (reasons.grade) reason = '학업성취율';
                                 else if (reasons.attendance) reason = '과목출석률';
-                                const completion = { status: '확인필요', color: 'text-gray-500'};
+                                
+                                // 해당 과목의 이수 현황 확인
+                                let completion = { status: '확인필요', color: 'text-gray-500'};
+                                if (this.allTeacherCompletionData[name] && this.allTeacherCompletionData[name][student.id]) {
+                                    const completionStatus = this.allTeacherCompletionData[name][student.id];
+                                    if (completionStatus === '이수') {
+                                        completion = { status: '이수확인', color: 'text-green-600'};
+                                    } else if (completionStatus === '미이수') {
+                                        completion = { status: '미이수', color: 'text-red-600'};
+                                    }
+                                }
                                 return { subject: name, reason: reason, status: completion.status, statusColor: completion.color };
                             });
 
@@ -2102,30 +2126,33 @@
                             return { success: false, message: `저장 중 오류 발생: ${error.message}` };
                         }
                     },
-                    async saveGuidanceDataManually() {
+                    async saveGuidanceDataManually(type = 'attendance') {
+                        // type: 'attendance' 또는 'lessonLog'
+                        const statusVar = type === 'lessonLog' ? 'lessonLogDataStatus' : 'guidanceDataStatus';
+                        
                         if (!this.user || !db || !this.schoolId || this.role !== '교과교사') {
-                            this.guidanceDataStatus = '저장할 수 없습니다: 권한이 없거나 로그인되지 않았습니다.';
-                            setTimeout(() => this.guidanceDataStatus = '', 5000);
+                            this[statusVar] = '저장할 수 없습니다: 권한이 없거나 로그인되지 않았습니다.';
+                            setTimeout(() => this[statusVar] = '', 5000);
                             return;
                         }
                         if (!this.teacherPlan.subjectName) {
-                            this.guidanceDataStatus = '과목명을 먼저 입력해주세요.';
-                            setTimeout(() => this.guidanceDataStatus = '', 5000);
+                            this[statusVar] = '과목명을 먼저 입력해주세요.';
+                            setTimeout(() => this[statusVar] = '', 5000);
                             return;
                         }
-                        this.guidanceDataStatus = '저장 중...';
+                        this[statusVar] = '저장 중...';
                         const result = await this.saveGuidanceData();
                         if (result) {
                             if (result.success) {
-                                this.guidanceDataStatus = '✓ 저장 완료';
-                                setTimeout(() => this.guidanceDataStatus = '', 3000);
+                                this[statusVar] = '✓ 저장 완료';
+                                setTimeout(() => this[statusVar] = '', 3000);
                             } else {
-                                this.guidanceDataStatus = result.message;
-                                setTimeout(() => this.guidanceDataStatus = '', 5000);
+                                this[statusVar] = result.message;
+                                setTimeout(() => this[statusVar] = '', 5000);
                             }
                         } else {
-                            this.guidanceDataStatus = '저장에 실패했습니다.';
-                            setTimeout(() => this.guidanceDataStatus = '', 5000);
+                            this[statusVar] = '저장에 실패했습니다.';
+                            setTimeout(() => this[statusVar] = '', 5000);
                         }
                     },
                     mergeSessions(defaultSessions, loadedSessions) {
@@ -2164,6 +2191,23 @@
                     },
 
                     // --- Helper and UI Methods ---
+                    formatDateRange(period) {
+                        if (!period || !Array.isArray(period) || period.length === 0) return '';
+                        const validDates = period.filter(d => d instanceof Date || (d && typeof d === 'object' && d.seconds));
+                        if (validDates.length === 0) return '';
+                        const dates = validDates.map(d => {
+                            if (d instanceof Date) return d;
+                            if (d.seconds) return new Date(d.seconds * 1000);
+                            return null;
+                        }).filter(d => d && !isNaN(d.getTime()));
+                        if (dates.length === 0) return '';
+                        if (dates.length === 1) return dates[0].toLocaleDateString('ko-KR');
+                        return `${dates[0].toLocaleDateString('ko-KR')} ~ ${dates[1].toLocaleDateString('ko-KR')}`;
+                    },
+                    updatePeriodFromInput(type, event) {
+                        // flatpickr의 onChange가 이미 처리하므로 여기서는 Vue 반응성만 보장
+                        this.$forceUpdate();
+                    },
                     initFlatpickr() {
                         this.$nextTick(() => {
                             document.querySelectorAll('.flatpickr-input').forEach(el => {
@@ -2181,12 +2225,20 @@
                                     if (plan.hasOwnProperty(targetPeriod)) {
                                         if (Array.isArray(selectedDates) && selectedDates.every(d => d instanceof Date)) {
                                             plan[targetPeriod] = selectedDates;
+                                            // Vue 반응성을 위해 강제 업데이트
+                                            this.$nextTick(() => {
+                                                this.$forceUpdate();
+                                            });
                                         } else {
                                             plan[targetPeriod] = [];
+                                            this.$nextTick(() => {
+                                                this.$forceUpdate();
+                                            });
                                         }
                                         this.saveTeacherPlan();
                                     }
-                                }
+                                },
+                                defaultDate: null // 초기값 설정
                             });
                             flatpickr(".flatpickr-single", {
                                 dateFormat: "Y-m-d", locale: "ko",
@@ -3009,6 +3061,9 @@
                         const allStudents = this.deployedUnderachievers;
                         if (!allStudents || allStudents.length === 0) { this.homeroomMessage = '관리자가 배포한 학생 데이터가 없습니다.'; return; }
 
+                        // 모든 교과교사의 이수 현황 데이터 불러오기
+                        await this.loadAllTeacherCompletionData();
+
                         const filtered = allStudents.filter(s => s && s.id && s.id.startsWith(classInput));
                         
                         if(filtered.length > 0){
@@ -3016,6 +3071,115 @@
                             this.homeroomMessage = `${classInput}반 미도달 학생 ${filtered.length}명을 조회했습니다.`;
                         } else {
                             this.homeroomMessage = `해당 학급에 미도달 학생이 없습니다.`;
+                        }
+                    },
+                    async loadAllTeacherCompletionData() {
+                        // 모든 교과교사의 이수 현황 데이터를 불러와서 allTeacherCompletionData에 저장
+                        if (!this.schoolId || !db) return;
+                        this.allTeacherCompletionData = {};
+                        
+                        try {
+                            // 모든 교과교사의 guidance 데이터를 불러오기
+                            const teacherDataRef = collection(db, `schools/${this.schoolId}/teacherData`);
+                            const teacherDataSnap = await getDocs(teacherDataRef);
+                            
+                            for (const teacherDoc of teacherDataSnap.docs) {
+                                const uid = teacherDoc.id;
+                                const guidanceRef = collection(teacherDoc.ref, 'guidance');
+                                const guidanceSnap = await getDocs(guidanceRef);
+                                
+                                for (const guidanceDoc of guidanceSnap.docs) {
+                                    const guidanceData = guidanceDoc.data();
+                                    const subjectName = this.decodeSubjectName(guidanceDoc.id);
+                                    
+                                    if (!guidanceData || !guidanceData.supplementary || !guidanceData.supplementary.students) continue;
+                                    
+                                    // 이수 현황 계산 (guidanceCompletionStatus 로직과 유사)
+                                    const students = guidanceData.supplementary.students || [];
+                                    const sessions = guidanceData.supplementary.sessions || [];
+                                    const preventiveSessions = guidanceData.preventive?.sessions || [];
+                                    
+                                    // 예방지도 시간 계산
+                                    const preventiveTotals = {};
+                                    preventiveSessions.forEach(session => {
+                                        if (session && session.isSaved && session.attendance) {
+                                            for (const studentId in session.attendance) {
+                                                const methodName = session.attendance[studentId];
+                                                if (methodName) {
+                                                    const methodConfig = this.moduleConfig.recognizedHours.find(m => m.name === methodName);
+                                                    if (methodConfig) {
+                                                        if (!preventiveTotals[studentId]) preventiveTotals[studentId] = 0;
+                                                        preventiveTotals[studentId] += methodConfig.hours;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    });
+                                    
+                                    // 보충지도 시간 및 이수 현황 계산
+                                    const subjectInfo = this.curriculumData.find(s => s.과목명 === subjectName);
+                                    if (!subjectInfo) continue;
+                                    
+                                    const requiredSubjectCredits = Number(subjectInfo.학점) || 0;
+                                    const supplementaryHours = requiredSubjectCredits * this.moduleConfig.hoursPerCredit;
+                                    const requiredHoursForCompletion = Math.ceil((supplementaryHours * 2) / 3 * 10) / 10;
+                                    const maxEmotionalSupportHours = supplementaryHours * (this.moduleConfig.emotionalSupportRatio / 100);
+                                    
+                                    students.forEach(student => {
+                                        if (!student || !student.id) return;
+                                        
+                                        if (!this.allTeacherCompletionData[subjectName]) {
+                                            this.allTeacherCompletionData[subjectName] = {};
+                                        }
+                                        
+                                        let studentTotal = 0;
+                                        
+                                        // 보충지도 시간 계산
+                                        sessions.forEach(session => {
+                                            if (session && session.isSaved && session.attendance && session.attendance[student.id]) {
+                                                const methodName = session.attendance[student.id];
+                                                const methodConfig = this.moduleConfig.recognizedHours.find(m => m.name === methodName);
+                                                if (methodConfig) {
+                                                    studentTotal += methodConfig.hours;
+                                                }
+                                            }
+                                        });
+                                        
+                                        // 예방지도 시간 추가
+                                        const totalPreventiveHours = preventiveTotals[student.id] || 0;
+                                        if (totalPreventiveHours > 0) {
+                                            const studentInfo = this.studentData.find(s => String(s['학번']) === student.id);
+                                            const isSpecialSupport = studentInfo && studentInfo['특기사항'] === '학습지원대상';
+                                            let maxAllowedHours = 0;
+                                            let creditedPreventiveHours = 0;
+                                            if (isSpecialSupport) {
+                                                maxAllowedHours = supplementaryHours * (this.moduleConfig.specialPreventiveRatio / 100);
+                                                creditedPreventiveHours = Math.min(totalPreventiveHours, maxAllowedHours);
+                                            } else {
+                                                maxAllowedHours = supplementaryHours * (this.moduleConfig.preventiveRatio / 100);
+                                                creditedPreventiveHours = Math.floor(Math.min(totalPreventiveHours, maxAllowedHours));
+                                            }
+                                            studentTotal += creditedPreventiveHours;
+                                        }
+                                        
+                                        // 정서지원 시간 추가
+                                        const emotionalData = this.emotionalSupportData.find(e => String(e['학번']) === student.id);
+                                        const uploadedHours = emotionalData ? Number(emotionalData['정서지원프로그램 참여시간']) : 0;
+                                        const creditedEmotionalHours = Math.min(uploadedHours, maxEmotionalSupportHours);
+                                        studentTotal += creditedEmotionalHours;
+                                        
+                                        // 이수 여부 판단
+                                        const tolerance = 0.001;
+                                        if (requiredHoursForCompletion > 0 && studentTotal >= requiredHoursForCompletion - tolerance) {
+                                            this.allTeacherCompletionData[subjectName][student.id] = '이수';
+                                        } else {
+                                            this.allTeacherCompletionData[subjectName][student.id] = '미이수';
+                                        }
+                                    });
+                                }
+                            }
+                        } catch (error) {
+                            console.error('교과교사 이수 현황 데이터 불러오기 오류:', error);
                         }
                     },
                     
