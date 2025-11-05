@@ -737,7 +737,12 @@
 
                            <!-- 이수현황표 -->
                            <div class="bg-white p-6 rounded-lg shadow-md">
-                               <h4 class="text-lg font-semibold mb-4">{{ teacherTab === 'preventive' ? '예방지도' : '보충지도(추가학습)' }} 이수현황표</h4>
+                               <div class="flex justify-between items-center mb-4">
+                                   <h4 class="text-lg font-semibold">{{ teacherTab === 'preventive' ? '예방지도' : '보충지도(추가학습)' }} 이수현황표</h4>
+                                   <button v-if="teacherTab === 'supplementary'" @click="sendCompletionStatusToHomeroom" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition text-sm font-semibold">
+                                       담임교사 대시보드로 전송
+                                   </button>
+                               </div>
                                <div class="overflow-x-auto">
                                    <table class="min-w-full text-sm text-center">
                                        <thead class="bg-gray-50">
@@ -2801,14 +2806,19 @@
                             [[subjectInfo.학년, subjectInfo.학기, `${supplementaryHours}시수`, `${requiredHours}시수 (2/3 반올림)`, `${preventionPossibleHours}시수 (일반)`, `${emotionalSupportHours}시수`]]
                         );
                         
-                        const statementsTable = createTable(['성취기준', '최소 성취수준 진술문'], plan.achievements.map(a => [`<div class="whitespace-pre-wrap text-left">${a.text || ''}</div>`, `<div class="whitespace-pre-wrap text-left">${a.statement || '미생성'}</div>`]));
+                        const statementsTable = createTable(['성취기준', '최소 성취수준 진술문'], plan.achievements.map(a => {
+                            const textCell = a.text ? `<div class="whitespace-pre-wrap text-left" style="max-height: 200px; overflow-y: auto;">${a.text}</div>` : '';
+                            const statementCell = a.statement ? `<div class="whitespace-pre-wrap text-left" style="max-height: 200px; overflow-y: auto;">${a.statement}</div>` : '미생성';
+                            return [textCell, statementCell];
+                        }));
                         
                         let preventionPlanHtml = '';
                         if (plan.conductPrevention === 'O') {
                             const pPeriod = (plan.preventionPeriod || []).filter(d => d instanceof Date).map(d => d.toLocaleDateString('ko-KR'));
                             const pPeriodFmt = pPeriod.length === 2 ? `${pPeriod[0]} ~ ${pPeriod[1]}` : (pPeriod.length === 1 ? pPeriod[0] : '미정');
-                            const pSessions = plan.preventionSessions.map((s, i) => [`${i + 1}차시`, `<div class="whitespace-pre-wrap text-left">${s.plan || ''}</div>`]);
-                            preventionPlanHtml = `<h3>4. 최소 성취수준 미도달 예방 지도 계획</h3>${createTable(['구분', '내용'], [['대상학생 선정 기준', `<div class="whitespace-pre-wrap text-left">${plan.preventionTarget || ''}</div>`], ['지도 방법', (plan.preventionMethods || []).join(', ')], ['운영 차시', `${(plan.preventionSessions || []).length}차시`], ['운영 기간', pPeriodFmt]])}<h4>차시별 지도 계획</h4>${createTable(['차시', '지도 계획'], pSessions)}`;
+                            const preventionTargetCell = plan.preventionTarget ? `<div class="whitespace-pre-wrap text-left" style="max-height: 150px; overflow-y: auto;">${plan.preventionTarget}</div>` : '';
+                            const pSessions = plan.preventionSessions.map((s, i) => [`${i + 1}차시`, `<div class="whitespace-pre-wrap text-left" style="max-height: 150px; overflow-y: auto;">${s.plan || ''}</div>`]);
+                            preventionPlanHtml = `<h3>4. 최소 성취수준 미도달 예방 지도 계획</h3>${createTable(['구분', '내용'], [['대상학생 선정 기준', preventionTargetCell], ['지도 방법', (plan.preventionMethods || []).join(', ')], ['운영 차시', `${(plan.preventionSessions || []).length}차시`], ['운영 기간', pPeriodFmt]])}<h4>차시별 지도 계획</h4>${createTable(['차시', '지도 계획'], pSessions)}`;
                         } else {
                             preventionPlanHtml = `<h3>4. 최소 성취수준 미도달 예방 지도 계획</h3><p>- 해당 없음</p>`;
                         }
@@ -2816,7 +2826,7 @@
                         const createGuidancePlanHtml = (title, target, methods, period, sessions) => {
                             const sPeriod = (period || []).filter(d => d instanceof Date).map(d => d.toLocaleDateString('ko-KR'));
                             const sPeriodFmt = sPeriod.length === 2 ? `${sPeriod[0]} ~ ${sPeriod[1]}` : (sPeriod.length === 1 ? sPeriod[0] : '미정');
-                            const sSessions = (sessions || []).map((s, i) => [`${i + 1}차시`, `<div class="whitespace-pre-wrap text-left">${s.plan || ''}</div>`]);
+                            const sSessions = (sessions || []).map((s, i) => [`${i + 1}차시`, `<div class="whitespace-pre-wrap text-left" style="max-height: 150px; overflow-y: auto;">${s.plan || ''}</div>`]);
                             return `<h3>${title}</h3>${createTable(['구분', '내용'], [['대상학생 선정 기준', target], ['지도 방법', (methods || []).join(', ')], ['운영 차시', `${(sessions || []).length}차시`], ['운영 기간', sPeriodFmt]])}<h4>차시별 지도 계획</h4>${createTable(['차시', '지도 계획'], sSessions)}`;
                         };
 
@@ -2977,6 +2987,55 @@
                         
                         this.generatePdfFromHtml(finalHtml);
                     },
+                    async sendCompletionStatusToHomeroom() {
+                        if (this.role !== '교과교사' || this.teacherTab !== 'supplementary') return;
+                        if (!this.teacherPlan.subjectName || !this.schoolId || !this.user || !db) {
+                            alert('과목명을 입력하고 저장해주세요.');
+                            return;
+                        }
+                        
+                        try {
+                            // 먼저 출석부 데이터를 저장 (최신 상태 반영)
+                            await this.saveGuidanceData();
+                            
+                            // 이수현황 데이터를 별도 컬렉션에 저장
+                            const subjectName = this.teacherPlan.subjectName;
+                            const completionData = {};
+                            
+                            // 현재 이수현황 상태를 계산하여 저장
+                            const students = this.teacherGuidanceData.supplementary?.students || [];
+                            students.forEach(student => {
+                                if (!student || !student.id) return;
+                                const studentId = String(student.id);
+                                const status = this.guidanceCompletionStatus[studentId];
+                                if (status && status.completionStatus) {
+                                    if (!completionData[subjectName]) {
+                                        completionData[subjectName] = {};
+                                    }
+                                    completionData[subjectName][studentId] = status.completionStatus;
+                                }
+                            });
+                            
+                            // 공용 데이터 컬렉션에 저장
+                            const completionDocRef = doc(db, `schools/${this.schoolId}/commonData`, 'completionStatus');
+                            const existingData = await getDoc(completionDocRef);
+                            const existingCompletionData = existingData.exists() ? existingData.data().data || {} : {};
+                            
+                            // 현재 과목의 데이터만 업데이트
+                            if (!existingCompletionData[subjectName]) {
+                                existingCompletionData[subjectName] = {};
+                            }
+                            existingCompletionData[subjectName] = { ...existingCompletionData[subjectName], ...completionData[subjectName] };
+                            
+                            await setDoc(completionDocRef, { data: existingCompletionData }, { merge: true });
+                            
+                            alert('이수현황 데이터가 담임교사 대시보드로 전송되었습니다.');
+                            console.log('이수현황 데이터 전송 완료:', completionData);
+                        } catch (error) {
+                            console.error('이수현황 데이터 전송 오류:', error);
+                            alert(`이수현황 데이터 전송 중 오류가 발생했습니다: ${error.message}`);
+                        }
+                    },
                     async generateAttendancePdf(type) {
                         const data = this.teacherGuidanceData[type];
                         if (!data || !this.role) return;
@@ -3121,6 +3180,22 @@
                         this.allTeacherCompletionData = {};
                         
                         try {
+                            // 먼저 공용 데이터에서 전송된 이수현황 데이터 확인
+                            const completionDocRef = doc(db, `schools/${this.schoolId}/commonData`, 'completionStatus');
+                            const completionSnap = await getDoc(completionDocRef);
+                            if (completionSnap.exists()) {
+                                const completionData = completionSnap.data().data || {};
+                                // 전송된 데이터를 먼저 로드
+                                Object.keys(completionData).forEach(subjectName => {
+                                    if (completionData[subjectName]) {
+                                        if (!this.allTeacherCompletionData[subjectName]) {
+                                            this.allTeacherCompletionData[subjectName] = {};
+                                        }
+                                        this.allTeacherCompletionData[subjectName] = { ...this.allTeacherCompletionData[subjectName], ...completionData[subjectName] };
+                                    }
+                                });
+                            }
+                            
                             // 모든 교과교사의 guidance 데이터를 불러오기
                             const teacherDataRef = collection(db, `schools/${this.schoolId}/teacherData`);
                             const teacherDataSnap = await getDocs(teacherDataRef);
