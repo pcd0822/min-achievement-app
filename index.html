@@ -3046,16 +3046,47 @@
                                 }
                             });
                             
-                            // 교과교사의 teacherData/completionStatus에 저장 (자신의 데이터는 쓰기 가능)
-                            // 구조: { subjectName, data: { studentId: { completionStatus, total, lastUpdated } } }
-                            // 담임교사는 Firestore 규칙을 통해 이 데이터를 읽을 수 있음
-                            const completionDocRef = doc(db, `schools/${this.schoolId}/teacherData/${this.user.uid}/completionStatus`, encodedSubjectName);
-                            await setDoc(completionDocRef, { 
-                                subjectName: subjectName,
-                                data: completionData,
-                                lastUpdated: new Date().toISOString(),
-                                sentToHomeroom: true // 담임교사 대시보드로 전송됨을 표시
-                            }, { merge: true });
+                            // 1. commonData/completionStatus에 저장 (담임교사가 읽을 수 있도록)
+                            // 구조: { data: { subjectName: { studentId: completionStatus } } }
+                            try {
+                                const commonCompletionDocRef = doc(db, `schools/${this.schoolId}/commonData`, 'completionStatus');
+                                const existingDoc = await getDoc(commonCompletionDocRef);
+                                const existingData = existingDoc.exists() ? existingDoc.data().data || {} : {};
+                                
+                                // 현재 과목의 데이터만 업데이트
+                                if (!existingData[subjectName]) {
+                                    existingData[subjectName] = {};
+                                }
+                                
+                                // 학생별 이수현황 업데이트
+                                Object.keys(completionData).forEach(studentId => {
+                                    const normalizedStudentId = String(studentId);
+                                    existingData[subjectName][normalizedStudentId] = completionData[studentId].completionStatus;
+                                });
+                                
+                                await setDoc(commonCompletionDocRef, { 
+                                    data: existingData,
+                                    lastUpdated: new Date().toISOString()
+                                }, { merge: true });
+                                console.log('commonData/completionStatus 저장 완료');
+                            } catch (commonDataError) {
+                                console.error('commonData/completionStatus 저장 실패:', commonDataError);
+                                // 권한 오류가 발생해도 teacherData에는 저장 시도
+                            }
+                            
+                            // 2. teacherData/completionStatus에도 백업 저장 (자신의 데이터는 쓰기 가능)
+                            try {
+                                const completionDocRef = doc(db, `schools/${this.schoolId}/teacherData/${this.user.uid}/completionStatus`, encodedSubjectName);
+                                await setDoc(completionDocRef, { 
+                                    subjectName: subjectName,
+                                    data: completionData,
+                                    lastUpdated: new Date().toISOString(),
+                                    sentToHomeroom: true
+                                }, { merge: true });
+                                console.log('teacherData/completionStatus 저장 완료');
+                            } catch (teacherDataError) {
+                                console.error('teacherData/completionStatus 저장 실패:', teacherDataError);
+                            }
                             
                             alert('이수현황 데이터가 담임교사 대시보드로 전송되었습니다.');
                             console.log('이수현황 데이터 전송 완료:', {
@@ -3248,203 +3279,185 @@
                                 console.log('commonData/completionStatus 읽기 실패 (무시 가능):', e);
                             }
                             
-                            // collectionGroup을 사용하여 모든 completionStatus와 guidance 컬렉션 읽기 (권한 문제 해결)
-                            // 이렇게 하면 teacherData 컬렉션을 직접 읽지 않고도 하위 컬렉션에 접근 가능
+                            // commonData/completionStatus에서 전송된 데이터 우선 읽기
+                            // collectionGroup 대신 직접 경로 접근 방식 사용
                             try {
-                                // 1. 먼저 전송된 이수현황 데이터 확인 (completionStatus 컬렉션)
-                                // collectionGroup으로 모든 completionStatus 읽기 (경로 필터링은 클라이언트에서)
+                                // 1. commonData/completionStatus에서 전송된 이수현황 데이터 읽기 (우선)
+                                // 이 데이터가 가장 최신이고 정확함
                                 try {
-                                    console.log('collectionGroup(completionStatus) 쿼리 시작...');
-                                    const completionStatusSnap = await getDocs(collectionGroup(db, 'completionStatus'));
-                                    console.log(`completionStatus 문서 개수: ${completionStatusSnap.docs.length}`);
-                                    
-                                    let loadedCount = 0;
-                                    completionStatusSnap.docs.forEach(completionDoc => {
-                                        // 경로에서 schoolId 확인 (보안) - 클라이언트 측 필터링
-                                        const docPath = completionDoc.ref.path;
-                                        console.log(`completionStatus 문서 경로: ${docPath}`);
-                                        
-                                        if (!docPath.includes(`schools/${this.schoolId}/teacherData/`)) {
-                                            console.log(`다른 학교 데이터 무시: ${docPath}`);
-                                            return; // 다른 학교의 데이터는 무시
-                                        }
-                                        
-                                        const completionDocData = completionDoc.data();
-                                        const docSubjectName = completionDocData.subjectName || this.decodeSubjectName(completionDoc.id);
-                                        const studentData = completionDocData.data || {};
-                                        
-                                        console.log(`completionStatus 로드: 과목=${docSubjectName}, 학생 수=${Object.keys(studentData).length}`);
-                                        
-                                        if (!this.allTeacherCompletionData[docSubjectName]) {
-                                            this.allTeacherCompletionData[docSubjectName] = {};
-                                        }
-                                        
-                                        // 전송된 이수현황 데이터를 우선적으로 사용
-                                        Object.keys(studentData).forEach(studentId => {
-                                            const normalizedStudentId = String(studentId);
-                                            const completionInfo = studentData[studentId];
-                                            if (completionInfo) {
-                                                // completionStatus가 객체인 경우와 문자열인 경우 모두 처리
-                                                const completionStatus = typeof completionInfo === 'string' 
-                                                    ? completionInfo 
-                                                    : (completionInfo.completionStatus || completionInfo);
-                                                if (completionStatus === '이수' || completionStatus === '미이수') {
-                                                    this.allTeacherCompletionData[docSubjectName][normalizedStudentId] = completionStatus;
-                                                    loadedCount++;
-                                                    console.log(`전송된 데이터 로드 (completionStatus): ${docSubjectName} - ${normalizedStudentId} - ${completionStatus}`);
+                                    const commonCompletionDocRef = doc(db, `schools/${this.schoolId}/commonData`, 'completionStatus');
+                                    const commonCompletionSnap = await getDoc(commonCompletionDocRef);
+                                    if (commonCompletionSnap.exists()) {
+                                        const completionData = commonCompletionSnap.data().data || {};
+                                        let loadedCount = 0;
+                                        Object.keys(completionData).forEach(subjectName => {
+                                            if (completionData[subjectName]) {
+                                                if (!this.allTeacherCompletionData[subjectName]) {
+                                                    this.allTeacherCompletionData[subjectName] = {};
                                                 }
+                                                Object.keys(completionData[subjectName]).forEach(studentId => {
+                                                    const normalizedStudentId = String(studentId);
+                                                    const completionStatus = completionData[subjectName][studentId];
+                                                    if (completionStatus === '이수' || completionStatus === '미이수') {
+                                                        this.allTeacherCompletionData[subjectName][normalizedStudentId] = completionStatus;
+                                                        loadedCount++;
+                                                        console.log(`전송된 데이터 로드 (commonData): ${subjectName} - ${normalizedStudentId} - ${completionStatus}`);
+                                                    }
+                                                });
                                             }
                                         });
-                                    });
-                                    console.log(`completionStatus 총 ${loadedCount}개 학생 데이터 로드 완료`);
+                                        console.log(`commonData/completionStatus에서 총 ${loadedCount}개 학생 데이터 로드 완료`);
+                                    }
                                 } catch (e) {
-                                    console.error('completionStatus 컬렉션 그룹 읽기 실패:', e);
-                                    console.error('오류 상세:', {
-                                        code: e.code,
-                                        message: e.message,
-                                        stack: e.stack
-                                    });
+                                    console.error('commonData/completionStatus 읽기 실패:', e);
                                 }
                                 
-                                // 2. guidance 데이터를 불러오기 (이수현황 계산용)
+                                // 2. teacherData 컬렉션을 순회하면서 각 교과교사의 guidance 데이터 읽기 (이수현황 계산용)
+                                // commonData에 없는 데이터만 계산
                                 try {
-                                    console.log('collectionGroup(guidance) 쿼리 시작...');
-                                    const guidanceSnap = await getDocs(collectionGroup(db, 'guidance'));
-                                    console.log(`guidance 문서 개수: ${guidanceSnap.docs.length}`);
+                                    console.log('teacherData 컬렉션 읽기 시작...');
+                                    const teacherDataRef = collection(db, `schools/${this.schoolId}/teacherData`);
+                                    const teacherDataSnap = await getDocs(teacherDataRef);
+                                    console.log(`teacherData 문서 개수: ${teacherDataSnap.docs.length}`);
                                     
-                                for (const guidanceDoc of guidanceSnap.docs) {
-                                    // 경로에서 schoolId 확인 (보안)
-                                    const docPath = guidanceDoc.ref.path;
-                                    if (!docPath.includes(`schools/${this.schoolId}/teacherData/`)) {
-                                        console.warn('잘못된 경로의 guidance 문서:', docPath);
-                                        continue;
-                                    }
-                                    
-                                    const guidanceData = guidanceDoc.data();
-                                    const subjectName = this.decodeSubjectName(guidanceDoc.id);
-                                    
-                                    if (!guidanceData || !guidanceData.supplementary || !guidanceData.supplementary.students) continue;
-                                    
-                                    // 보충지도 시간 및 이수 현황 계산
-                                    const subjectInfo = this.curriculumData.find(s => s.과목명 === subjectName);
-                                    if (!subjectInfo) {
-                                        console.log(`과목 정보 없음: ${subjectName}`);
-                                        continue;
-                                    }
-                                    
-                                    const requiredSubjectCredits = Number(subjectInfo.학점) || 0;
-                                    if (requiredSubjectCredits <= 0) continue;
-                                    
-                                    const supplementaryHours = requiredSubjectCredits * this.moduleConfig.hoursPerCredit;
-                                    const requiredHoursForCompletion = Math.ceil((supplementaryHours * 2) / 3 * 10) / 10;
-                                    const maxEmotionalSupportHours = supplementaryHours * (this.moduleConfig.emotionalSupportRatio / 100);
-                                    
-                                    // 예방지도 시간 계산 (guidanceCompletionStatus와 동일한 로직)
-                                    const preventiveTotals = {};
-                                    const preventiveSessions = guidanceData.preventive?.sessions || [];
-                                    if (preventiveSessions && preventiveSessions.length > 0) {
-                                        preventiveSessions.forEach(session => {
-                                            if (session && session.isSaved && session.attendance) {
-                                                for (const studentId in session.attendance) {
-                                                    const methodName = session.attendance[studentId];
-                                                    if (methodName) {
-                                                        const methodConfig = this.moduleConfig.recognizedHours.find(m => m.name === methodName);
-                                                        if (methodConfig) {
-                                                            if (!preventiveTotals[studentId]) preventiveTotals[studentId] = 0;
-                                                            preventiveTotals[studentId] += methodConfig.hours;
-                                                        }
-                                                    }
+                                    for (const teacherDoc of teacherDataSnap.docs) {
+                                        const uid = teacherDoc.id;
+                                        
+                                        // 각 교과교사의 guidance 컬렉션 읽기
+                                        try {
+                                            const guidanceRef = collection(teacherDoc.ref, 'guidance');
+                                            const guidanceSnap = await getDocs(guidanceRef);
+                                            
+                                            for (const guidanceDoc of guidanceSnap.docs) {
+                                                const guidanceData = guidanceDoc.data();
+                                                const subjectName = this.decodeSubjectName(guidanceDoc.id);
+                                                
+                                                if (!guidanceData || !guidanceData.supplementary || !guidanceData.supplementary.students) continue;
+                                                
+                                                // 보충지도 시간 및 이수 현황 계산
+                                                const subjectInfo = this.curriculumData.find(s => s.과목명 === subjectName);
+                                                if (!subjectInfo) {
+                                                    console.log(`과목 정보 없음: ${subjectName}`);
+                                                    continue;
                                                 }
-                                            }
-                                        });
-                                    }
-                                    
-                                    const students = guidanceData.supplementary.students || [];
-                                    const sessions = guidanceData.supplementary.sessions || [];
-                                    
-                                    // 학생별 이수 현황 계산 (guidanceCompletionStatus와 정확히 동일한 로직)
-                                    students.forEach(student => {
-                                        if (!student || !student.id) return;
-                                        
-                                        // 학번을 문자열로 정규화하여 일관성 보장
-                                        const studentId = String(student.id);
-                                        
-                                        if (!this.allTeacherCompletionData[subjectName]) {
-                                            this.allTeacherCompletionData[subjectName] = {};
-                                        }
-                                        
-                                        // 전송된 데이터가 이미 있으면 계산하지 않고 건너뛰기
-                                        if (this.allTeacherCompletionData[subjectName][studentId]) {
-                                            console.log(`전송된 데이터 사용: ${subjectName} - ${studentId} - ${this.allTeacherCompletionData[subjectName][studentId]}`);
-                                            return;
-                                        }
-                                        
-                                        // 각 방법별 시간을 누적 (guidanceCompletionStatus와 동일)
-                                        const methodHours = {};
-                                        this.moduleConfig.recognizedHours.forEach(rh => {
-                                            methodHours[rh.name] = 0;
-                                        });
-                                        
-                                        // 보충지도 시간 계산 (각 방법별로 누적)
-                                        if (sessions && sessions.length > 0) {
-                                            sessions.forEach(session => {
-                                                if (session && session.isSaved && session.attendance && session.attendance[studentId]) {
-                                                    const methodName = session.attendance[studentId];
-                                                    if (methodName && methodHours.hasOwnProperty(methodName)) {
-                                                        const methodConfig = this.moduleConfig.recognizedHours.find(m => m.name === methodName);
-                                                        if (methodConfig) {
-                                                            methodHours[methodName] = parseFloat((methodHours[methodName] + methodConfig.hours).toFixed(2));
+                                                
+                                                const requiredSubjectCredits = Number(subjectInfo.학점) || 0;
+                                                if (requiredSubjectCredits <= 0) continue;
+                                                
+                                                const supplementaryHours = requiredSubjectCredits * this.moduleConfig.hoursPerCredit;
+                                                const requiredHoursForCompletion = Math.ceil((supplementaryHours * 2) / 3 * 10) / 10;
+                                                const maxEmotionalSupportHours = supplementaryHours * (this.moduleConfig.emotionalSupportRatio / 100);
+                                                
+                                                // 예방지도 시간 계산 (guidanceCompletionStatus와 동일한 로직)
+                                                const preventiveTotals = {};
+                                                const preventiveSessions = guidanceData.preventive?.sessions || [];
+                                                if (preventiveSessions && preventiveSessions.length > 0) {
+                                                    preventiveSessions.forEach(session => {
+                                                        if (session && session.isSaved && session.attendance) {
+                                                            for (const studentId in session.attendance) {
+                                                                const methodName = session.attendance[studentId];
+                                                                if (methodName) {
+                                                                    const methodConfig = this.moduleConfig.recognizedHours.find(m => m.name === methodName);
+                                                                    if (methodConfig) {
+                                                                        if (!preventiveTotals[studentId]) preventiveTotals[studentId] = 0;
+                                                                        preventiveTotals[studentId] += methodConfig.hours;
+                                                                    }
+                                                                }
+                                                            }
                                                         }
-                                                    }
+                                                    });
                                                 }
-                                            });
-                                        }
-                                        
-                                        // 보충지도 시간 합계 계산
-                                        let currentStudentTotal = 0;
-                                        this.moduleConfig.recognizedHours.forEach(rh => {
-                                            currentStudentTotal += (methodHours[rh.name] || 0);
-                                        });
-                                        
-                                        // 예방지도 시간 추가 (guidanceCompletionStatus와 동일한 로직)
-                                        const totalPreventiveHoursForStudent = preventiveTotals[studentId] || 0;
-                                        if (totalPreventiveHoursForStudent > 0) {
-                                            const studentInfo = this.studentData.find(s => String(s['학번']) === studentId);
-                                            const isSpecialSupport = studentInfo && studentInfo['특기사항'] === '학습지원대상';
-                                            let maxAllowedHours = 0;
-                                            let creditedPreventiveHours = 0;
-                                            if (isSpecialSupport) {
-                                                maxAllowedHours = supplementaryHours * (this.moduleConfig.specialPreventiveRatio / 100);
-                                                creditedPreventiveHours = Math.min(totalPreventiveHoursForStudent, maxAllowedHours);
-                                            } else {
-                                                maxAllowedHours = supplementaryHours * (this.moduleConfig.preventiveRatio / 100);
-                                                creditedPreventiveHours = Math.floor(Math.min(totalPreventiveHoursForStudent, maxAllowedHours));
+                                                
+                                                const students = guidanceData.supplementary.students || [];
+                                                const sessions = guidanceData.supplementary.sessions || [];
+                                                
+                                                // 학생별 이수 현황 계산 (guidanceCompletionStatus와 정확히 동일한 로직)
+                                                students.forEach(student => {
+                                                    if (!student || !student.id) return;
+                                                    
+                                                    // 학번을 문자열로 정규화하여 일관성 보장
+                                                    const studentId = String(student.id);
+                                                    
+                                                    if (!this.allTeacherCompletionData[subjectName]) {
+                                                        this.allTeacherCompletionData[subjectName] = {};
+                                                    }
+                                                    
+                                                    // 전송된 데이터가 이미 있으면 계산하지 않고 건너뛰기
+                                                    if (this.allTeacherCompletionData[subjectName][studentId]) {
+                                                        console.log(`전송된 데이터 사용: ${subjectName} - ${studentId} - ${this.allTeacherCompletionData[subjectName][studentId]}`);
+                                                        return;
+                                                    }
+                                                    
+                                                    // 각 방법별 시간을 누적 (guidanceCompletionStatus와 동일)
+                                                    const methodHours = {};
+                                                    this.moduleConfig.recognizedHours.forEach(rh => {
+                                                        methodHours[rh.name] = 0;
+                                                    });
+                                                    
+                                                    // 보충지도 시간 계산 (각 방법별로 누적)
+                                                    if (sessions && sessions.length > 0) {
+                                                        sessions.forEach(session => {
+                                                            if (session && session.isSaved && session.attendance && session.attendance[studentId]) {
+                                                                const methodName = session.attendance[studentId];
+                                                                if (methodName && methodHours.hasOwnProperty(methodName)) {
+                                                                    const methodConfig = this.moduleConfig.recognizedHours.find(m => m.name === methodName);
+                                                                    if (methodConfig) {
+                                                                        methodHours[methodName] = parseFloat((methodHours[methodName] + methodConfig.hours).toFixed(2));
+                                                                    }
+                                                                }
+                                                            }
+                                                        });
+                                                    }
+                                                    
+                                                    // 보충지도 시간 합계 계산
+                                                    let currentStudentTotal = 0;
+                                                    this.moduleConfig.recognizedHours.forEach(rh => {
+                                                        currentStudentTotal += (methodHours[rh.name] || 0);
+                                                    });
+                                                    
+                                                    // 예방지도 시간 추가 (guidanceCompletionStatus와 동일한 로직)
+                                                    const totalPreventiveHoursForStudent = preventiveTotals[studentId] || 0;
+                                                    if (totalPreventiveHoursForStudent > 0) {
+                                                        const studentInfo = this.studentData.find(s => String(s['학번']) === studentId);
+                                                        const isSpecialSupport = studentInfo && studentInfo['특기사항'] === '학습지원대상';
+                                                        let maxAllowedHours = 0;
+                                                        let creditedPreventiveHours = 0;
+                                                        if (isSpecialSupport) {
+                                                            maxAllowedHours = supplementaryHours * (this.moduleConfig.specialPreventiveRatio / 100);
+                                                            creditedPreventiveHours = Math.min(totalPreventiveHoursForStudent, maxAllowedHours);
+                                                        } else {
+                                                            maxAllowedHours = supplementaryHours * (this.moduleConfig.preventiveRatio / 100);
+                                                            creditedPreventiveHours = Math.floor(Math.min(totalPreventiveHoursForStudent, maxAllowedHours));
+                                                        }
+                                                        currentStudentTotal += creditedPreventiveHours;
+                                                    }
+                                                    
+                                                    // 정서지원 시간 추가 (guidanceCompletionStatus와 동일한 로직)
+                                                    const emotionalData = this.emotionalSupportData.find(e => String(e['학번']) === studentId);
+                                                    const uploadedHours = emotionalData ? Number(emotionalData['정서지원프로그램 참여시간']) : 0;
+                                                    const creditedEmotionalHours = Math.min(uploadedHours, maxEmotionalSupportHours);
+                                                    currentStudentTotal += creditedEmotionalHours;
+                                                    
+                                                    // 최종 합계 계산 (소수점 2자리)
+                                                    const finalTotal = parseFloat(currentStudentTotal.toFixed(2));
+                                                    
+                                                    // 이수 여부 판단 (guidanceCompletionStatus와 동일한 로직)
+                                                    const tolerance = 0.001;
+                                                    if (requiredHoursForCompletion > 0 && finalTotal >= requiredHoursForCompletion - tolerance) {
+                                                        this.allTeacherCompletionData[subjectName][studentId] = '이수';
+                                                        console.log(`이수현황 계산 완료: ${subjectName} - ${studentId} - 이수 (${finalTotal}/${requiredHoursForCompletion})`);
+                                                    } else {
+                                                        this.allTeacherCompletionData[subjectName][studentId] = '미이수';
+                                                        console.log(`이수현황 계산 완료: ${subjectName} - ${studentId} - 미이수 (${finalTotal}/${requiredHoursForCompletion})`);
+                                                    }
+                                                });
                                             }
-                                            currentStudentTotal += creditedPreventiveHours;
+                                        } catch (guidanceError) {
+                                            console.log(`교과교사 ${uid}의 guidance 컬렉션 읽기 실패 (권한 없음 가능):`, guidanceError);
                                         }
-                                        
-                                        // 정서지원 시간 추가 (guidanceCompletionStatus와 동일한 로직)
-                                        const emotionalData = this.emotionalSupportData.find(e => String(e['학번']) === studentId);
-                                        const uploadedHours = emotionalData ? Number(emotionalData['정서지원프로그램 참여시간']) : 0;
-                                        const creditedEmotionalHours = Math.min(uploadedHours, maxEmotionalSupportHours);
-                                        currentStudentTotal += creditedEmotionalHours;
-                                        
-                                        // 최종 합계 계산 (소수점 2자리)
-                                        const finalTotal = parseFloat(currentStudentTotal.toFixed(2));
-                                        
-                                        // 이수 여부 판단 (guidanceCompletionStatus와 동일한 로직)
-                                        const tolerance = 0.001;
-                                        if (requiredHoursForCompletion > 0 && finalTotal >= requiredHoursForCompletion - tolerance) {
-                                            this.allTeacherCompletionData[subjectName][studentId] = '이수';
-                                            console.log(`이수현황 계산 완료: ${subjectName} - ${studentId} - 이수 (${finalTotal}/${requiredHoursForCompletion})`);
-                                        } else {
-                                            this.allTeacherCompletionData[subjectName][studentId] = '미이수';
-                                            console.log(`이수현황 계산 완료: ${subjectName} - ${studentId} - 미이수 (${finalTotal}/${requiredHoursForCompletion})`);
-                                        }
-                                    });
                                     }
                                 } catch (e) {
-                                    console.error('guidance 컬렉션 그룹 읽기 실패:', e);
+                                    console.error('teacherData 컬렉션 읽기 실패:', e);
                                     console.error('오류 상세:', {
                                         code: e.code,
                                         message: e.message,
@@ -3452,7 +3465,7 @@
                                     });
                                 }
                             } catch (e) {
-                                console.error('collectionGroup 쿼리 실패:', e);
+                                console.error('이수현황 데이터 로드 실패:', e);
                                 console.error('오류 상세:', {
                                     code: e.code,
                                     message: e.message,
