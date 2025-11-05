@@ -3254,17 +3254,26 @@
                                 // 1. 먼저 전송된 이수현황 데이터 확인 (completionStatus 컬렉션)
                                 // collectionGroup으로 모든 completionStatus 읽기 (경로 필터링은 클라이언트에서)
                                 try {
+                                    console.log('collectionGroup(completionStatus) 쿼리 시작...');
                                     const completionStatusSnap = await getDocs(collectionGroup(db, 'completionStatus'));
+                                    console.log(`completionStatus 문서 개수: ${completionStatusSnap.docs.length}`);
+                                    
+                                    let loadedCount = 0;
                                     completionStatusSnap.docs.forEach(completionDoc => {
                                         // 경로에서 schoolId 확인 (보안) - 클라이언트 측 필터링
                                         const docPath = completionDoc.ref.path;
+                                        console.log(`completionStatus 문서 경로: ${docPath}`);
+                                        
                                         if (!docPath.includes(`schools/${this.schoolId}/teacherData/`)) {
+                                            console.log(`다른 학교 데이터 무시: ${docPath}`);
                                             return; // 다른 학교의 데이터는 무시
                                         }
                                         
                                         const completionDocData = completionDoc.data();
                                         const docSubjectName = completionDocData.subjectName || this.decodeSubjectName(completionDoc.id);
                                         const studentData = completionDocData.data || {};
+                                        
+                                        console.log(`completionStatus 로드: 과목=${docSubjectName}, 학생 수=${Object.keys(studentData).length}`);
                                         
                                         if (!this.allTeacherCompletionData[docSubjectName]) {
                                             this.allTeacherCompletionData[docSubjectName] = {};
@@ -3281,17 +3290,27 @@
                                                     : (completionInfo.completionStatus || completionInfo);
                                                 if (completionStatus === '이수' || completionStatus === '미이수') {
                                                     this.allTeacherCompletionData[docSubjectName][normalizedStudentId] = completionStatus;
+                                                    loadedCount++;
                                                     console.log(`전송된 데이터 로드 (completionStatus): ${docSubjectName} - ${normalizedStudentId} - ${completionStatus}`);
                                                 }
                                             }
                                         });
                                     });
+                                    console.log(`completionStatus 총 ${loadedCount}개 학생 데이터 로드 완료`);
                                 } catch (e) {
                                     console.error('completionStatus 컬렉션 그룹 읽기 실패:', e);
+                                    console.error('오류 상세:', {
+                                        code: e.code,
+                                        message: e.message,
+                                        stack: e.stack
+                                    });
                                 }
                                 
                                 // 2. guidance 데이터를 불러오기 (이수현황 계산용)
-                                const guidanceSnap = await getDocs(collectionGroup(db, 'guidance'));
+                                try {
+                                    console.log('collectionGroup(guidance) 쿼리 시작...');
+                                    const guidanceSnap = await getDocs(collectionGroup(db, 'guidance'));
+                                    console.log(`guidance 문서 개수: ${guidanceSnap.docs.length}`);
                                     
                                 for (const guidanceDoc of guidanceSnap.docs) {
                                     // 경로에서 schoolId 확인 (보안)
@@ -3423,9 +3442,22 @@
                                             console.log(`이수현황 계산 완료: ${subjectName} - ${studentId} - 미이수 (${finalTotal}/${requiredHoursForCompletion})`);
                                         }
                                     });
+                                    }
+                                } catch (e) {
+                                    console.error('guidance 컬렉션 그룹 읽기 실패:', e);
+                                    console.error('오류 상세:', {
+                                        code: e.code,
+                                        message: e.message,
+                                        stack: e.stack
+                                    });
                                 }
                             } catch (e) {
                                 console.error('collectionGroup 쿼리 실패:', e);
+                                console.error('오류 상세:', {
+                                    code: e.code,
+                                    message: e.message,
+                                    stack: e.stack
+                                });
                             }
                             
                             console.log('담임교사 대시보드: 모든 교과교사 이수 현황 데이터 로드 완료', {
