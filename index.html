@@ -1457,13 +1457,22 @@
                                 // 학번을 문자열로 정규화하여 일관성 보장
                                 const studentId = String(student.id);
                                 let completion = { status: '확인필요', color: 'text-gray-500'};
-                                if (this.allTeacherCompletionData[name] && this.allTeacherCompletionData[name][studentId]) {
+                                
+                                // 디버깅: 데이터 확인
+                                if (this.allTeacherCompletionData[name]) {
                                     const completionStatus = this.allTeacherCompletionData[name][studentId];
-                                    if (completionStatus === '이수') {
-                                        completion = { status: '이수확인', color: 'text-green-600'};
-                                    } else if (completionStatus === '미이수') {
-                                        completion = { status: '미이수', color: 'text-red-600'};
+                                    if (completionStatus) {
+                                        console.log(`이수현황 매칭 성공: 과목=${name}, 학번=${studentId}, 상태=${completionStatus}`);
+                                        if (completionStatus === '이수') {
+                                            completion = { status: '이수확인', color: 'text-green-600'};
+                                        } else if (completionStatus === '미이수') {
+                                            completion = { status: '미이수', color: 'text-red-600'};
+                                        }
+                                    } else {
+                                        console.log(`이수현황 매칭 실패: 과목=${name}, 학번=${studentId}, 과목 데이터 존재하나 학생 데이터 없음`);
                                     }
+                                } else {
+                                    console.log(`이수현황 매칭 실패: 과목=${name}, 학번=${studentId}, 과목 데이터 없음`);
                                 }
                                 return { subject: name, reason: reason, status: completion.status, statusColor: completion.color };
                             });
@@ -3027,7 +3036,13 @@
                             }, { merge: true });
                             
                             alert('이수현황 데이터가 담임교사 대시보드로 전송되었습니다.');
-                            console.log('이수현황 데이터 전송 완료:', completionData);
+                            console.log('이수현황 데이터 전송 완료:', {
+                                subjectName: subjectName,
+                                encodedSubjectName: encodedSubjectName,
+                                docPath: `schools/${this.schoolId}/teacherData/${this.user.uid}/completionStatus/${encodedSubjectName}`,
+                                studentCount: Object.keys(completionData).length,
+                                completionData: completionData
+                            });
                         } catch (error) {
                             console.error('이수현황 데이터 전송 오류:', error);
                             alert(`이수현황 데이터 전송 중 오류가 발생했습니다: ${error.message}`);
@@ -3201,9 +3216,16 @@
                                         // 전송된 이수현황 데이터를 우선적으로 사용
                                         Object.keys(studentData).forEach(studentId => {
                                             const normalizedStudentId = String(studentId);
-                                            if (studentData[studentId] && studentData[studentId].completionStatus) {
-                                                this.allTeacherCompletionData[subjectName][normalizedStudentId] = studentData[studentId].completionStatus;
-                                                console.log(`전송된 데이터 로드: ${subjectName} - ${normalizedStudentId} - ${studentData[studentId].completionStatus}`);
+                                            const completionInfo = studentData[studentId];
+                                            if (completionInfo) {
+                                                // completionStatus가 객체인 경우와 문자열인 경우 모두 처리
+                                                const completionStatus = typeof completionInfo === 'string' 
+                                                    ? completionInfo 
+                                                    : (completionInfo.completionStatus || completionInfo);
+                                                if (completionStatus === '이수' || completionStatus === '미이수') {
+                                                    this.allTeacherCompletionData[subjectName][normalizedStudentId] = completionStatus;
+                                                    console.log(`전송된 데이터 로드: ${subjectName} - ${normalizedStudentId} - ${completionStatus}`);
+                                                }
                                             }
                                         });
                                     });
@@ -3338,8 +3360,18 @@
                             
                             console.log('담임교사 대시보드: 모든 교과교사 이수 현황 데이터 로드 완료', {
                                 subjectsCount: Object.keys(this.allTeacherCompletionData).length,
+                                subjects: Object.keys(this.allTeacherCompletionData),
                                 data: this.allTeacherCompletionData
                             });
+                            
+                            // 각 과목별로 학생 수 확인
+                            Object.keys(this.allTeacherCompletionData).forEach(subj => {
+                                const studentCount = Object.keys(this.allTeacherCompletionData[subj]).length;
+                                console.log(`과목 ${subj}: ${studentCount}명의 이수현황 데이터`, this.allTeacherCompletionData[subj]);
+                            });
+                            
+                            // Vue 반응성을 위해 강제 업데이트
+                            this.$forceUpdate();
                         } catch (error) {
                             console.error('교과교사 이수 현황 데이터 불러오기 오류:', error);
                         }
