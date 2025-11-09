@@ -231,7 +231,7 @@
             #app > main,
             div[v-if="showAttendanceModal"],
             div[v-if="showImportModal"],
-            div[v-if="showSchoolIdModal"], /* 학교 ID 모달 숨기기 */
+            div[v-if="showSchoolIdModal"], /* 학교코드 모달 숨기기 */
             #print-area-container, /* html2canvas용 컨테이너 숨기기 */
             .modal-overlay .modal-content > div:not(#print-area-container-in-modal), /* 모달 내 버튼, 상태메시지 숨기기 */
             .scroll-arrow {
@@ -338,7 +338,7 @@
                     <div class="space-y-4">
                         <button @click="selectRole('교과교사')" class="w-full text-left px-6 py-4 bg-gray-100 rounded-lg hover:bg-gray-200 transition">교과교사</button>
                         <button @click="selectRole('담임교사')" class="w-full text-left px-6 py-4 bg-gray-100 rounded-lg hover:bg-gray-200 transition">담임교사</button>
-                        <p class="text-sm text-gray-600 text-center mt-2 mb-2">※ 교과교사/담임교사 선택 시 학교 ID 입력이 필요합니다.</p>
+                        <p class="text-sm text-gray-600 text-center mt-2 mb-2">※ 교과교사/담임교사 선택 시 학교코드 입력이 필요합니다.</p>
                         <div>
                             <button @click="selectRole('관리자')" class="w-full text-left px-6 py-4 bg-gray-100 rounded-lg hover:bg-gray-200 transition">관리자</button>
                             <div v-if="showAdminCodeInput" class="mt-2">
@@ -407,11 +407,11 @@
              <!-- Main Dashboard (Show only if logged in and role is selected) -->
              <div v-if="isLoggedIn && role && !isLoading">
                 <!-- Admin View -->
-                 <div v-if="role === '관리자'">
-                      <h2 class="text-3xl font-bold text-gray-800 mb-6">관리자 대시보드 (학교 ID: {{ schoolId || 'null' }})</h2>
-                      <div v-if="!schoolId" class="mb-6 p-4 bg-yellow-100 text-yellow-800 border-l-4 border-yellow-500 rounded-md">
+                     <div v-if="role === '관리자'">
+                      <h2 class="text-3xl font-bold text-gray-800 mb-6">관리자 대시보드 (학교코드: {{ currentSchoolCode || '미설정' }})</h2>
+                      <div v-if="!currentSchoolCode" class="mb-6 p-4 bg-yellow-100 text-yellow-800 border-l-4 border-yellow-500 rounded-md">
                           <p class="font-bold">안내</p>
-                          <p>학교 ID가 설정되지 않았습니다. 데이터를 저장하거나 관리하려면 우측 상단의 '학교 코드 수정 및 발급' 버튼을 눌러 ID를 먼저 설정해주세요.</p>
+                          <p>학교코드가 설정되지 않았습니다. 데이터를 저장하거나 관리하려면 우측 상단의 '학교 코드 수정 및 발급' 버튼을 눌러 코드를 먼저 설정해주세요.</p>
                       </div>
                        <div class="space-y-8">
                            <!-- 1. 교육과정 편제표 업로드 -->
@@ -599,7 +599,7 @@
 
                 <!-- Teacher View -->
                  <div v-if="role === '교과교사' && schoolId">
-                       <h2 class="text-3xl font-bold text-gray-800 mb-6">교과교사 대시보드 (학교 ID: {{ schoolId }})</h2>
+                      <h2 class="text-3xl font-bold text-gray-800 mb-6">교과교사 대시보드 (학교코드: {{ currentSchoolCode || schoolId || '미설정' }})</h2>
                        <div class="flex border-b mb-6">
                            <button class="tab-button" :class="{ 'active': teacherTab === 'plan' }" @click="switchTeacherTab('plan')">계획서 작성</button>
                            <button class="tab-button" :class="{ 'active': teacherTab === 'preventive' }" @click="switchTeacherTab('preventive')">예방지도 출석부 & 수업일지</button>
@@ -964,8 +964,8 @@
                  </div>
 
                  <!-- Homeroom Teacher View -->
-                  <div v-if="role === '담임교사' && schoolId" class="space-y-6">
-                      <h2 class="text-3xl font-bold text-gray-800">담임교사 대시보드 (학교 ID: {{ schoolId }})</h2>
+                 <div v-if="role === '담임교사' && schoolId" class="space-y-6">
+                     <h2 class="text-3xl font-bold text-gray-800">담임교사 대시보드 (학교코드: {{ currentSchoolCode || schoolId || '미설정' }})</h2>
                       <div class="bg-white p-6 rounded-lg shadow-md">
                           <div class="flex items-end space-x-2">
                               <div class="flex-grow">
@@ -2070,7 +2070,7 @@
 
                     // --- Data Saving (Admin) ---
                     async uploadFile(event, type) {
-                        if (!this.schoolId) { alert("학교 ID가 설정되지 않았습니다. '학교 코드 수정 및 발급' 메뉴에서 ID를 먼저 설정해주세요."); event.target.value = null; return; }
+                        if (!this.schoolId) { alert("학교코드가 설정되지 않았습니다. '학교 코드 수정 및 발급' 메뉴에서 코드를 먼저 설정해주세요."); event.target.value = null; return; }
                         if (this.role !== '관리자' || !db) { event.target.value = null; return; }
 
                         const file = event.target.files[0];
@@ -2116,7 +2116,7 @@
                         reader.readAsArrayBuffer(file);
                     },
                     async saveModuleConfig() {
-                        if (!this.schoolId) { alert("학교 ID가 설정되지 않았습니다. '학교 코드 수정 및 발급' 메뉴에서 ID를 먼저 설정해주세요."); return; }
+                        if (!this.schoolId) { alert("학교코드가 설정되지 않았습니다. '학교 코드 수정 및 발급' 메뉴에서 코드를 먼저 설정해주세요."); return; }
                         if (this.role !== '관리자' || !db) return;
                         this.moduleConfigStatus = "운영 모듈 설정 저장 중...";
                         try {
@@ -2128,7 +2128,7 @@
                         setTimeout(() => this.moduleConfigStatus = '', 3000);
                     },
                     async saveFormTemplates(){
-                        if (!this.schoolId) { alert("학교 ID가 설정되지 않았습니다. '학교 코드 수정 및 발급' 메뉴에서 ID를 먼저 설정해주세요."); return; }
+                        if (!this.schoolId) { alert("학교코드가 설정되지 않았습니다. '학교 코드 수정 및 발급' 메뉴에서 코드를 먼저 설정해주세요."); return; }
                         if (this.role !== '관리자' || !db) return;
                         this.adminActionStatus = '양식 저장 중...';
                         try {
@@ -2139,11 +2139,12 @@
                             };
                             await setDoc(docRef, templatesToSave);
                             this.adminActionStatus = '가정통신문 및 서약서 양식이 저장되었습니다.';
+                            alert('양식 저장이 완료되었습니다.');
                         } catch (error) { console.error("Error saving form templates:", error); this.adminActionStatus = '양식 저장 실패.'; }
                         setTimeout(() => this.adminActionStatus = '', 3000);
                     },
                     async deployUnderachievers() {
-                        if (!this.schoolId) { alert("학교 ID가 설정되지 않았습니다. '학교 코드 수정 및 발급' 메뉴에서 ID를 먼저 설정해주세요."); return; }
+                        if (!this.schoolId) { alert("학교코드가 설정되지 않았습니다. '학교 코드 수정 및 발급' 메뉴에서 코드를 먼저 설정해주세요."); return; }
                         if (this.role !== '관리자' || !db) return;
                         this.underachieversStatus = "미도달 학생 명단 배포 중...";
                         try {
