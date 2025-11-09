@@ -310,8 +310,7 @@
                     <div v-if="isLoggedIn" class="flex items-center space-x-4">
                          <span class="text-gray-600 text-sm"> {{ user?.email }}</span>
                          <span v-if="role" class="text-gray-600 font-semibold">[{{ role }}] 모드</span>
-                         <span v-if="currentSchoolCode" class="text-xs text-indigo-600 bg-indigo-50 px-2 py-1 rounded">CODE: {{ currentSchoolCode }}</span>
-                         <span v-if="schoolId && currentSchoolCode && schoolId !== currentSchoolCode" class="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">ID: {{ schoolId }}</span>
+                         <span v-if="currentSchoolCode" class="text-xs text-indigo-600 bg-indigo-50 px-2 py-1 rounded">학교코드: {{ currentSchoolCode }}</span>
                          <button @click="logout" class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition text-sm">로그아웃</button>
                          <button v-if="role" @click="resetRole" class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition text-sm">역할 재선택</button>
                          <button v-if="role === '관리자'" @click="openAdminModifyModal" class="ml-2 px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition text-sm">학교 코드 수정 및 발급</button>
