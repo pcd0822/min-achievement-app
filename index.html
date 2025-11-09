@@ -521,8 +521,11 @@
                                    <input type="text" v-model="newsletterForm.department" placeholder="담당 부서 및 연락처" class="w-full p-2 border rounded">
                                    <div>
                                        <label class="block text-sm font-medium text-gray-700">학교 로고 이미지</label>
-                                       <input type="file" @change="handleImageUpload($event, 'newsletter', 'logoUrl')" accept="image/*" class="w-full">
-                                        <img v-if="newsletterForm.logoUrl" :src="newsletterForm.logoUrl" alt="로고 미리보기" class="mt-2 h-16 object-contain">
+                                   <input type="file" @change="handleImageUpload($event, 'newsletter', 'logoUrl')" accept="image/*" class="w-full">
+                                   <div v-if="newsletterForm.logoUrl" class="mt-2 relative inline-block">
+                                        <img :src="newsletterForm.logoUrl" alt="로고 미리보기" class="h-16 object-contain border rounded">
+                                        <button type="button" @click="removeImage('newsletter', 'logoUrl')" class="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-black bg-opacity-60 text-white flex items-center justify-center text-sm hover:bg-opacity-80" aria-label="로고 삭제">×</button>
+                                   </div>
                                    </div>
                                    <textarea v-model="newsletterForm.body" placeholder="본문 내용" rows="10" class="w-full p-2 border rounded"></textarea>
                                    <input type="text" v-model="newsletterForm.dispatchDate" placeholder="발송일 (예: 2025.7.14.)" class="w-full p-2 border rounded">
@@ -533,7 +536,10 @@
                                    <div v-if="newsletterForm.includeSeal">
                                        <label class="block text-sm font-medium text-gray-700">학교장 날인 이미지</label>
                                        <input type="file" @change="handleImageUpload($event, 'newsletter', 'sealUrl')" accept="image/*" class="w-full">
-                                        <img v-if="newsletterForm.sealUrl" :src="newsletterForm.sealUrl" alt="날인 미리보기" class="mt-2 h-16 object-contain">
+                                       <div v-if="newsletterForm.sealUrl" class="mt-2 relative inline-block">
+                                            <img :src="newsletterForm.sealUrl" alt="날인 미리보기" class="h-16 object-contain border rounded">
+                                            <button type="button" @click="removeImage('newsletter', 'sealUrl')" class="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-black bg-opacity-60 text-white flex items-center justify-center text-sm hover:bg-opacity-80" aria-label="날인 삭제">×</button>
+                                       </div>
                                    </div>
                                    <div class="flex space-x-2">
                                        <button @click="previewFormAdmin('newsletter')" class="mt-4 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600">미리보기 및 출력</button>
@@ -601,9 +607,30 @@
                                        </button>
                                        <button @click="removeAchievement(index)" class="px-3 py-1.5 bg-red-500 text-white text-sm rounded-md hover:bg-red-600">&times; 삭제</button>
                                    </div>
-                                   <div v-if="achievement.statement" class="mt-2 p-2 bg-gray-100 rounded-md">
-                                       <p class="text-sm font-semibold">최소 성취수준 진술문:</p>
-                                       <p class="text-sm text-gray-800">{{ achievement.statement }}</p>
+                                   <div v-if="achievement.statement || achievement.isEditing" class="mt-2 p-3 bg-gray-100 rounded-md">
+                                       <div class="flex items-start justify-between mb-2">
+                                           <p class="text-sm font-semibold">최소 성취수준 진술문:</p>
+                                           <button
+                                               v-if="!achievement.isEditing"
+                                               type="button"
+                                               @click="startEditingStatement(index)"
+                                               class="text-indigo-600 hover:text-indigo-800 transition flex items-center space-x-1 text-sm"
+                                               aria-label="진술문 수정"
+                                           >
+                                               <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                                   <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.651-1.652a1.875 1.875 0 112.652 2.652L8.25 18.375 3 21l2.625-5.25L16.862 4.487z" />
+                                               </svg>
+                                               <span>수정</span>
+                                           </button>
+                                       </div>
+                                       <div v-if="achievement.isEditing" class="space-y-2">
+                                           <textarea v-model="achievement.editDraft" rows="3" class="w-full p-2 border border-gray-300 rounded-md text-sm"></textarea>
+                                           <div class="flex justify-end space-x-2">
+                                               <button type="button" @click="cancelEditingStatement(index)" class="px-3 py-1.5 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">취소</button>
+                                               <button type="button" @click="saveEditedStatement(index)" class="px-3 py-1.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">저장</button>
+                                           </div>
+                                       </div>
+                                       <p v-else class="text-sm text-gray-800 whitespace-pre-line">{{ achievement.statement }}</p>
                                    </div>
                                </div>
                                <button @click="addAchievement" class="mt-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">+ 성취기준 추가</button>
@@ -1076,6 +1103,14 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc, collection, query, where, getDocs, writeBatch, collectionGroup } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        const createEmptyAchievement = () => ({
+            text: '',
+            statement: '',
+            loading: false,
+            isEditing: false,
+            editDraft: ''
+        });
         
         // --- Firebase Configuration ---
         const firebaseConfig = {
@@ -1172,7 +1207,7 @@
                         importModalError: '',
                         teacherPlan: {
                             subjectName: '', teacherNames: [''],
-                            achievements: [{ text: '', statement: '', loading: false }],
+                            achievements: [createEmptyAchievement()],
                             gradeCalculation: '추정분할점수', conductPrevention: 'X',
                             preventionTarget: '', preventionMethods: [], preventionPeriod: [],
                             preventionSessions: [{ plan: '' }, { plan: '' }, { plan: '' }],
@@ -1504,8 +1539,8 @@
                     getInitialTeacherPlan() {
                         return {
                             subjectName: '', teacherNames: [''],
-                            achievements: [{ text: '', statement: '', loading: false }],
-                            gradeCalculation: '추정분hal점수', conductPrevention: 'X',
+                            achievements: [createEmptyAchievement()],
+                            gradeCalculation: '추정분할점수', conductPrevention: 'X',
                             preventionTarget: '', preventionMethods: [], preventionPeriod: [],
                             preventionSessions: [{ plan: '' }, { plan: '' }, { plan: '' }],
                             supplementaryMethods: [], supplementaryPeriod: [],
@@ -1984,7 +2019,17 @@
                                 this.teacherPlan = { ...defaultPlan, ...loadedPlan };
 
                                 this.teacherPlan.teacherNames = this.teacherPlan.teacherNames && this.teacherPlan.teacherNames.length > 0 ? this.teacherPlan.teacherNames : [''];
-                                this.teacherPlan.achievements = this.teacherPlan.achievements && this.teacherPlan.achievements.length > 0 ? this.teacherPlan.achievements : [{ text: '', statement: '', loading: false }];
+                                const normalizeAchievements = (achievements) => {
+                                    if (!Array.isArray(achievements) || achievements.length === 0) return [createEmptyAchievement()];
+                                    return achievements.map(item => ({
+                                        text: item?.text || '',
+                                        statement: item?.statement || '',
+                                        loading: false,
+                                        isEditing: false,
+                                        editDraft: ''
+                                    }));
+                                };
+                                this.teacherPlan.achievements = normalizeAchievements(this.teacherPlan.achievements);
                                 this.teacherPlan.preventionMethods = this.teacherPlan.preventionMethods || [];
                                 this.teacherPlan.preventionSessions = this.teacherPlan.preventionSessions && this.teacherPlan.preventionSessions.length > 0 ? this.teacherPlan.preventionSessions : [{plan:''}];
                                 this.teacherPlan.supplementaryMethods = this.teacherPlan.supplementaryMethods || [];
@@ -1992,7 +2037,11 @@
                                 this.teacherPlan.additionalMethods = this.teacherPlan.additionalMethods || [];
                                 this.teacherPlan.additionalSessions = this.teacherPlan.additionalSessions || [];
 
-                                this.teacherPlan.achievements.forEach(a => a.loading = false);
+                                this.teacherPlan.achievements.forEach(a => {
+                                    a.loading = false;
+                                    a.isEditing = false;
+                                    a.editDraft = '';
+                                });
                                 
                                 const parseDates = (period) => (period || []).map(d => d ? new Date(d.seconds ? d.seconds * 1000 : d) : null).filter(d => d && !isNaN(d.getTime()));
                                 this.teacherPlan.preventionPeriod = parseDates(this.teacherPlan.preventionPeriod);
@@ -2026,7 +2075,11 @@
                             planToSave.supplementaryPeriod = formatDates(this.teacherPlan.supplementaryPeriod);
                             planToSave.additionalPeriod = formatDates(this.teacherPlan.additionalPeriod);
 
-                            planToSave.achievements = (planToSave.achievements || []).map(({ loading, ...rest }) => rest);
+                            planToSave.achievements = (planToSave.achievements || []).map((achievement) => {
+                                if (!achievement) return { text: '', statement: '' };
+                                const { loading, isEditing, editDraft, ...rest } = achievement;
+                                return rest;
+                            });
                             await setDoc(planDocRef, planToSave);
                             this.teacherPlanStatus = "계획안이 저장되었습니다.";
                         } catch (error) { console.error("Error saving teacher plan:", error); this.teacherPlanStatus = "계획안 저장 실패: " + error.message; }
@@ -2327,6 +2380,17 @@
                             else if (formType === 'pledge') this.pledgeForm[field] = e.target.result;
                             this.saveFormTemplates();
                         }; reader.readAsDataURL(file);
+                    },
+                    removeImage(formType, field) {
+                        if (this.role !== '관리자') return;
+                        if (formType === 'newsletter') {
+                            if (!Object.prototype.hasOwnProperty.call(this.newsletterForm, field)) return;
+                            this.newsletterForm[field] = null;
+                        } else if (formType === 'pledge') {
+                            if (!Object.prototype.hasOwnProperty.call(this.pledgeForm, field)) return;
+                            this.pledgeForm[field] = null;
+                        }
+                        this.saveFormTemplates();
                     },
                     previewForm(type, studentsToPrint) {
                         const studentsArray = Array.isArray(studentsToPrint) ? studentsToPrint : [studentsToPrint];
@@ -2701,7 +2765,7 @@
                             this.teacherPlan.additionalSessions = this.teacherPlan.additionalSessions.slice(0, calculatedHours);
                         }
                     },
-                    addAchievement() { this.teacherPlan.achievements.push({ text: '', statement: '', loading: false }); },
+                    addAchievement() { this.teacherPlan.achievements.push(createEmptyAchievement()); },
                     removeAchievement(index) { this.teacherPlan.achievements.splice(index, 1); },
                     addPreventionSession() { this.teacherPlan.preventionSessions.push({ plan: '' }); },
                     removePreventionSession(index) { this.teacherPlan.preventionSessions.splice(index, 1); },
@@ -2720,6 +2784,8 @@
                         }
                         achievement.loading = true;
                         achievement.statement = '';
+                        achievement.isEditing = false;
+                        achievement.editDraft = '';
                         
                         const systemPrompt = "당신은 교육 전문가로서 성취기준을 바탕으로 최소 성취수준과 최소 성취수준 학생들의 행동 특성을 설명하는 역할입니다. 입력한 성취기준에 대한 학습자들의 성취수준을 A~E 5단계로 나누었을 때 최하 수준인 E수준을 한 문장으로 진술하세요. 성취수준이란 입력한 성취기준을 학습한 결과로 나타나는 학습자들의 학습 수준을 의미해. 최소 성취수준이므로 간단하고 기초적인 수준으로 입력하되, 부정적인 진술은 하지 말고, 최소한의 노력을 하고 성취기준에 해당하는 내용을 기초적인 수준에서 찾아보았다는 식으로 진술하세요. '학생들은~', '최소 성취수준:' 또는 'E수준:~' 이라는 별도의 설명 구문 없이 바로 성취수준 진술문만 제시해야 합니다. 예를 들어 성취기준이 '논증 요소에 따른 분석을 바탕으로 효과적으로 내용을 조직하여 논증하는 글을 쓴다.'인 경우 최소 성취수준은 '논증 요소에 대한 제한적인 분석을 바탕으로 논증하는 글을 쓴다.'로 진술할 수 있습니다. 예시로 든 진술문의 형식을 유지하면서 최소 성취수준 진술문을 제시해주세요.";
                         const userQuery = achievement.text;
@@ -2788,6 +2854,34 @@
                         } finally {
                             achievement.loading = false;
                         }
+                    },
+                    startEditingStatement(index) {
+                        this.teacherPlanError = '';
+                        const achievement = this.teacherPlan.achievements[index];
+                        if (!achievement) return;
+                        achievement.isEditing = true;
+                        achievement.editDraft = achievement.statement || '';
+                    },
+                    cancelEditingStatement(index) {
+                        const achievement = this.teacherPlan.achievements[index];
+                        if (!achievement) return;
+                        achievement.isEditing = false;
+                        achievement.editDraft = '';
+                        this.teacherPlanError = '';
+                    },
+                    saveEditedStatement(index) {
+                        const achievement = this.teacherPlan.achievements[index];
+                        if (!achievement) return;
+                        const edited = (achievement.editDraft || '').trim();
+                        if (!edited) {
+                            this.teacherPlanError = '진술문 내용을 입력해주세요.';
+                            return;
+                        }
+                        achievement.statement = edited;
+                        achievement.isEditing = false;
+                        achievement.editDraft = '';
+                        this.teacherPlanError = '';
+                        this.saveTeacherPlan();
                     },
                     generatePlanPreview() {
                         const plan = this.teacherPlan;
