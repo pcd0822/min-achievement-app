@@ -297,11 +297,14 @@
         <header class="bg-white shadow-md">
             <div class="container mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex items-center justify-between h-16">
-                    <div class="flex items-center">
-                        <svg class="h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v11.494m-9-5.747h18"/>
-                        </svg>
-                        <h1 class="ml-2 text-2xl font-bold text-gray-800">최소 성취수준 보장지도 관리</h1>
+                    <div class="flex flex-col sm:flex-row sm:items-center">
+                        <div class="flex items-center">
+                            <svg class="h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v11.494m-9-5.747h18"/>
+                            </svg>
+                            <h1 class="ml-2 text-2xl font-bold text-gray-800">최소 성취수준 보장지도 관리</h1>
+                        </div>
+                        <span class="sm:ml-4 sm:mt-0 mt-1 text-xs text-gray-400">Designed by 박찬들 (설악고)</span>
                     </div>
                      <!-- Login/Logout UI -->
                     <div v-if="isLoggedIn" class="flex items-center space-x-4">
@@ -987,6 +990,12 @@
                   </div>
              </div>
         </main>
+
+        <footer class="bg-gray-50 border-t">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-6 text-center text-xs text-gray-500">
+                © 2025 박찬들. 본 웹 애플리케이션의 모든 콘텐츠는 저작권법의 보호를 받습니다.
+            </div>
+        </footer>
 
         <!-- Modals -->
         <!-- Attendance Modal (Restored for Admin) -->
