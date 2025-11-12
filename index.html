@@ -2234,7 +2234,8 @@
                                                 if (!session || !session.attendance) return;
                                                 Object.entries(session.attendance).forEach(([studentId, methodName]) => {
                                                     if (!studentId || !methodName) return;
-                                                    const hours = recognizedHoursMap.get(methodName) || 0;
+                                                    let hours = recognizedHoursMap.has(methodName) ? recognizedHoursMap.get(methodName) : 1;
+                                                    hours = Number(hours) || 0;
                                                     if (hours <= 0) return;
                                                     const normalizedId = String(studentId);
                                                     supplementaryParticipants.add(normalizedId);
@@ -2254,7 +2255,8 @@
                                                 let sessionHasHours = false;
                                                 Object.entries(session.attendance).forEach(([studentId, methodName]) => {
                                                     if (!studentId || !methodName) return;
-                                                    const hours = recognizedHoursMap.get(methodName) || 0;
+                                                    let hours = recognizedHoursMap.has(methodName) ? recognizedHoursMap.get(methodName) : 1;
+                                                    hours = Number(hours) || 0;
                                                     if (hours <= 0) return;
                                                     const normalizedId = String(studentId);
                                                     preventiveParticipants.add(normalizedId);
