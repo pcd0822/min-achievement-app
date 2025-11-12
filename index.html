@@ -2216,6 +2216,11 @@
                                                 if (!student || !student.id) return;
                                                 const id = String(student.id);
                                                 stats.preventionTargets.add(id);
+                                                stats.preventionParticipants.add(id);
+                                                const gradeValue = this.getStudentGrade(id);
+                                                if (gradeParticipants[gradeValue]) {
+                                                    gradeParticipants[gradeValue].add(id);
+                                                }
                                             });
 
                                             const supplementarySessions = guidanceData.supplementary?.sessions || [];
@@ -2311,7 +2316,7 @@
                                 const preventionNonParticipantsCount = Math.max(preventionTargetCount - preventionParticipantsCount, 0);
                                 preventionSummary.push({
                                     subjectName,
-                                    hasPrevention: stats.preventionSessions > 0,
+                                    hasPrevention: stats.preventionSessions > 0 || stats.preventionParticipants.size > 0,
                                     sessions: stats.preventionSessions,
                                     targets: preventionTargetCount,
                                     participants: preventionParticipantsCount,
