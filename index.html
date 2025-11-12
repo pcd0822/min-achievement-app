@@ -2226,7 +2226,7 @@
                                             const supplementarySessions = guidanceData.supplementary?.sessions || [];
                                             const supplementaryParticipants = new Set();
                                             supplementarySessions.forEach(session => {
-                                                if (!session || !session.isSaved || !session.attendance) return;
+                                                if (!session || !session.attendance) return;
                                                 Object.entries(session.attendance).forEach(([studentId, methodName]) => {
                                                     if (!methodName) return;
                                                     supplementaryParticipants.add(String(studentId));
