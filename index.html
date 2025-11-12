@@ -2335,8 +2335,6 @@
                                 const completeCountGrade = completeIds.filter(id => stats.gradeUnderachievers.has(id)).length;
                                 const incompleteCountGrade = incompleteIds.filter(id => stats.gradeUnderachievers.has(id)).length;
 
-                                const attendanceParticipants = new Set(Array.from(stats.supplementaryParticipants).filter(id => stats.attendanceUnderachievers.has(id)));
-                                const gradeParticipants = new Set(Array.from(stats.supplementaryParticipants).filter(id => stats.gradeUnderachievers.has(id)));
                                 const completionParticipants = new Set([...completeIds, ...incompleteIds]);
                                 completionParticipants.forEach(id => {
                                     stats.supplementaryParticipants.add(id);
@@ -2344,6 +2342,8 @@
                                         stats.preventionParticipants.add(id);
                                     }
                                 });
+                                const attendanceParticipants = new Set(Array.from(stats.supplementaryParticipants).filter(id => stats.attendanceUnderachievers.has(id)));
+                                const gradeParticipants = new Set(Array.from(stats.supplementaryParticipants).filter(id => stats.gradeUnderachievers.has(id)));
 
                                 subjectSummary.push({
                                     subjectName,
