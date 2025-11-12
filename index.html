@@ -93,13 +93,13 @@
         }
         .table-wide-cell {
             min-width: 220px;
-            max-width: 320px;
+            max-width: 340px;
             white-space: normal;
             word-break: keep-all;
         }
         .table-exception-cell {
-            min-width: 180px;
-            max-width: 260px;
+            min-width: 240px;
+            max-width: 360px;
         }
         /* A4 비율과 유사한 미리보기 모달창 스타일 */
         .modal-preview {
@@ -548,17 +548,17 @@
 
                                <div v-if="underachievers.length > 0" class="mt-6">
                                    <h4 class="text-lg font-semibold mb-2">학업성취율/출석률 미도달 학생 현황 (처리 결과)</h4>
-                                   <div class="overflow-x-auto">
+                                    <div class="overflow-x-auto">
                                        <table class="min-w-full" id="underachievers-table">
                                            <thead class="bg-gray-50">
                                                <tr>
                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">학번</th>
                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">이름</th>
-                                                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">특기사항</th>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48">특기사항</th>
                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">미도달내역</th>
                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider table-wide-cell">미도달 과목(학점수)</th>
                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">보충지도(추가학습) 내역</th>
-                                                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">예외처리</th>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider table-exception-cell">예외처리</th>
                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">조치</th>
                                                </tr>
                                            </thead>
@@ -566,7 +566,7 @@
                                                <tr v-for="(detail, detailIndex) in student.details" :key="student.id + detail.reason + detailIndex">
                                                    <td v-if="detailIndex === 0" :rowspan="student.details.length" class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200">{{ student.id }}</td>
                                                    <td v-if="detailIndex === 0" :rowspan="student.details.length" class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200">{{ student.name }}</td>
-                                                   <td v-if="detailIndex === 0" :rowspan="student.details.length" class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200">{{ student.specialNotes }}</td>
+                                                   <td v-if="detailIndex === 0" :rowspan="student.details.length" class="px-4 py-4 whitespace-nowrap align-top border-b border-gray-200 text-sm">{{ student.specialNotes }}</td>
                                                         <td class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200">{{ detail.reason }}</td>
                                                         <td class="px-6 py-4 whitespace-normal align-top border-b border-gray-200 table-wide-cell">{{ detail.subjects }}</td>
                                                    <td class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200">{{ detail.lessonDetails }}</td>
@@ -2247,13 +2247,14 @@
                                             const preventiveParticipants = new Set();
                                             let savedPreventiveCount = 0;
                                             preventiveSessions.forEach(session => {
-                                                if (!session || !session.isSaved) return;
-                                                savedPreventiveCount++;
-                                                if (session.attendance) {
-                                                    Object.keys(session.attendance).forEach(studentId => {
-                                                        preventiveParticipants.add(String(studentId));
-                                                    });
+                                                if (!session || !session.attendance) return;
+                                                if (session.isSaved) {
+                                                    savedPreventiveCount++;
                                                 }
+                                                Object.entries(session.attendance).forEach(([studentId, methodName]) => {
+                                                    if (!studentId || !methodName) return;
+                                                    preventiveParticipants.add(String(studentId));
+                                                });
                                             });
                                             if (savedPreventiveCount > 0) {
                                                 stats.preventionSessions += savedPreventiveCount;
@@ -2265,16 +2266,6 @@
                                                 const gradeValue = this.getStudentGrade(id);
                                                 if (gradeParticipants[gradeValue]) {
                                                     gradeParticipants[gradeValue].add(id);
-                                                }
-                                            });
-                                            preventiveStudents.forEach(student => {
-                                                const id = String(student.id);
-                                                if (id) {
-                                                    stats.preventionParticipants.add(id);
-                                                    const gradeValue = this.getStudentGrade(id);
-                                                    if (gradeParticipants[gradeValue]) {
-                                                        gradeParticipants[gradeValue].add(id);
-                                                    }
                                                 }
                                             });
                                         }
