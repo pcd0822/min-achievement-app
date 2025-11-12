@@ -1266,8 +1266,7 @@
                                     <tr>
                                         <th>과목</th>
                                         <th>진행 여부</th>
-                                        <th>진행 차시</th>
-                                        <th>대상 인원</th>
+                                        <th>예방지도 이수시간(시수)</th>
                                         <th>참여 인원</th>
                                         <th>미참여 인원</th>
                                     </tr>
@@ -1277,12 +1276,11 @@
                                         <td>{{ row.subjectName }}</td>
                                         <td>{{ row.hasPrevention ? '진행' : '미진행' }}</td>
                                         <td>{{ row.sessions }}</td>
-                                        <td>{{ row.targets }}</td>
                                         <td>{{ row.participants }}</td>
                                         <td>{{ row.nonParticipants }}</td>
                                     </tr>
                                     <tr v-if="statisticsState.preventionSummary.length === 0">
-                                        <td colspan="6">표시할 데이터가 없습니다.</td>
+                                        <td colspan="5">표시할 데이터가 없습니다.</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -1295,7 +1293,6 @@
                                     <tr>
                                         <th>과목</th>
                                         <th>학점</th>
-                                        <th>추가학습 대상(과목출석률)</th>
                                         <th>추가학습 참여 인원</th>
                                         <th>예외처리 인원</th>
                                         <th>미이수</th>
@@ -1306,14 +1303,13 @@
                                     <tr v-for="row in statisticsState.additionalSummary" :key="row.subjectName">
                                         <td>{{ row.subjectName }}</td>
                                         <td>{{ row.credits }}</td>
-                                        <td>{{ row.attendanceTargets }}</td>
                                         <td>{{ row.participants }}</td>
                                         <td>{{ row.exceptionCount }}</td>
                                         <td>{{ row.incompleteCount }}</td>
                                         <td>{{ row.completeCount }}</td>
                                     </tr>
                                     <tr v-if="statisticsState.additionalSummary.length === 0">
-                                        <td colspan="7">표시할 데이터가 없습니다.</td>
+                                        <td colspan="6">표시할 데이터가 없습니다.</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -1326,7 +1322,6 @@
                                     <tr>
                                         <th>과목</th>
                                         <th>학점</th>
-                                        <th>보충지도 대상(학업성취율)</th>
                                         <th>보충지도 참여 인원</th>
                                         <th>예외처리 인원</th>
                                         <th>미이수</th>
@@ -1337,14 +1332,13 @@
                                     <tr v-for="row in statisticsState.remedialSummary" :key="row.subjectName">
                                         <td>{{ row.subjectName }}</td>
                                         <td>{{ row.credits }}</td>
-                                        <td>{{ row.gradeTargets }}</td>
                                         <td>{{ row.participants }}</td>
                                         <td>{{ row.exceptionCount }}</td>
                                         <td>{{ row.incompleteCount }}</td>
                                         <td>{{ row.completeCount }}</td>
                                     </tr>
                                     <tr v-if="statisticsState.remedialSummary.length === 0">
-                                        <td colspan="7">표시할 데이터가 없습니다.</td>
+                                        <td colspan="6">표시할 데이터가 없습니다.</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -1428,26 +1422,6 @@
                             </p>
                         </section>
 
-                        <section>
-                            <h4 class="stats-section-title">예방지도 참가자 중 보충지도 대상 제외 비율</h4>
-                            <div class="space-y-3">
-                                <div v-for="row in statisticsState.preventionMismatchGraph" :key="row.subjectName" class="space-y-1">
-                                    <div class="flex items-center justify-between text-sm font-medium text-gray-700">
-                                        <span>{{ row.subjectName }}</span>
-                                        <span>{{ row.percentage }}%</span>
-                                    </div>
-                                    <div class="stats-chart-track">
-                                        <div
-                                            class="stats-chart-bar"
-                                            :style="{ width: Math.min(row.percentage, 100) + '%' }"
-                                        ></div>
-                                    </div>
-                                </div>
-                                <p v-if="statisticsState.preventionMismatchGraph.length === 0" class="text-sm text-gray-500">
-                                    표시할 데이터가 없습니다.
-                                </p>
-                            </div>
-                        </section>
                     </div>
                 </div>
             </div>
@@ -1574,7 +1548,6 @@
                             multiSubjectBuckets: [],
                             gradePreventionRatios: [],
                             preventionCourseRatio: { totalSubjects: 0, activeSubjects: 0, percentage: 0 },
-                            preventionMismatchGraph: [],
                             lastUpdated: ''
                         },
                         completionStatusCache: null,
@@ -2068,14 +2041,6 @@
                                 const credits = Number(row['학점']);
                                 curriculumMap.set(subjectName, isNaN(credits) ? 0 : credits);
                             });
-                            const recognizedHoursConfig = Array.isArray(this.moduleConfig?.recognizedHours) ? this.moduleConfig.recognizedHours : [];
-                            const recognizedHoursMap = new Map();
-                            recognizedHoursConfig.forEach(item => {
-                                const name = item && item.name ? String(item.name).trim() : '';
-                                if (!name) return;
-                                const hours = Number(item.hours) || 0;
-                                recognizedHoursMap.set(name, hours);
-                            });
                             const ensureSubject = (subjectName) => {
                                 const key = subjectName ? String(subjectName).trim() : '';
                                 if (!key) return null;
@@ -2090,11 +2055,11 @@
                                         completion: { complete: new Set(), incomplete: new Set() },
                                         preventionTargets: new Set(),
                                         preventionParticipants: new Set(),
-                                        preventionHours: new Map(),
                                         preventionSessions: 0,
                                         supplementaryParticipants: new Set(),
                                         supplementaryTargets: new Set(),
-                                        supplementaryHours: new Map(),
+                                        completionTotals: new Map(),
+                                        preventiveHours: new Map(),
                                         planTeachers: new Set(),
                                         preventiveTeachers: new Set()
                                     });
@@ -2239,17 +2204,8 @@
                                             supplementarySessions.forEach(session => {
                                                 if (!session || !session.attendance) return;
                                                 Object.entries(session.attendance).forEach(([studentId, methodName]) => {
-                                                    if (studentId == null || methodName == null) return;
-                                                    const normalizedId = String(studentId).trim();
-                                                    if (!normalizedId) return;
-                                                    const methodKey = String(methodName).trim();
-                                                    if (!methodKey) return;
-                                                    let hours = recognizedHoursMap.has(methodKey) ? recognizedHoursMap.get(methodKey) : 1;
-                                                    hours = Number(hours) || 0;
-                                                    if (hours <= 0) return;
-                                                    supplementaryParticipants.add(normalizedId);
-                                                    const currentHours = stats.supplementaryHours.get(normalizedId) || 0;
-                                                    stats.supplementaryHours.set(normalizedId, currentHours + hours);
+                                                    if (!methodName) return;
+                                                    supplementaryParticipants.add(String(studentId));
                                                 });
                                             });
                                             supplementaryParticipants.forEach(id => {
@@ -2258,30 +2214,19 @@
 
                                             const preventiveSessions = guidanceData.preventive?.sessions || [];
                                             const preventiveParticipants = new Set();
-                                            let recordedPreventiveCount = 0;
+                                            let savedPreventiveCount = 0;
                                             preventiveSessions.forEach(session => {
                                                 if (!session || !session.attendance) return;
-                                                let sessionHasHours = false;
                                                 Object.entries(session.attendance).forEach(([studentId, methodName]) => {
-                                                    if (studentId == null || methodName == null) return;
-                                                    const normalizedId = String(studentId).trim();
-                                                    if (!normalizedId) return;
-                                                    const methodKey = String(methodName).trim();
-                                                    if (!methodKey) return;
-                                                    let hours = recognizedHoursMap.has(methodKey) ? recognizedHoursMap.get(methodKey) : 1;
-                                                    hours = Number(hours) || 0;
-                                                    if (hours <= 0) return;
-                                                    preventiveParticipants.add(normalizedId);
-                                                    const currentHours = stats.preventionHours.get(normalizedId) || 0;
-                                                    stats.preventionHours.set(normalizedId, currentHours + hours);
-                                                    sessionHasHours = true;
+                                                    if (!studentId || !methodName) return;
+                                                    preventiveParticipants.add(String(studentId));
                                                 });
-                                                if (sessionHasHours) {
-                                                    recordedPreventiveCount++;
+                                                if (session.isSaved) {
+                                                    savedPreventiveCount++;
                                                 }
                                             });
-                                            if (recordedPreventiveCount > 0) {
-                                                stats.preventionSessions += recordedPreventiveCount;
+                                            if (savedPreventiveCount > 0) {
+                                                stats.preventionSessions += savedPreventiveCount;
                                                 stats.preventiveTeachers.add(teacherDoc.id);
                                                 preventionSubjects.add(subjectName);
                                             }
@@ -2312,21 +2257,25 @@
                                                         } else if (typeof entry === 'number') {
                                                             totalHours = Number(entry);
                                                         }
+                                                    const preventiveHours = (entry && typeof entry === 'object' && entry.preventiveHours != null)
+                                                        ? Number(entry.preventiveHours) || 0
+                                                        : 0;
                                                         if (completionStatusValue === '이수') {
                                                             stats.completion.complete.add(normalizedId);
                                                         } else if (completionStatusValue === '미이수') {
                                                             stats.completion.incomplete.add(normalizedId);
                                                         }
+                                                    stats.completionTotals.set(normalizedId, totalHours);
+                                                    stats.preventiveHours.set(normalizedId, preventiveHours);
                                                         if (totalHours > 0 || completionStatusValue === '이수' || completionStatusValue === '미이수') {
                                                             stats.supplementaryParticipants.add(normalizedId);
                                                             if (stats.preventionTargets.has(normalizedId)) {
                                                                 stats.preventionParticipants.add(normalizedId);
                                                             }
-                                                            if (totalHours > 0) {
-                                                                const existingTotal = stats.supplementaryHours.get(normalizedId) || 0;
-                                                                stats.supplementaryHours.set(normalizedId, Math.max(existingTotal, totalHours));
-                                                            }
                                                         }
+                                                    if (preventiveHours > 0) {
+                                                        stats.preventionParticipants.add(normalizedId);
+                                                    }
                                                     });
                                                 }
                                             } catch (completionDocError) {
@@ -2346,9 +2295,6 @@
                             const additionalSummary = [];
                             const remedialSummary = [];
                             const deficitSummary = [];
-                            const mismatchRows = [];
-                            let totalParticipantsPairs = 0;
-                            let totalNonSupplementaryPairs = 0;
 
                             subjectStats.forEach(stats => {
                                 const subjectName = stats.subjectName;
@@ -2369,23 +2315,27 @@
                                 const completeCountGrade = completeIds.filter(id => stats.gradeUnderachievers.has(id)).length;
                                 const incompleteCountGrade = incompleteIds.filter(id => stats.gradeUnderachievers.has(id)).length;
 
-                                const completionParticipants = new Set([...completeIds, ...incompleteIds]);
-                                completionParticipants.forEach(id => {
-                                    stats.supplementaryParticipants.add(id);
-                                    if (stats.preventionTargets.has(id)) {
-                                        stats.preventionParticipants.add(id);
-                                    }
-                                });
+                                const supplementaryCompletionParticipants = [...stats.completionTotals.entries()]
+                                    .filter(([, total]) => (Number(total) || 0) > 0)
+                                    .map(([id]) => id);
+                                const supplementaryParticipantSet = new Set(supplementaryCompletionParticipants);
+                                stats.supplementaryParticipants.forEach(id => supplementaryParticipantSet.add(id));
 
-                                const supplementaryParticipantIds = new Set();
-                                stats.supplementaryParticipants.forEach(id => supplementaryParticipantIds.add(id));
-                                stats.supplementaryHours.forEach((hours, id) => { if (hours > 0) supplementaryParticipantIds.add(id); });
-                                const preventionParticipantIds = new Set();
-                                stats.preventionParticipants.forEach(id => preventionParticipantIds.add(id));
-                                stats.preventionHours.forEach((hours, id) => { if (hours > 0) preventionParticipantIds.add(id); });
+                                const preventiveHoursEntries = [...stats.preventiveHours.entries()];
+                                const preventiveParticipantSet = new Set(
+                                    preventiveHoursEntries
+                                        .filter(([, hours]) => (Number(hours) || 0) > 0)
+                                        .map(([id]) => id)
+                                );
+                                stats.preventionParticipants.forEach(id => preventiveParticipantSet.add(id));
 
-                                const attendanceParticipants = new Set([...supplementaryParticipantIds].filter(id => stats.attendanceUnderachievers.has(id)));
-                                const gradeParticipants = new Set([...supplementaryParticipantIds].filter(id => stats.gradeUnderachievers.has(id)));
+                                const totalPreventiveHours = preventiveHoursEntries.reduce((sum, [, hours]) => sum + (Number(hours) || 0), 0);
+                                const preventiveHoursDisplay = Number.isFinite(totalPreventiveHours) ? Number(totalPreventiveHours.toFixed(1)) : 0;
+
+                                const supplementaryTargetSet = stats.supplementaryTargets;
+                                const preventiveNonParticipants = supplementaryTargetSet.size > 0
+                                    ? [...supplementaryTargetSet].filter(id => !preventiveParticipantSet.has(id))
+                                    : [];
 
                                 subjectSummary.push({
                                     subjectName,
@@ -2397,33 +2347,32 @@
                                     incompleteCount
                                 });
 
-                                const preventionTargetCount = stats.preventionTargets.size;
-                                const preventionParticipantsCount = preventionParticipantIds.size;
-                                const preventionNonParticipantsCount = Math.max(preventionTargetCount - preventionParticipantsCount, 0);
                                 preventionSummary.push({
                                     subjectName,
-                                    hasPrevention: stats.preventionSessions > 0 || preventionParticipantsCount > 0,
-                                    sessions: stats.preventionSessions,
-                                    targets: preventionTargetCount,
-                                    participants: preventionParticipantsCount,
-                                    nonParticipants: preventionNonParticipantsCount
+                                    hasPrevention: totalPreventiveHours > 0 || preventiveParticipantSet.size > 0 || stats.preventionSessions > 0,
+                                    sessions: preventiveHoursDisplay,
+                                    participants: preventiveParticipantSet.size,
+                                    nonParticipants: preventiveNonParticipants.length
                                 });
+
+                                const supplementaryParticipantList = [...supplementaryParticipantSet];
+                                const supplementaryParticipantsCount = supplementaryParticipantList.length;
 
                                 additionalSummary.push({
                                     subjectName,
                                     credits: stats.credits,
-                                    attendanceTargets: attendanceIds.length,
-                                    participants: attendanceParticipants.size,
+                                    participants: supplementaryParticipantsCount,
                                     exceptionCount: exceptionCountAttendance,
                                     completeCount: completeCountAttendance,
                                     incompleteCount: incompleteCountAttendance
                                 });
 
+                                const gradeParticipantCount = supplementaryParticipantList.filter(id => stats.gradeUnderachievers.has(id)).length;
+
                                 remedialSummary.push({
                                     subjectName,
                                     credits: stats.credits,
-                                    gradeTargets: gradeIds.length,
-                                    participants: gradeParticipants.size,
+                                    participants: gradeParticipantCount,
                                     exceptionCount: exceptionCountGrade,
                                     completeCount: completeCountGrade,
                                     incompleteCount: incompleteCountGrade
@@ -2438,21 +2387,6 @@
                                     attendanceCount,
                                     bothCount
                                 });
-
-                                if (preventionParticipantsCount > 0) {
-                                    const nonSupplementaryCount = [...preventionParticipantIds].filter(studentId => !stats.attendanceUnderachievers.has(studentId)).length;
-                                    const percentage = nonSupplementaryCount > 0
-                                        ? Number(((nonSupplementaryCount / preventionParticipantsCount) * 100).toFixed(1))
-                                        : 0;
-                                    mismatchRows.push({
-                                        subjectName,
-                                        percentage,
-                                        nonSupplementaryCount,
-                                        participants: preventionParticipantsCount
-                                    });
-                                    totalParticipantsPairs += preventionParticipantsCount;
-                                    totalNonSupplementaryPairs += nonSupplementaryCount;
-                                }
                             });
 
                             subjectSummary.sort((a, b) => a.subjectName.localeCompare(b.subjectName, 'ko'));
@@ -2460,15 +2394,6 @@
                             additionalSummary.sort((a, b) => a.subjectName.localeCompare(b.subjectName, 'ko'));
                             remedialSummary.sort((a, b) => a.subjectName.localeCompare(b.subjectName, 'ko'));
                             deficitSummary.sort((a, b) => a.subjectName.localeCompare(b.subjectName, 'ko'));
-                            mismatchRows.sort((a, b) => b.percentage - a.percentage);
-
-                            const overallMismatchPercentage = totalParticipantsPairs > 0
-                                ? Number(((totalNonSupplementaryPairs / totalParticipantsPairs) * 100).toFixed(1))
-                                : 0;
-                            const preventionMismatchGraph = [{ subjectName: '전체', percentage: overallMismatchPercentage }];
-                            mismatchRows.forEach(row => {
-                                preventionMismatchGraph.push({ subjectName: row.subjectName, percentage: row.percentage });
-                            });
 
                             const multiSubjectBuckets = [
                                 { label: '1과목', count: 0 },
@@ -2511,7 +2436,6 @@
                             this.statisticsState.multiSubjectBuckets = multiSubjectBuckets;
                             this.statisticsState.gradePreventionRatios = gradePreventionRatios;
                             this.statisticsState.preventionCourseRatio = preventionCourseRatio;
-                            this.statisticsState.preventionMismatchGraph = preventionMismatchGraph;
                             this.statisticsState.lastUpdated = new Date().toLocaleString('ko-KR');
                         } catch (error) {
                             console.error('통계 대시보드 계산 오류:', error);
@@ -4238,6 +4162,7 @@
                                     completionData[studentId] = {
                                         completionStatus: status.completionStatus,
                                         total: status.total || 0,
+                                        preventiveHours: status.preventiveHours || 0,
                                         lastUpdated: new Date().toISOString()
                                     };
                                 }
