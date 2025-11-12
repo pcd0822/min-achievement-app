@@ -2337,6 +2337,13 @@
 
                                 const attendanceParticipants = new Set(Array.from(stats.supplementaryParticipants).filter(id => stats.attendanceUnderachievers.has(id)));
                                 const gradeParticipants = new Set(Array.from(stats.supplementaryParticipants).filter(id => stats.gradeUnderachievers.has(id)));
+                                const completionParticipants = new Set([...completeIds, ...incompleteIds]);
+                                completionParticipants.forEach(id => {
+                                    stats.supplementaryParticipants.add(id);
+                                    if (stats.preventionTargets.has(id)) {
+                                        stats.preventionParticipants.add(id);
+                                    }
+                                });
 
                                 subjectSummary.push({
                                     subjectName,
