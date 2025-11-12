@@ -2220,11 +2220,10 @@
                                                     if (!normalizedId) return;
                                                     supplementaryParticipants.add(normalizedId);
                                                     const methodKey = methodName ? String(methodName).trim() : '';
-                                                    const hours = recognizedHoursMap.has(methodKey) ? recognizedHoursMap.get(methodKey) : 0;
-                                                    if (hours > 0) {
-                                                        const prevTotal = stats.completionTotals.get(normalizedId) || 0;
-                                                        stats.completionTotals.set(normalizedId, prevTotal + hours);
-                                                    }
+                                                    const rawHours = recognizedHoursMap.has(methodKey) ? recognizedHoursMap.get(methodKey) : 0;
+                                                    const increment = rawHours > 0 ? rawHours : 1;
+                                                    const prevTotal = stats.completionTotals.get(normalizedId) || 0;
+                                                    stats.completionTotals.set(normalizedId, prevTotal + increment);
                                                 });
                                             });
                                             supplementaryParticipants.forEach(id => {
@@ -2242,11 +2241,10 @@
                                                     if (!normalizedId) return;
                                                     preventiveParticipants.add(normalizedId);
                                                     const methodKey = methodName ? String(methodName).trim() : '';
-                                                    const hours = recognizedHoursMap.has(methodKey) ? recognizedHoursMap.get(methodKey) : 0;
-                                                    if (hours > 0) {
-                                                        const prevPreventive = stats.preventiveHours.get(normalizedId) || 0;
-                                                        stats.preventiveHours.set(normalizedId, prevPreventive + hours);
-                                                    }
+                                                    const rawHours = recognizedHoursMap.has(methodKey) ? recognizedHoursMap.get(methodKey) : 0;
+                                                    const increment = rawHours > 0 ? rawHours : 1;
+                                                    const prevPreventive = stats.preventiveHours.get(normalizedId) || 0;
+                                                    stats.preventiveHours.set(normalizedId, prevPreventive + increment);
                                                 });
                                                 if (session.isSaved) {
                                                     savedPreventiveCount++;
