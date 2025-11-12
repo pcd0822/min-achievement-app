@@ -1293,7 +1293,9 @@
                                     <tr>
                                         <th>과목</th>
                                         <th>학점</th>
+                                        <th>추가학습 대상(과목출석률)</th>
                                         <th>추가학습 참여 인원</th>
+                                        <th>미참여 인원</th>
                                         <th>예외처리 인원</th>
                                         <th>미이수</th>
                                         <th>이수</th>
@@ -1303,13 +1305,15 @@
                                     <tr v-for="row in statisticsState.additionalSummary" :key="row.subjectName">
                                         <td>{{ row.subjectName }}</td>
                                         <td>{{ row.credits }}</td>
+                                        <td>{{ row.attendanceTargets }}</td>
                                         <td>{{ row.participants }}</td>
+                                        <td>{{ row.nonParticipants }}</td>
                                         <td>{{ row.exceptionCount }}</td>
                                         <td>{{ row.incompleteCount }}</td>
                                         <td>{{ row.completeCount }}</td>
                                     </tr>
                                     <tr v-if="statisticsState.additionalSummary.length === 0">
-                                        <td colspan="6">표시할 데이터가 없습니다.</td>
+                                        <td colspan="8">표시할 데이터가 없습니다.</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -1322,7 +1326,9 @@
                                     <tr>
                                         <th>과목</th>
                                         <th>학점</th>
+                                        <th>보충지도 대상(학업성취율)</th>
                                         <th>보충지도 참여 인원</th>
+                                        <th>미참여 인원</th>
                                         <th>예외처리 인원</th>
                                         <th>미이수</th>
                                         <th>이수</th>
@@ -1332,13 +1338,15 @@
                                     <tr v-for="row in statisticsState.remedialSummary" :key="row.subjectName">
                                         <td>{{ row.subjectName }}</td>
                                         <td>{{ row.credits }}</td>
+                                        <td>{{ row.gradeTargets }}</td>
                                         <td>{{ row.participants }}</td>
+                                        <td>{{ row.nonParticipants }}</td>
                                         <td>{{ row.exceptionCount }}</td>
                                         <td>{{ row.incompleteCount }}</td>
                                         <td>{{ row.completeCount }}</td>
                                     </tr>
                                     <tr v-if="statisticsState.remedialSummary.length === 0">
-                                        <td colspan="6">표시할 데이터가 없습니다.</td>
+                                        <td colspan="8">표시할 데이터가 없습니다.</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -1550,7 +1558,6 @@
                             preventionCourseRatio: { totalSubjects: 0, activeSubjects: 0, percentage: 0 },
                             lastUpdated: ''
                         },
-                        completionStatusCache: null,
                         fileProcessingError: '',
                         showAttendanceModal: false,
                         newAttendanceStudent: { id: '', subjects: [''] },
@@ -2112,32 +2119,27 @@
                                 }
                             });
 
-                            let completionData = this.completionStatusCache;
-                            if (!completionData) {
-                                try {
-                                    const completionDocRef = doc(db, `schools/${this.schoolId}/commonData`, 'completionStatus');
-                                    const completionSnap = await getDoc(completionDocRef);
-                                    completionData = completionSnap.exists() ? completionSnap.data().data || {} : {};
-                                    this.completionStatusCache = completionData;
-                                } catch (error) {
-                                    console.warn('completionStatus 로드 실패:', error);
-                                    completionData = {};
-                                }
-                            }
-                            Object.keys(completionData || {}).forEach(subjectName => {
-                                const stats = ensureSubject(subjectName);
-                                if (!stats) return;
-                                const subjectEntries = completionData[subjectName] || {};
-                                Object.keys(subjectEntries).forEach(studentId => {
-                                    const statusValue = subjectEntries[studentId];
-                                    const id = String(studentId);
-                                    if (statusValue === '이수') {
-                                        stats.completion.complete.add(id);
-                                    } else if (statusValue === '미이수') {
-                                        stats.completion.incomplete.add(id);
-                                    }
+                            try {
+                                const completionDocRef = doc(db, `schools/${this.schoolId}/commonData`, 'completionStatus');
+                                const completionSnap = await getDoc(completionDocRef);
+                                const completionData = completionSnap.exists() ? completionSnap.data().data || {} : {};
+                                Object.keys(completionData || {}).forEach(subjectName => {
+                                    const stats = ensureSubject(subjectName);
+                                    if (!stats) return;
+                                    const subjectEntries = completionData[subjectName] || {};
+                                    Object.keys(subjectEntries).forEach(studentId => {
+                                        const statusValue = subjectEntries[studentId];
+                                        const id = String(studentId);
+                                        if (statusValue === '이수') {
+                                            stats.completion.complete.add(id);
+                                        } else if (statusValue === '미이수') {
+                                            stats.completion.incomplete.add(id);
+                                        }
+                                    });
                                 });
-                            });
+                            } catch (error) {
+                                console.warn('completionStatus 로드 실패:', error);
+                            }
 
                             const planSubjects = new Set();
                             const preventionSubjects = new Set();
@@ -2357,22 +2359,32 @@
 
                                 const supplementaryParticipantList = [...supplementaryParticipantSet];
                                 const supplementaryParticipantsCount = supplementaryParticipantList.length;
+                                const supplementaryNonParticipantsCount = attendanceIds.length > 0
+                                    ? attendanceIds.filter(id => !supplementaryParticipantSet.has(id)).length
+                                    : 0;
 
                                 additionalSummary.push({
                                     subjectName,
                                     credits: stats.credits,
+                                    attendanceTargets: attendanceIds.length,
                                     participants: supplementaryParticipantsCount,
                                     exceptionCount: exceptionCountAttendance,
+                                    nonParticipants: supplementaryNonParticipantsCount,
                                     completeCount: completeCountAttendance,
                                     incompleteCount: incompleteCountAttendance
                                 });
 
                                 const gradeParticipantCount = supplementaryParticipantList.filter(id => stats.gradeUnderachievers.has(id)).length;
+                                const gradeNonParticipantCount = gradeIds.length > 0
+                                    ? gradeIds.filter(id => !supplementaryParticipantSet.has(id)).length
+                                    : 0;
 
                                 remedialSummary.push({
                                     subjectName,
                                     credits: stats.credits,
+                                    gradeTargets: gradeIds.length,
                                     participants: gradeParticipantCount,
+                                    nonParticipants: gradeNonParticipantCount,
                                     exceptionCount: exceptionCountGrade,
                                     completeCount: completeCountGrade,
                                     incompleteCount: incompleteCountGrade
