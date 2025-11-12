@@ -92,14 +92,14 @@
             font-size: 0.85rem;
         }
         .table-wide-cell {
-            min-width: 220px;
-            max-width: 340px;
+            min-width: 260px;
+            max-width: 420px;
             white-space: normal;
             word-break: keep-all;
         }
         .table-exception-cell {
-            min-width: 240px;
-            max-width: 360px;
+            min-width: 280px;
+            max-width: 420px;
         }
         /* A4 비율과 유사한 미리보기 모달창 스타일 */
         .modal-preview {
@@ -548,13 +548,13 @@
 
                                <div v-if="underachievers.length > 0" class="mt-6">
                                    <h4 class="text-lg font-semibold mb-2">학업성취율/출석률 미도달 학생 현황 (처리 결과)</h4>
-                                    <div class="overflow-x-auto">
-                                       <table class="min-w-full" id="underachievers-table">
+                                   <div class="overflow-x-auto">
+                                       <table class="min-w-full" id="underachievers-table" style="min-width: 1150px;">
                                            <thead class="bg-gray-50">
                                                <tr>
                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">학번</th>
                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">이름</th>
-                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48">특기사항</th>
+                                                   <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">특기사항</th>
                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">미도달내역</th>
                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider table-wide-cell">미도달 과목(학점수)</th>
                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">보충지도(추가학습) 내역</th>
@@ -566,28 +566,25 @@
                                                <tr v-for="(detail, detailIndex) in student.details" :key="student.id + detail.reason + detailIndex">
                                                    <td v-if="detailIndex === 0" :rowspan="student.details.length" class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200">{{ student.id }}</td>
                                                    <td v-if="detailIndex === 0" :rowspan="student.details.length" class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200">{{ student.name }}</td>
-                                                   <td v-if="detailIndex === 0" :rowspan="student.details.length" class="px-4 py-4 whitespace-nowrap align-top border-b border-gray-200 text-sm">{{ student.specialNotes }}</td>
+                                                   <td v-if="detailIndex === 0" :rowspan="student.details.length" class="px-3 py-4 whitespace-nowrap align-top border-b border-gray-200 text-xs">{{ student.specialNotes }}</td>
                                                         <td class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200">{{ detail.reason }}</td>
                                                         <td class="px-6 py-4 whitespace-normal align-top border-b border-gray-200 table-wide-cell">{{ detail.subjects }}</td>
                                                    <td class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200">{{ detail.lessonDetails }}</td>
                                                        <td class="px-6 py-4 whitespace-normal align-top border-b border-gray-200 table-exception-cell">
-                                                           <div v-for="subjectInfo in detail.originalSubjects" :key="subjectInfo.name" class="py-1.5 border-b border-gray-100 last:border-b-0">
-                                                               <div class="flex items-start justify-between gap-2">
-                                                                   <div class="text-left">
-                                                                       <p class="text-xs font-semibold text-gray-700 leading-5 break-words">{{ subjectInfo.name }}</p>
-                                                                       <p class="text-[11px] text-gray-500 leading-4">
-                                                                           {{ getExceptionReason(detail.id, subjectInfo.name) ? `예외처리: ${getExceptionReason(detail.id, subjectInfo.name)}` : '예외처리 없음' }}
-                                                                       </p>
-                                                                   </div>
-                                                                   <select
-                                                                       class="border border-gray-300 rounded-md text-[11px] px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                                                                       :value="getExceptionReason(detail.id, subjectInfo.name)"
-                                                                       @change="updateExceptionReason(detail.id, subjectInfo.name, $event.target.value)"
-                                                                   >
-                                                                       <option value="">선택</option>
-                                                                       <option v-for="option in exceptionOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
-                                                                   </select>
-                                                               </div>
+                                                           <div v-if="detailIndex === 0" class="space-y-2">
+                                                               <select
+                                                                   class="border border-gray-300 rounded-md text-sm px-3 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                                                   :value="getStudentExceptionReason(student.id)"
+                                                                   @change="updateStudentExceptionReason(student.id, $event.target.value)"
+                                                               >
+                                                                   <option value="">예외처리 없음</option>
+                                                                   <option v-for="option in exceptionOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+                                                               </select>
+                                                               <p class="text-xs text-gray-600" v-if="getStudentExceptionReason(student.id)">선택된 사유: {{ getStudentExceptionReason(student.id) }}</p>
+                                                               <p class="text-xs text-gray-500" v-else>학생이 예외처리 대상이 아니면 '예외처리 없음'으로 두세요.</p>
+                                                           </div>
+                                                           <div v-else class="text-xs text-gray-600">
+                                                               {{ getStudentExceptionReason(student.id) ? `예외처리: ${getStudentExceptionReason(student.id)}` : '예외처리 없음' }}
                                                            </div>
                                                        </td>
                                                    <td class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200 text-sm font-medium">
@@ -1972,19 +1969,19 @@
                                 .filter(subjectName => subjectName)
                                 .map(subjectName => String(subjectName).trim())
                             : [];
-                        const exceptionsRaw = entry.exceptions && typeof entry.exceptions === 'object' && !Array.isArray(entry.exceptions)
-                            ? entry.exceptions
-                            : {};
-                        const normalizedExceptions = {};
-                        Object.keys(exceptionsRaw).forEach(subjectKey => {
-                            if (!subjectKey) return;
-                            const key = String(subjectKey).trim();
-                            const value = exceptionsRaw[subjectKey];
-                            if (value) {
-                                normalizedExceptions[key] = String(value).trim();
+                        let exceptionReason = entry.exceptionReason ? String(entry.exceptionReason).trim() : '';
+                        if (!exceptionReason && entry.exceptions && typeof entry.exceptions === 'object') {
+                            for (const subjectKey in entry.exceptions) {
+                                if (!subjectKey) continue;
+                                const value = entry.exceptions[subjectKey];
+                                if (value) {
+                                    exceptionReason = String(value).trim();
+                                    break;
+                                }
                             }
-                        });
-                        normalized.exceptions = normalizedExceptions;
+                        }
+                        normalized.exceptionReason = exceptionReason;
+                        if (normalized.exceptions) delete normalized.exceptions;
                         return normalized;
                     },
                     normalizeUnderachieverList(list) {
@@ -1995,37 +1992,28 @@
                         result.sort((a, b) => a.id.localeCompare(b.id));
                         return result;
                     },
-                    getExceptionReason(studentId, subjectName) {
+                    getStudentExceptionReason(studentId) {
                         const id = studentId ? String(studentId) : '';
-                        const subjectKey = subjectName ? String(subjectName).trim() : '';
-                        if (!id || !subjectKey) return '';
+                        if (!id) return '';
                         const findReason = (list) => {
                             if (!Array.isArray(list)) return '';
-                            const target = list.find(item => item && item.id === id);
-                            if (!target || !target.exceptions) return '';
-                            return target.exceptions[subjectKey] || '';
+                            const student = list.find(item => item && item.id === id);
+                            if (!student) return '';
+                            return student.exceptionReason ? String(student.exceptionReason).trim() : '';
                         };
                         return findReason(this.underachievers) || findReason(this.deployedUnderachievers) || '';
                     },
-                    async updateExceptionReason(studentId, subjectName, reason) {
+                    async updateStudentExceptionReason(studentId, reason) {
                         if (this.role !== '관리자') return;
                         const id = studentId ? String(studentId) : '';
-                        const subjectKey = subjectName ? String(subjectName).trim() : '';
                         const trimmedReason = reason ? String(reason).trim() : '';
-                        if (!id || !subjectKey) return;
+                        if (!id) return;
 
                         const applyUpdate = (list) => {
                             if (!Array.isArray(list)) return false;
                             const student = list.find(item => item && item.id === id);
                             if (!student) return false;
-                            if (!student.exceptions || typeof student.exceptions !== 'object') {
-                                student.exceptions = {};
-                            }
-                            if (trimmedReason) {
-                                student.exceptions[subjectKey] = trimmedReason;
-                            } else {
-                                delete student.exceptions[subjectKey];
-                            }
+                            student.exceptionReason = trimmedReason;
                             return true;
                         };
 
@@ -2090,7 +2078,7 @@
                                         underachievers: new Set(),
                                         gradeUnderachievers: new Set(),
                                         attendanceUnderachievers: new Set(),
-                                        exceptions: new Map(),
+                                        exceptions: new Set(),
                                         completion: { complete: new Set(), incomplete: new Set() },
                                         preventionTargets: new Set(),
                                         preventionParticipants: new Set(),
@@ -2127,8 +2115,8 @@
                                     if (!stats) return;
                                     stats.underachievers.add(studentId);
                                     stats.gradeUnderachievers.add(studentId);
-                                    if (student.exceptions && student.exceptions[subjectName]) {
-                                        stats.exceptions.set(studentId, student.exceptions[subjectName]);
+                                    if (student.exceptionReason) {
+                                        stats.exceptions.add(studentId);
                                     }
                                     gradeSubjectsSet.add(subjectName);
                                 });
@@ -2140,8 +2128,8 @@
                                     if (!stats) return;
                                     stats.underachievers.add(studentId);
                                     stats.attendanceUnderachievers.add(studentId);
-                                    if (student.exceptions && student.exceptions[subjectName]) {
-                                        stats.exceptions.set(studentId, student.exceptions[subjectName]);
+                                    if (student.exceptionReason) {
+                                        stats.exceptions.add(studentId);
                                     }
                                 });
                                 if (gradeSubjectsSet.size > 0) {
@@ -2217,9 +2205,9 @@
                                                 const id = String(student.id);
                                                 stats.supplementaryTargets.add(id);
                                                 if (student.exceptionReason) {
-                                                    stats.exceptions.set(id, String(student.exceptionReason));
+                                                    stats.exceptions.add(id);
                                                 } else if (student.isException && student.reason) {
-                                                    stats.exceptions.set(id, String(student.reason));
+                                                    stats.exceptions.add(id);
                                                 }
                                             });
 
@@ -2290,13 +2278,13 @@
                                 const subjectName = stats.subjectName;
                                 const gradeIds = Array.from(stats.gradeUnderachievers);
                                 const attendanceIds = Array.from(stats.attendanceUnderachievers);
-                                const exceptionEntries = Array.from(stats.exceptions.entries());
+                                const exceptionEntries = Array.from(stats.exceptions);
                                 const completeIds = Array.from(stats.completion.complete);
                                 const incompleteIds = Array.from(stats.completion.incomplete);
 
                                 const exceptionCount = exceptionEntries.length;
-                                const exceptionCountAttendance = exceptionEntries.filter(([id]) => stats.attendanceUnderachievers.has(id)).length;
-                                const exceptionCountGrade = exceptionEntries.filter(([id]) => stats.gradeUnderachievers.has(id)).length;
+                                const exceptionCountAttendance = exceptionEntries.filter(id => stats.attendanceUnderachievers.has(id)).length;
+                                const exceptionCountGrade = exceptionEntries.filter(id => stats.gradeUnderachievers.has(id)).length;
 
                                 const completeCount = completeIds.length;
                                 const incompleteCount = incompleteIds.length;
@@ -3605,7 +3593,7 @@
                                                     name: data.name,
                                                     gradeSubjects: gradeSubjectsData,
                                                     attendanceSubjects: [],
-                                                    exceptions: {}
+                                                    exceptionReason: ''
                                                 });
                                             }
                                         });
@@ -3658,7 +3646,7 @@
                                 if (!existingSubjects.has(subject)) this.underachievers[studentIndex].attendanceSubjects.push(subject);
                             });
                         } else {
-                            this.underachievers.push({ id: canonicalId, name, gradeSubjects: [], attendanceSubjects: validSubjects, exceptions: {} });
+                            this.underachievers.push({ id: canonicalId, name, gradeSubjects: [], attendanceSubjects: validSubjects, exceptionReason: '' });
                         }
                         this.underachievers.sort((a, b) => a.id.localeCompare(b.id));
                         this.closeAttendanceModal();
@@ -3676,9 +3664,6 @@
                             }
                             if (detailToDelete.reason.includes('과목출석률')) {
                                 student.attendanceSubjects = student.attendanceSubjects.filter(asName => asName !== subjectInfo.name);
-                            }
-                            if (student.exceptions && subjectInfo.name && student.exceptions[subjectInfo.name]) {
-                                delete student.exceptions[subjectInfo.name];
                             }
                         });
                         
@@ -3747,7 +3732,7 @@
                                 else if (gradeMatch) reason = '학업성취율';
                                 else if (attendanceMatch) reason = '과목출석률';
                                 s.reason = reason || s.reason || '';
-                                const exceptionReason = match.exceptions && match.exceptions[subject] ? match.exceptions[subject] : '';
+                                const exceptionReason = match.exceptionReason ? String(match.exceptionReason).trim() : '';
                                 const isException = !!exceptionReason;
                                 s.isException = isException;
                                 s.exceptionReason = exceptionReason || '';
@@ -4314,7 +4299,7 @@
                             else if (gradeMatch) reason = '학업성취율';
                             else if (attendanceMatch) reason = '과목출석률';
 
-                            const exceptionReason = newStudent.exceptions && newStudent.exceptions[subject] ? newStudent.exceptions[subject] : '';
+                            const exceptionReason = newStudent.exceptionReason ? String(newStudent.exceptionReason).trim() : '';
                             const isException = !!exceptionReason;
                             const note = isException ? `보충지도 예외처리 대상자 (${exceptionReason})` : '';
 
