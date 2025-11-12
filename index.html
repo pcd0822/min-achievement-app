@@ -51,6 +51,46 @@
             max-width: 90%;
             width: 500px;
         }
+        .modal-content.modal-large {
+            width: 90%;
+            max-width: 1200px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .stats-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .stats-table th, .stats-table td {
+            border: 1px solid #e5e7eb;
+            padding: 0.5rem;
+            text-align: center;
+            font-size: 0.875rem;
+        }
+        .stats-table thead th {
+            background-color: #f9fafb;
+            font-weight: 600;
+        }
+        .stats-section-title {
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            font-size: 1.1rem;
+        }
+        .stats-chart-track {
+            width: 100%;
+            background: #e5e7eb;
+            border-radius: 9999px;
+            overflow: hidden;
+            height: 24px;
+        }
+        .stats-chart-bar {
+            height: 24px;
+            border-radius: 9999px;
+            background: linear-gradient(90deg, #4f46e5, #6366f1);
+        }
+        .stats-chart-label {
+            font-size: 0.85rem;
+        }
         /* A4 비율과 유사한 미리보기 모달창 스타일 */
         .modal-preview {
              width: 210mm; /* A4 width */
@@ -407,7 +447,15 @@
              <div v-if="isLoggedIn && role && !isLoading">
                 <!-- Admin View -->
                      <div v-if="role === '관리자'">
-                      <h2 class="text-3xl font-bold text-gray-800 mb-6">관리자 대시보드 (학교코드: {{ currentSchoolCode || '미설정' }})</h2>
+                      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-3">
+                          <h2 class="text-3xl font-bold text-gray-800">관리자 대시보드 (학교코드: {{ currentSchoolCode || '미설정' }})</h2>
+                          <button
+                              @click="openStatisticsModal"
+                              class="inline-flex items-center justify-center px-4 py-2 bg-slate-800 text-white rounded-md hover:bg-slate-900 transition text-sm font-semibold shadow-sm"
+                          >
+                              통계 대시보드 보기
+                          </button>
+                      </div>
                       <div v-if="!currentSchoolCode" class="mb-6 p-4 bg-yellow-100 text-yellow-800 border-l-4 border-yellow-500 rounded-md">
                           <p class="font-bold">안내</p>
                           <p>학교코드가 설정되지 않았습니다. 데이터를 저장하거나 관리하려면 우측 상단의 '학교 코드 수정 및 발급' 버튼을 눌러 코드를 먼저 설정해주세요.</p>
@@ -500,6 +548,7 @@
                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">미도달내역</th>
                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">미도달 과목(학점수)</th>
                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">보충지도(추가학습) 내역</th>
+                                                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">예외처리</th>
                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">조치</th>
                                                </tr>
                                            </thead>
@@ -511,6 +560,26 @@
                                                    <td class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200">{{ detail.reason }}</td>
                                                    <td class="px-6 py-4 whitespace-normal align-top border-b border-gray-200">{{ detail.subjects }}</td>
                                                    <td class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200">{{ detail.lessonDetails }}</td>
+                                                       <td class="px-6 py-4 whitespace-normal align-top border-b border-gray-200">
+                                                           <div v-for="subjectInfo in detail.originalSubjects" :key="subjectInfo.name" class="py-2 border-b border-gray-100 last:border-b-0">
+                                                               <div class="flex items-center justify-between gap-2">
+                                                                   <div class="text-left">
+                                                                       <p class="text-sm font-semibold text-gray-700">{{ subjectInfo.name }}</p>
+                                                                       <p class="text-xs text-gray-500">
+                                                                           {{ getExceptionReason(detail.id, subjectInfo.name) ? `예외처리: ${getExceptionReason(detail.id, subjectInfo.name)}` : '예외처리 없음' }}
+                                                                       </p>
+                                                                   </div>
+                                                                   <select
+                                                                       class="border border-gray-300 rounded-md text-xs px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                                                       :value="getExceptionReason(detail.id, subjectInfo.name)"
+                                                                       @change="updateExceptionReason(detail.id, subjectInfo.name, $event.target.value)"
+                                                                   >
+                                                                       <option value="">선택</option>
+                                                                       <option v-for="option in exceptionOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+                                                                   </select>
+                                                               </div>
+                                                           </div>
+                                                       </td>
                                                    <td class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200 text-sm font-medium">
                                                        <button @click="deleteDetailGroup(detail)" class="text-red-600 hover:text-red-900">삭제</button>
                                                    </td>
@@ -811,6 +880,7 @@
                                                <th v-for="rh in moduleConfig.recognizedHours" :key="rh.name" class="p-2 border">{{ rh.name }}</th>
                                                <th class="p-2 border bg-gray-100">총계</th>
                                                <th v-if="teacherTab === 'supplementary'" class="p-2 border bg-gray-100">이수여부</th>
+                                               <th v-if="teacherTab === 'supplementary'" class="p-2 border bg-gray-100">비고</th>
                                            </tr>
                                        </thead>
                                        <tbody>
@@ -840,9 +910,12 @@
                                                    }">
                                                    {{ guidanceCompletionStatus[student.id] ? guidanceCompletionStatus[student.id].completionStatus : '' }}
                                                </td>
+                                               <td v-if="teacherTab === 'supplementary'" class="p-2 border text-sm text-gray-700">
+                                                   {{ student.note || '' }}
+                                               </td>
                                            </tr>
                                             <tr v-if="!currentGuidanceData.students || currentGuidanceData.students.length === 0">
-                                               <td :colspan="moduleConfig.recognizedHours.length + (teacherTab === 'supplementary' ? 7 : 2)" class="text-center p-4 text-gray-500">학생이 없습니다.</td>
+                                               <td :colspan="moduleConfig.recognizedHours.length + (teacherTab === 'supplementary' ? 8 : 2)" class="text-center p-4 text-gray-500">학생이 없습니다.</td>
                                            </tr>
                                        </tbody>
                                    </table>
@@ -1125,6 +1198,217 @@
             </div>
         </div>    
         
+        <!-- Statistics Dashboard Modal -->
+        <div v-if="showStatisticsModal" class="modal-overlay" @click.self="closeStatisticsModal">
+            <div class="modal-content modal-large">
+                <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
+                    <div>
+                        <h3 class="text-2xl font-bold text-gray-900">통계 대시보드</h3>
+                        <p v-if="statisticsState.lastUpdated" class="text-sm text-gray-500 mt-1">
+                            최종 계산 시각: {{ statisticsState.lastUpdated }}
+                        </p>
+                    </div>
+                    <button
+                        @click="closeStatisticsModal"
+                        class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition text-sm font-semibold"
+                    >
+                        닫기
+                    </button>
+                </div>
+                <div v-if="statisticsState.loading" class="py-12 text-center text-sm text-gray-600">
+                    통계를 계산 중입니다. 잠시만 기다려주세요...
+                </div>
+                <div v-else>
+                    <p v-if="statisticsState.error" class="mb-4 text-sm text-red-600">{{ statisticsState.error }}</p>
+                    <div class="space-y-8 max-h-[70vh] overflow-y-auto pr-2">
+                        <section>
+                            <h4 class="stats-section-title">과목별 이수 현황 요약</h4>
+                            <table class="stats-table">
+                                <thead>
+                                    <tr>
+                                        <th>과목</th>
+                                        <th>학점</th>
+                                        <th>미도달 인원</th>
+                                        <th>예외처리 인원</th>
+                                        <th>미이수</th>
+                                        <th>이수</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="row in statisticsState.subjectSummary" :key="row.subjectName">
+                                        <td>{{ row.subjectName }}</td>
+                                        <td>{{ row.credits }}</td>
+                                        <td>{{ row.underachieverCount }}</td>
+                                        <td>{{ row.exceptionCount }}</td>
+                                        <td>{{ row.incompleteCount }}</td>
+                                        <td>{{ row.completeCount }}</td>
+                                    </tr>
+                                    <tr v-if="statisticsState.subjectSummary.length === 0">
+                                        <td colspan="6">표시할 데이터가 없습니다.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </section>
+
+                        <section>
+                            <h4 class="stats-section-title">과목별 예방지도 참여 현황</h4>
+                            <table class="stats-table">
+                                <thead>
+                                    <tr>
+                                        <th>과목</th>
+                                        <th>진행 여부</th>
+                                        <th>진행 차시</th>
+                                        <th>참여 인원</th>
+                                        <th>미참여 인원</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="row in statisticsState.preventionSummary" :key="row.subjectName">
+                                        <td>{{ row.subjectName }}</td>
+                                        <td>{{ row.hasPrevention ? '진행' : '미진행' }}</td>
+                                        <td>{{ row.sessions }}</td>
+                                        <td>{{ row.participants }}</td>
+                                        <td>{{ row.nonParticipants }}</td>
+                                    </tr>
+                                    <tr v-if="statisticsState.preventionSummary.length === 0">
+                                        <td colspan="5">표시할 데이터가 없습니다.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </section>
+
+                        <section>
+                            <h4 class="stats-section-title">과목별 추가학습 참여 현황</h4>
+                            <table class="stats-table">
+                                <thead>
+                                    <tr>
+                                        <th>과목</th>
+                                        <th>학점</th>
+                                        <th>추가학습 인원</th>
+                                        <th>예외처리 인원</th>
+                                        <th>미이수</th>
+                                        <th>이수</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="row in statisticsState.additionalSummary" :key="row.subjectName">
+                                        <td>{{ row.subjectName }}</td>
+                                        <td>{{ row.credits }}</td>
+                                        <td>{{ row.supplementaryParticipants }}</td>
+                                        <td>{{ row.exceptionCount }}</td>
+                                        <td>{{ row.incompleteCount }}</td>
+                                        <td>{{ row.completeCount }}</td>
+                                    </tr>
+                                    <tr v-if="statisticsState.additionalSummary.length === 0">
+                                        <td colspan="6">표시할 데이터가 없습니다.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </section>
+
+                        <section>
+                            <h4 class="stats-section-title">과목별 미도달 유형 분포</h4>
+                            <table class="stats-table">
+                                <thead>
+                                    <tr>
+                                        <th>과목</th>
+                                        <th>학업성취율 미도달</th>
+                                        <th>과목출석률 미도달</th>
+                                        <th>둘 다 미도달</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="row in statisticsState.deficitSummary" :key="row.subjectName">
+                                        <td>{{ row.subjectName }}</td>
+                                        <td>{{ row.gradeCount }}</td>
+                                        <td>{{ row.attendanceCount }}</td>
+                                        <td>{{ row.bothCount }}</td>
+                                    </tr>
+                                    <tr v-if="statisticsState.deficitSummary.length === 0">
+                                        <td colspan="4">표시할 데이터가 없습니다.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </section>
+
+                        <section>
+                            <h4 class="stats-section-title">학업성취율 다과목 미도달 학생 수</h4>
+                            <table class="stats-table">
+                                <thead>
+                                    <tr>
+                                        <th>구분</th>
+                                        <th>학생 수</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="bucket in statisticsState.multiSubjectBuckets" :key="bucket.label">
+                                        <td>{{ bucket.label }}</td>
+                                        <td>{{ bucket.count }}</td>
+                                    </tr>
+                                    <tr v-if="statisticsState.multiSubjectBuckets.length === 0">
+                                        <td colspan="2">표시할 데이터가 없습니다.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </section>
+
+                        <section>
+                            <h4 class="stats-section-title">학년별 예방지도 참가자 비율</h4>
+                            <table class="stats-table">
+                                <thead>
+                                    <tr>
+                                        <th>학년</th>
+                                        <th>미도달 인원</th>
+                                        <th>예방지도 참여 인원</th>
+                                        <th>참여율</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="ratio in statisticsState.gradePreventionRatios" :key="ratio.grade">
+                                        <td>{{ ratio.grade }}</td>
+                                        <td>{{ ratio.total }}</td>
+                                        <td>{{ ratio.participants }}</td>
+                                        <td>{{ ratio.percentage }}%</td>
+                                    </tr>
+                                    <tr v-if="statisticsState.gradePreventionRatios.length === 0">
+                                        <td colspan="4">표시할 데이터가 없습니다.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <p class="text-sm text-gray-600 mt-3">
+                                예방지도 진행 중인 과목 비율: 
+                                <span class="font-semibold text-indigo-600">
+                                    {{ statisticsState.preventionCourseRatio.activeSubjects }} / {{ statisticsState.preventionCourseRatio.totalSubjects }}
+                                </span>
+                                ({{ statisticsState.preventionCourseRatio.percentage }}%)
+                            </p>
+                        </section>
+
+                        <section>
+                            <h4 class="stats-section-title">예방지도 참가자 중 보충지도 대상 제외 비율</h4>
+                            <div class="space-y-3">
+                                <div v-for="row in statisticsState.preventionMismatchGraph" :key="row.subjectName" class="space-y-1">
+                                    <div class="flex items-center justify-between text-sm font-medium text-gray-700">
+                                        <span>{{ row.subjectName }}</span>
+                                        <span>{{ row.percentage }}%</span>
+                                    </div>
+                                    <div class="stats-chart-track">
+                                        <div
+                                            class="stats-chart-bar"
+                                            :style="{ width: Math.min(row.percentage, 100) + '%' }"
+                                        ></div>
+                                    </div>
+                                </div>
+                                <p v-if="statisticsState.preventionMismatchGraph.length === 0" class="text-sm text-gray-500">
+                                    표시할 데이터가 없습니다.
+                                </p>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <!-- 인쇄용 컨테이너 (숨김 - html2canvas 전용) -->
         <div id="print-area-container" class="hidden"></div>
 
@@ -1229,6 +1513,26 @@
 
                         // --- Admin Specific Local State ---
                         underachievers: [],
+                        exceptionOptions: [
+                            { value: '특수교육대상', label: '특수교육대상' },
+                            { value: '위탁학생', label: '위탁학생' },
+                            { value: '중장기적 정기적인 병원진료', label: '중장기적 정기적인 병원진료' }
+                        ],
+                        showStatisticsModal: false,
+                        statisticsState: {
+                            loading: false,
+                            error: '',
+                            subjectSummary: [],
+                            preventionSummary: [],
+                            additionalSummary: [],
+                            deficitSummary: [],
+                            multiSubjectBuckets: [],
+                            gradePreventionRatios: [],
+                            preventionCourseRatio: { totalSubjects: 0, activeSubjects: 0, percentage: 0 },
+                            preventionMismatchGraph: [],
+                            lastUpdated: ''
+                        },
+                        completionStatusCache: null,
                         fileProcessingError: '',
                         showAttendanceModal: false,
                         newAttendanceStudent: { id: '', subjects: [''] },
@@ -1469,6 +1773,15 @@
                                 } else {
                                     status[student.id].completionStatus = '미이수';
                                 }
+                                if (student.note) {
+                                    status[student.id].note = student.note;
+                                }
+                                if (student.isException) {
+                                    status[student.id].completionStatus = '이수';
+                                    if (requiredHoursForCompletion > 0) {
+                                        status[student.id].total = parseFloat(requiredHoursForCompletion.toFixed(2));
+                                    }
+                                }
                             });
                         }
                         return status;
@@ -1592,6 +1905,454 @@
                             supplementary: { students: [], sessions: Array.from({ length: 10 }, defaultSession), error: ''}
                         };
                     },
+                    normalizeUnderachieverEntry(entry) {
+                        if (!entry) return null;
+                        const normalized = { ...entry };
+                        normalized.id = entry.id ? String(entry.id) : '';
+                        normalized.name = entry.name || '';
+                        normalized.gradeSubjects = Array.isArray(entry.gradeSubjects)
+                            ? entry.gradeSubjects
+                                .filter(subject => subject && subject.name)
+                                .map(subject => ({
+                                    ...subject,
+                                    name: String(subject.name).trim(),
+                                    credits: subject.credits !== undefined ? subject.credits : (subject.학점 || subject.credit || '')
+                                }))
+                            : [];
+                        normalized.attendanceSubjects = Array.isArray(entry.attendanceSubjects)
+                            ? entry.attendanceSubjects
+                                .filter(subjectName => subjectName)
+                                .map(subjectName => String(subjectName).trim())
+                            : [];
+                        const exceptionsRaw = entry.exceptions && typeof entry.exceptions === 'object' && !Array.isArray(entry.exceptions)
+                            ? entry.exceptions
+                            : {};
+                        const normalizedExceptions = {};
+                        Object.keys(exceptionsRaw).forEach(subjectKey => {
+                            if (!subjectKey) return;
+                            const key = String(subjectKey).trim();
+                            const value = exceptionsRaw[subjectKey];
+                            if (value) {
+                                normalizedExceptions[key] = String(value).trim();
+                            }
+                        });
+                        normalized.exceptions = normalizedExceptions;
+                        return normalized;
+                    },
+                    normalizeUnderachieverList(list) {
+                        if (!Array.isArray(list)) return [];
+                        const result = list
+                            .map(entry => this.normalizeUnderachieverEntry(entry))
+                            .filter(entry => entry && entry.id);
+                        result.sort((a, b) => a.id.localeCompare(b.id));
+                        return result;
+                    },
+                    getExceptionReason(studentId, subjectName) {
+                        const id = studentId ? String(studentId) : '';
+                        const subjectKey = subjectName ? String(subjectName).trim() : '';
+                        if (!id || !subjectKey) return '';
+                        const findReason = (list) => {
+                            if (!Array.isArray(list)) return '';
+                            const target = list.find(item => item && item.id === id);
+                            if (!target || !target.exceptions) return '';
+                            return target.exceptions[subjectKey] || '';
+                        };
+                        return findReason(this.underachievers) || findReason(this.deployedUnderachievers) || '';
+                    },
+                    async updateExceptionReason(studentId, subjectName, reason) {
+                        if (this.role !== '관리자') return;
+                        const id = studentId ? String(studentId) : '';
+                        const subjectKey = subjectName ? String(subjectName).trim() : '';
+                        const trimmedReason = reason ? String(reason).trim() : '';
+                        if (!id || !subjectKey) return;
+
+                        const applyUpdate = (list) => {
+                            if (!Array.isArray(list)) return false;
+                            const student = list.find(item => item && item.id === id);
+                            if (!student) return false;
+                            if (!student.exceptions || typeof student.exceptions !== 'object') {
+                                student.exceptions = {};
+                            }
+                            if (trimmedReason) {
+                                student.exceptions[subjectKey] = trimmedReason;
+                            } else {
+                                delete student.exceptions[subjectKey];
+                            }
+                            return true;
+                        };
+
+                        const updated = applyUpdate(this.underachievers);
+                        applyUpdate(this.deployedUnderachievers);
+
+                        if (updated) {
+                            await this.persistProcessedUnderachievers();
+                        }
+                    },
+                    async persistProcessedUnderachievers() {
+                        if (this.role !== '관리자' || !this.schoolId || !db) return;
+                        try {
+                            this.underachievers = this.normalizeUnderachieverList(this.underachievers);
+                            const docRef = doc(db, `schools/${this.schoolId}/commonData`, "underachieversProcessed");
+                            await setDoc(docRef, { data: JSON.parse(JSON.stringify(this.underachievers)) });
+                        } catch (error) {
+                            console.error('예외처리 저장 실패:', error);
+                        }
+                    },
+                    getStudentGrade(studentId) {
+                        const id = studentId ? String(studentId) : '';
+                        if (!id) return '';
+                        const studentInfo = this.studentData.find(student => String(student['학번']) === id);
+                        if (studentInfo && studentInfo['학년']) {
+                            return String(studentInfo['학년']);
+                        }
+                        return id.length > 0 ? id[0] : '';
+                    },
+                    openStatisticsModal() {
+                        if (this.role !== '관리자') return;
+                        this.showStatisticsModal = true;
+                        this.$nextTick(() => {
+                            this.computeStatisticsData();
+                        });
+                    },
+                    closeStatisticsModal() {
+                        this.showStatisticsModal = false;
+                    },
+                    async computeStatisticsData() {
+                        if (this.role !== '관리자' || !this.schoolId || !db) return;
+                        if (this.statisticsState.loading) return;
+                        this.statisticsState.loading = true;
+                        this.statisticsState.error = '';
+                        try {
+                            const subjectStats = new Map();
+                            const curriculumMap = new Map();
+                            (this.curriculumData || []).forEach(row => {
+                                if (!row || !row['과목명']) return;
+                                const subjectName = String(row['과목명']).trim();
+                                if (!subjectName) return;
+                                const credits = Number(row['학점']);
+                                curriculumMap.set(subjectName, isNaN(credits) ? 0 : credits);
+                            });
+                            const ensureSubject = (subjectName) => {
+                                const key = subjectName ? String(subjectName).trim() : '';
+                                if (!key) return null;
+                                if (!subjectStats.has(key)) {
+                                    subjectStats.set(key, {
+                                        subjectName: key,
+                                        credits: curriculumMap.has(key) ? curriculumMap.get(key) : 0,
+                                        underachievers: new Set(),
+                                        gradeUnderachievers: new Set(),
+                                        attendanceUnderachievers: new Set(),
+                                        exceptions: new Map(),
+                                        completion: { complete: new Set(), incomplete: new Set() },
+                                        preventionParticipants: new Set(),
+                                        preventionSessions: 0,
+                                        supplementaryParticipants: new Set(),
+                                        supplementaryTargets: new Set(),
+                                        planTeachers: new Set(),
+                                        preventiveTeachers: new Set()
+                                    });
+                                }
+                                return subjectStats.get(key);
+                            };
+
+                            const baseUnderachieversRaw = (this.underachievers && this.underachievers.length > 0)
+                                ? this.underachievers
+                                : this.deployedUnderachievers;
+                            const baseUnderachievers = this.normalizeUnderachieverList(baseUnderachieversRaw);
+                            const gradeSubjectCounter = new Map();
+                            const gradeTotals = { '1': new Set(), '2': new Set(), '3': new Set() };
+
+                            baseUnderachievers.forEach(student => {
+                                if (!student || !student.id) return;
+                                const studentId = student.id;
+                                const gradeValue = this.getStudentGrade(studentId);
+                                if (gradeTotals[gradeValue]) {
+                                    gradeTotals[gradeValue].add(studentId);
+                                }
+                                const gradeSubjectsSet = new Set();
+                                (student.gradeSubjects || []).forEach(subjectInfo => {
+                                    if (!subjectInfo || !subjectInfo.name) return;
+                                    const subjectName = String(subjectInfo.name).trim();
+                                    if (!subjectName) return;
+                                    const stats = ensureSubject(subjectName);
+                                    if (!stats) return;
+                                    stats.underachievers.add(studentId);
+                                    stats.gradeUnderachievers.add(studentId);
+                                    if (student.exceptions && student.exceptions[subjectName]) {
+                                        stats.exceptions.set(studentId, student.exceptions[subjectName]);
+                                    }
+                                    gradeSubjectsSet.add(subjectName);
+                                });
+                                (student.attendanceSubjects || []).forEach(subjectNameRaw => {
+                                    if (!subjectNameRaw) return;
+                                    const subjectName = String(subjectNameRaw).trim();
+                                    if (!subjectName) return;
+                                    const stats = ensureSubject(subjectName);
+                                    if (!stats) return;
+                                    stats.underachievers.add(studentId);
+                                    stats.attendanceUnderachievers.add(studentId);
+                                    if (student.exceptions && student.exceptions[subjectName]) {
+                                        stats.exceptions.set(studentId, student.exceptions[subjectName]);
+                                    }
+                                });
+                                if (gradeSubjectsSet.size > 0) {
+                                    gradeSubjectCounter.set(studentId, gradeSubjectsSet.size);
+                                }
+                            });
+
+                            let completionData = this.completionStatusCache;
+                            if (!completionData) {
+                                try {
+                                    const completionDocRef = doc(db, `schools/${this.schoolId}/commonData`, 'completionStatus');
+                                    const completionSnap = await getDoc(completionDocRef);
+                                    completionData = completionSnap.exists() ? completionSnap.data().data || {} : {};
+                                    this.completionStatusCache = completionData;
+                                } catch (error) {
+                                    console.warn('completionStatus 로드 실패:', error);
+                                    completionData = {};
+                                }
+                            }
+                            Object.keys(completionData || {}).forEach(subjectName => {
+                                const stats = ensureSubject(subjectName);
+                                if (!stats) return;
+                                const subjectEntries = completionData[subjectName] || {};
+                                Object.keys(subjectEntries).forEach(studentId => {
+                                    const statusValue = subjectEntries[studentId];
+                                    const id = String(studentId);
+                                    if (statusValue === '이수') {
+                                        stats.completion.complete.add(id);
+                                    } else if (statusValue === '미이수') {
+                                        stats.completion.incomplete.add(id);
+                                    }
+                                });
+                            });
+
+                            const planSubjects = new Set();
+                            const preventionSubjects = new Set();
+                            const gradeParticipants = { '1': new Set(), '2': new Set(), '3': new Set() };
+
+                            try {
+                                const teacherDataRef = collection(db, `schools/${this.schoolId}/teacherData`);
+                                const teacherDataSnap = await getDocs(teacherDataRef);
+                                for (const teacherDoc of teacherDataSnap.docs) {
+                                    try {
+                                        const planDocRef = doc(teacherDoc.ref, 'plans', 'teacherPlan');
+                                        const planSnap = await getDoc(planDocRef);
+                                        if (planSnap.exists()) {
+                                            const planData = planSnap.data();
+                                            if (planData && planData.subjectName) {
+                                                const subjectName = String(planData.subjectName).trim();
+                                                const stats = ensureSubject(subjectName);
+                                                if (stats) {
+                                                    stats.planTeachers.add(teacherDoc.id);
+                                                    planSubjects.add(subjectName);
+                                                }
+                                            }
+                                        }
+                                    } catch (planError) {
+                                        console.warn('교과교사 계획서 로드 실패:', planError);
+                                    }
+
+                                    try {
+                                        const guidanceRef = collection(teacherDoc.ref, 'guidance');
+                                        const guidanceSnap = await getDocs(guidanceRef);
+                                        for (const guidanceDoc of guidanceSnap.docs) {
+                                            const subjectName = this.decodeSubjectName(guidanceDoc.id);
+                                            const stats = ensureSubject(subjectName);
+                                            if (!stats) continue;
+                                            const guidanceData = guidanceDoc.data() || {};
+
+                                            const supplementaryStudents = guidanceData.supplementary?.students || [];
+                                            supplementaryStudents.forEach(student => {
+                                                if (!student || !student.id) return;
+                                                const id = String(student.id);
+                                                stats.supplementaryTargets.add(id);
+                                                if (student.exceptionReason) {
+                                                    stats.exceptions.set(id, String(student.exceptionReason));
+                                                } else if (student.isException && student.reason) {
+                                                    stats.exceptions.set(id, String(student.reason));
+                                                }
+                                            });
+
+                                            const supplementarySessions = guidanceData.supplementary?.sessions || [];
+                                            const supplementaryParticipants = new Set();
+                                            supplementarySessions.forEach(session => {
+                                                if (!session || !session.isSaved || !session.attendance) return;
+                                                Object.entries(session.attendance).forEach(([studentId, methodName]) => {
+                                                    if (!methodName) return;
+                                                    supplementaryParticipants.add(String(studentId));
+                                                });
+                                            });
+                                            supplementaryParticipants.forEach(id => {
+                                                stats.supplementaryParticipants.add(id);
+                                            });
+
+                                            const preventiveSessions = guidanceData.preventive?.sessions || [];
+                                            const preventiveParticipants = new Set();
+                                            let savedPreventiveCount = 0;
+                                            preventiveSessions.forEach(session => {
+                                                if (!session || !session.isSaved) return;
+                                                savedPreventiveCount++;
+                                                if (session.attendance) {
+                                                    Object.entries(session.attendance).forEach(([studentId, methodName]) => {
+                                                        if (!methodName) return;
+                                                        preventiveParticipants.add(String(studentId));
+                                                    });
+                                                }
+                                            });
+                                            if (savedPreventiveCount > 0) {
+                                                stats.preventionSessions += savedPreventiveCount;
+                                                stats.preventiveTeachers.add(teacherDoc.id);
+                                                preventionSubjects.add(subjectName);
+                                            }
+                                            preventiveParticipants.forEach(id => {
+                                                stats.preventionParticipants.add(id);
+                                                const gradeValue = this.getStudentGrade(id);
+                                                if (gradeParticipants[gradeValue]) {
+                                                    gradeParticipants[gradeValue].add(id);
+                                                }
+                                            });
+                                        }
+                                    } catch (guidanceError) {
+                                        console.warn('교과교사 guidance 로드 실패:', guidanceError);
+                                    }
+                                }
+                            } catch (teacherDataError) {
+                                console.warn('teacherData 로드 실패:', teacherDataError);
+                            }
+
+                            const subjectSummary = [];
+                            const preventionSummary = [];
+                            const additionalSummary = [];
+                            const deficitSummary = [];
+                            const mismatchRows = [];
+                            let totalParticipantsPairs = 0;
+                            let totalNonSupplementaryPairs = 0;
+
+                            subjectStats.forEach(stats => {
+                                const subjectName = stats.subjectName;
+                                const underachieverCount = stats.underachievers.size;
+                                const exceptionCount = stats.exceptions.size;
+                                const completeCount = stats.completion.complete.size;
+                                const incompleteCount = stats.completion.incomplete.size;
+
+                                subjectSummary.push({
+                                    subjectName,
+                                    credits: stats.credits,
+                                    underachieverCount,
+                                    exceptionCount,
+                                    completeCount,
+                                    incompleteCount
+                                });
+
+                                const preventionParticipantsCount = stats.preventionParticipants.size;
+                                const preventionNonParticipantsCount = Math.max(stats.supplementaryTargets.size - preventionParticipantsCount, 0);
+                                preventionSummary.push({
+                                    subjectName,
+                                    hasPrevention: stats.preventionSessions > 0,
+                                    sessions: stats.preventionSessions,
+                                    participants: preventionParticipantsCount,
+                                    nonParticipants: preventionNonParticipantsCount
+                                });
+
+                                additionalSummary.push({
+                                    subjectName,
+                                    credits: stats.credits,
+                                    supplementaryParticipants: stats.supplementaryParticipants.size,
+                                    exceptionCount,
+                                    completeCount,
+                                    incompleteCount
+                                });
+
+                                const gradeCount = stats.gradeUnderachievers.size;
+                                const attendanceCount = stats.attendanceUnderachievers.size;
+                                const bothCount = [...stats.gradeUnderachievers].filter(studentId => stats.attendanceUnderachievers.has(studentId)).length;
+                                deficitSummary.push({
+                                    subjectName,
+                                    gradeCount,
+                                    attendanceCount,
+                                    bothCount
+                                });
+
+                                if (preventionParticipantsCount > 0) {
+                                    const nonSupplementaryCount = [...stats.preventionParticipants].filter(studentId => !stats.supplementaryTargets.has(studentId)).length;
+                                    const percentage = nonSupplementaryCount > 0
+                                        ? Number(((nonSupplementaryCount / preventionParticipantsCount) * 100).toFixed(1))
+                                        : 0;
+                                    mismatchRows.push({
+                                        subjectName,
+                                        percentage,
+                                        nonSupplementaryCount,
+                                        participants: preventionParticipantsCount
+                                    });
+                                    totalParticipantsPairs += preventionParticipantsCount;
+                                    totalNonSupplementaryPairs += nonSupplementaryCount;
+                                }
+                            });
+
+                            subjectSummary.sort((a, b) => a.subjectName.localeCompare(b.subjectName, 'ko'));
+                            preventionSummary.sort((a, b) => a.subjectName.localeCompare(b.subjectName, 'ko'));
+                            additionalSummary.sort((a, b) => a.subjectName.localeCompare(b.subjectName, 'ko'));
+                            deficitSummary.sort((a, b) => a.subjectName.localeCompare(b.subjectName, 'ko'));
+                            mismatchRows.sort((a, b) => b.percentage - a.percentage);
+
+                            const overallMismatchPercentage = totalParticipantsPairs > 0
+                                ? Number(((totalNonSupplementaryPairs / totalParticipantsPairs) * 100).toFixed(1))
+                                : 0;
+                            const preventionMismatchGraph = [{ subjectName: '전체', percentage: overallMismatchPercentage }];
+                            mismatchRows.forEach(row => {
+                                preventionMismatchGraph.push({ subjectName: row.subjectName, percentage: row.percentage });
+                            });
+
+                            const multiSubjectBuckets = [
+                                { label: '1과목', count: 0 },
+                                { label: '2~3과목', count: 0 },
+                                { label: '4~5과목', count: 0 },
+                                { label: '6과목 이상', count: 0 }
+                            ];
+                            gradeSubjectCounter.forEach(count => {
+                                if (count === 1) multiSubjectBuckets[0].count += 1;
+                                else if (count >= 2 && count <= 3) multiSubjectBuckets[1].count += 1;
+                                else if (count >= 4 && count <= 5) multiSubjectBuckets[2].count += 1;
+                                else if (count >= 6) multiSubjectBuckets[3].count += 1;
+                            });
+
+                            const gradePreventionRatios = ['1', '2', '3'].map(grade => {
+                                const total = gradeTotals[grade]?.size || 0;
+                                const participants = gradeParticipants[grade]?.size || 0;
+                                const percentage = total > 0 ? Number(((participants / total) * 100).toFixed(1)) : 0;
+                                return {
+                                    grade: `${grade}학년`,
+                                    total,
+                                    participants,
+                                    percentage
+                                };
+                            });
+
+                            const preventionCourseRatio = {
+                                totalSubjects: planSubjects.size,
+                                activeSubjects: preventionSubjects.size,
+                                percentage: planSubjects.size > 0
+                                    ? Number(((preventionSubjects.size / planSubjects.size) * 100).toFixed(1))
+                                    : 0
+                            };
+
+                            this.statisticsState.subjectSummary = subjectSummary;
+                            this.statisticsState.preventionSummary = preventionSummary;
+                            this.statisticsState.additionalSummary = additionalSummary;
+                            this.statisticsState.deficitSummary = deficitSummary;
+                            this.statisticsState.multiSubjectBuckets = multiSubjectBuckets;
+                            this.statisticsState.gradePreventionRatios = gradePreventionRatios;
+                            this.statisticsState.preventionCourseRatio = preventionCourseRatio;
+                            this.statisticsState.preventionMismatchGraph = preventionMismatchGraph;
+                            this.statisticsState.lastUpdated = new Date().toLocaleString('ko-KR');
+                        } catch (error) {
+                            console.error('통계 대시보드 계산 오류:', error);
+                            this.statisticsState.error = error.message || '통계 데이터를 계산하는 중 오류가 발생했습니다.';
+                        } finally {
+                            this.statisticsState.loading = false;
+                        }
+                    },
 
                     // --- [핵심 수정] Initialization and Auth ---
                     async initApp() {
@@ -1618,7 +2379,7 @@
                                                 this.filterSupplementaryStudents();
                                             }
                                         } else if (this.role === '관리자') {
-                                            this.underachievers = JSON.parse(JSON.stringify(this.deployedUnderachievers));
+                                        this.underachievers = this.normalizeUnderachieverList(this.deployedUnderachievers);
                                         }
                                     } else if (this.isLoggedIn && this.role && !this.schoolId) {
                                         console.log("Role exists, but schoolId is missing. Showing schoolId modal.");
@@ -1762,7 +2523,7 @@
                             await this.saveUserRoleAndSchoolId('관리자');
                             if (this.schoolId) {
                                 await this.loadCommonData();
-                                this.underachievers = JSON.parse(JSON.stringify(this.deployedUnderachievers));
+                                this.underachievers = this.normalizeUnderachieverList(this.deployedUnderachievers);
                                 this.isLoading = false;
                             } else {
                                 this.schoolIdMode = 'create';
@@ -1791,7 +2552,7 @@
                         console.log("공용 데이터 로딩 완료");
 
                         if (this.role === '관리자') {
-                            this.underachievers = JSON.parse(JSON.stringify(this.deployedUnderachievers));
+                            this.underachievers = this.normalizeUnderachieverList(this.deployedUnderachievers);
                         }
 
                         if (this.role === '교과교사') {
@@ -2036,18 +2797,22 @@
                                 this.pledgeForm = defaultPledge;
                             }
 
-                            this.deployedUnderachievers = underachieversSnap.exists() ? underachieversSnap.data().data || [] : [];
+                            const deployedDataRaw = underachieversSnap.exists() ? underachieversSnap.data().data || [] : [];
+                            this.deployedUnderachievers = this.normalizeUnderachieverList(deployedDataRaw);
                             
                             // 관리자인 경우, 처리된 미도달 대상자 목록 불러오기
                             if (this.role === '관리자' && underachieversProcessedSnap.exists()) {
-                                const processedData = underachieversProcessedSnap.data().data || [];
+                                const processedDataRaw = underachieversProcessedSnap.data().data || [];
+                                const processedData = this.normalizeUnderachieverList(processedDataRaw);
                                 if (processedData.length > 0) {
-                                    this.underachievers = JSON.parse(JSON.stringify(processedData));
+                                    this.underachievers = processedData;
                                     this.statusMessage = `공용 데이터 로딩 완료. (저장된 미도달 대상자 ${processedData.length}명 불러옴)`;
                                 } else {
+                                    this.underachievers = this.normalizeUnderachieverList(this.deployedUnderachievers);
                                     this.statusMessage = '공용 데이터 로딩 완료.';
                                 }
                             } else {
+                                this.underachievers = this.normalizeUnderachieverList(this.deployedUnderachievers);
                                 this.statusMessage = '공용 데이터 로딩 완료.';
                             }
                             
@@ -2147,9 +2912,11 @@
                         if (this.role !== '관리자' || !db) return;
                         this.underachieversStatus = "미도달 학생 명단 배포 중...";
                         try {
+                            const normalizedUnderachievers = this.normalizeUnderachieverList(this.underachievers);
+                            this.underachievers = normalizedUnderachievers;
                             const docRef = doc(db, `schools/${this.schoolId}/commonData`, "underachievers");
-                            await setDoc(docRef, { data: JSON.parse(JSON.stringify(this.underachievers)) });
-                            this.deployedUnderachievers = JSON.parse(JSON.stringify(this.underachievers));
+                            await setDoc(docRef, { data: JSON.parse(JSON.stringify(normalizedUnderachievers)) });
+                            this.deployedUnderachievers = this.normalizeUnderachieverList(normalizedUnderachievers);
                             this.underachieversStatus = "대상자 명단이 Firestore에 배포되었습니다.";
                             alert('미도달 학생 명단이 성공적으로 배포되었습니다.');
                         } catch (error) { 
@@ -2669,9 +3436,9 @@
                         const files = event.target.files;
                         if (!files || files.length === 0) return;
                         
-                        const attendanceOnly = this.underachievers.filter(s =>
+                        const attendanceOnly = this.normalizeUnderachieverList(this.underachievers.filter(s =>
                             (!s.gradeSubjects || s.gradeSubjects.length === 0) && (s.attendanceSubjects && s.attendanceSubjects.length > 0)
-                        );
+                        ));
                         let processedUnderachievers = [...attendanceOnly];
                         const resultData = new Map();
                         let filesProcessed = 0;
@@ -2745,10 +3512,16 @@
                                                     }
                                                 });
                                             } else {
-                                                processedUnderachievers.push({ id: id, name: data.name, gradeSubjects: gradeSubjectsData, attendanceSubjects: [] });
+                                                processedUnderachievers.push({
+                                                    id: id,
+                                                    name: data.name,
+                                                    gradeSubjects: gradeSubjectsData,
+                                                    attendanceSubjects: [],
+                                                    exceptions: {}
+                                                });
                                             }
                                         });
-                                        processedUnderachievers.sort((a,b) => a.id.localeCompare(b.id));
+                                        processedUnderachievers = this.normalizeUnderachieverList(processedUnderachievers);
                                         this.underachievers = processedUnderachievers;
                                         
                                         // Firestore에 저장 (로그아웃 후에도 유지)
@@ -2797,7 +3570,7 @@
                                 if (!existingSubjects.has(subject)) this.underachievers[studentIndex].attendanceSubjects.push(subject);
                             });
                         } else {
-                            this.underachievers.push({ id: canonicalId, name, gradeSubjects: [], attendanceSubjects: validSubjects });
+                            this.underachievers.push({ id: canonicalId, name, gradeSubjects: [], attendanceSubjects: validSubjects, exceptions: {} });
                         }
                         this.underachievers.sort((a, b) => a.id.localeCompare(b.id));
                         this.closeAttendanceModal();
@@ -2815,6 +3588,9 @@
                             }
                             if (detailToDelete.reason.includes('과목출석률')) {
                                 student.attendanceSubjects = student.attendanceSubjects.filter(asName => asName !== subjectInfo.name);
+                            }
+                            if (student.exceptions && subjectInfo.name && student.exceptions[subjectInfo.name]) {
+                                delete student.exceptions[subjectInfo.name];
                             }
                         });
                         
@@ -2882,7 +3658,15 @@
                                 if (gradeMatch && attendanceMatch) reason = '학업성취율&과목출석률';
                                 else if (gradeMatch) reason = '학업성취율';
                                 else if (attendanceMatch) reason = '과목출석률';
-                                s.reason = reason;
+                                s.reason = reason || s.reason || '';
+                                const exceptionReason = match.exceptions && match.exceptions[subject] ? match.exceptions[subject] : '';
+                                const isException = !!exceptionReason;
+                                s.isException = isException;
+                                s.exceptionReason = exceptionReason || '';
+                                s.note = isException ? `보충지도 예외처리 대상자 (${exceptionReason})` : '';
+                                if (!isException && !reason) {
+                                    s.reason = s.reason || '';
+                                }
                             }
                         });
 
@@ -3232,7 +4016,7 @@
                             ${type === 'supplementary' ? '<th>특기사항</th><th>미도달 항목</th><th>예방지도</th><th>정서지원프로그램</th>' : ''}
                             ${this.moduleConfig.recognizedHours.map(rh => `<th>${rh.name}</th>`).join('')}
                             <th>총계</th>
-                            ${type === 'supplementary' ? '<th>이수여부</th>' : ''}
+                            ${type === 'supplementary' ? '<th>이수여부</th><th>비고</th>' : ''}
                             </tr></thead><tbody>`;
 
                         if (data.students && data.students.length > 0) {
@@ -3250,11 +4034,12 @@
                                 if (type === 'supplementary') {
                                     const status = studentStatus.completionStatus || '미이수';
                                     tableHtml += `<td style="color: ${status === '이수' ? 'green' : 'red'}; font-weight: bold;">${status}</td>`;
+                                    tableHtml += `<td>${student.note || ''}</td>`;
                                 }
                                 tableHtml += '</tr>';
                             });
                         } else {
-                            const colspan = this.moduleConfig.recognizedHours.length + (type === 'supplementary' ? 7 : 2);
+                            const colspan = this.moduleConfig.recognizedHours.length + (type === 'supplementary' ? 8 : 2);
                             tableHtml += `<tr><td colspan="${colspan}">학생 정보가 없습니다.</td></tr>`;
                         }
                         tableHtml += '</tbody></table>';
@@ -3406,7 +4191,8 @@
                         this.importModalError = '최신 명단 확인 중...';
                         try {
                             const underachieversSnap = await getDoc(doc(db, `schools/${this.schoolId}/commonData`, "underachievers"));
-                            this.deployedUnderachievers = underachieversSnap.exists() ? underachieversSnap.data().data || [] : [];
+                            const deployedData = underachieversSnap.exists() ? underachieversSnap.data().data || [] : [];
+                            this.deployedUnderachievers = this.normalizeUnderachieverList(deployedData);
                         } catch (e) {
                             this.importModalError = '최신 명단을 불러오는 데 실패했습니다.';
                             return;
@@ -3440,8 +4226,19 @@
                             else if (gradeMatch) reason = '학업성취율';
                             else if (attendanceMatch) reason = '과목출석률';
 
+                            const exceptionReason = newStudent.exceptions && newStudent.exceptions[subject] ? newStudent.exceptions[subject] : '';
+                            const isException = !!exceptionReason;
+                            const note = isException ? `보충지도 예외처리 대상자 (${exceptionReason})` : '';
+
                             if (!currentSuppIds.has(newStudent.id)) {
-                                newSupplementaryStudents.push({ id: newStudent.id, name: newStudent.name, reason: reason });
+                                newSupplementaryStudents.push({
+                                    id: newStudent.id,
+                                    name: newStudent.name,
+                                    reason: reason,
+                                    isException,
+                                    exceptionReason,
+                                    note
+                                });
                                 addedCount++;
                             }
                         });
