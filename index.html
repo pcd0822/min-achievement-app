@@ -2048,6 +2048,15 @@
                                 const credits = Number(row['학점']);
                                 curriculumMap.set(subjectName, isNaN(credits) ? 0 : credits);
                             });
+                            const recognizedHoursConfig = Array.isArray(this.moduleConfig?.recognizedHours) ? this.moduleConfig.recognizedHours : [];
+                            const recognizedHoursMap = new Map();
+                            recognizedHoursConfig.forEach(item => {
+                                if (!item) return;
+                                const name = item.name ? String(item.name).trim() : '';
+                                if (!name) return;
+                                const hours = Number(item.hours);
+                                recognizedHoursMap.set(name, isNaN(hours) ? 0 : hours);
+                            });
                             const ensureSubject = (subjectName) => {
                                 const key = subjectName ? String(subjectName).trim() : '';
                                 if (!key) return null;
@@ -2206,8 +2215,16 @@
                                             supplementarySessions.forEach(session => {
                                                 if (!session || !session.attendance) return;
                                                 Object.entries(session.attendance).forEach(([studentId, methodName]) => {
-                                                    if (!methodName) return;
-                                                    supplementaryParticipants.add(String(studentId));
+                                                    if (!studentId) return;
+                                                    const normalizedId = String(studentId).trim();
+                                                    if (!normalizedId) return;
+                                                    supplementaryParticipants.add(normalizedId);
+                                                    const methodKey = methodName ? String(methodName).trim() : '';
+                                                    const hours = recognizedHoursMap.has(methodKey) ? recognizedHoursMap.get(methodKey) : 0;
+                                                    if (hours > 0) {
+                                                        const prevTotal = stats.completionTotals.get(normalizedId) || 0;
+                                                        stats.completionTotals.set(normalizedId, prevTotal + hours);
+                                                    }
                                                 });
                                             });
                                             supplementaryParticipants.forEach(id => {
@@ -2220,8 +2237,16 @@
                                             preventiveSessions.forEach(session => {
                                                 if (!session || !session.attendance) return;
                                                 Object.entries(session.attendance).forEach(([studentId, methodName]) => {
-                                                    if (!studentId || !methodName) return;
-                                                    preventiveParticipants.add(String(studentId));
+                                                    if (!studentId) return;
+                                                    const normalizedId = String(studentId).trim();
+                                                    if (!normalizedId) return;
+                                                    preventiveParticipants.add(normalizedId);
+                                                    const methodKey = methodName ? String(methodName).trim() : '';
+                                                    const hours = recognizedHoursMap.has(methodKey) ? recognizedHoursMap.get(methodKey) : 0;
+                                                    if (hours > 0) {
+                                                        const prevPreventive = stats.preventiveHours.get(normalizedId) || 0;
+                                                        stats.preventiveHours.set(normalizedId, prevPreventive + hours);
+                                                    }
                                                 });
                                                 if (session.isSaved) {
                                                     savedPreventiveCount++;
@@ -2317,27 +2342,43 @@
                                 const completeCountGrade = completeIds.filter(id => stats.gradeUnderachievers.has(id)).length;
                                 const incompleteCountGrade = incompleteIds.filter(id => stats.gradeUnderachievers.has(id)).length;
 
-                                const supplementaryCompletionParticipants = [...stats.completionTotals.entries()]
-                                    .filter(([, total]) => (Number(total) || 0) > 0)
-                                    .map(([id]) => id);
-                                const supplementaryParticipantSet = new Set(supplementaryCompletionParticipants);
-                                stats.supplementaryParticipants.forEach(id => supplementaryParticipantSet.add(id));
+                                const completionStudentIds = new Set([
+                                    ...completeIds,
+                                    ...incompleteIds,
+                                    ...stats.completionTotals.keys(),
+                                    ...stats.preventiveHours.keys()
+                                ]);
+                                if (completionStudentIds.size === 0) {
+                                    stats.supplementaryParticipants.forEach(id => completionStudentIds.add(id));
+                                }
+                                const completionIdList = [...completionStudentIds];
 
-                                const preventiveHoursEntries = [...stats.preventiveHours.entries()];
-                                const preventiveParticipantSet = new Set(
-                                    preventiveHoursEntries
-                                        .filter(([, hours]) => (Number(hours) || 0) > 0)
-                                        .map(([id]) => id)
-                                );
-                                stats.preventionParticipants.forEach(id => preventiveParticipantSet.add(id));
+                                const supplementaryParticipantsCount = completionIdList.filter(id => {
+                                    const total = stats.completionTotals.get(id);
+                                    if (total != null) return total > 0;
+                                    return stats.supplementaryParticipants.has(id);
+                                }).length;
 
-                                const totalPreventiveHours = preventiveHoursEntries.reduce((sum, [, hours]) => sum + (Number(hours) || 0), 0);
-                                const preventiveHoursDisplay = Number.isFinite(totalPreventiveHours) ? Number(totalPreventiveHours.toFixed(1)) : 0;
+                                const supplementaryNonParticipantsCount = completionIdList.filter(id => {
+                                    const total = stats.completionTotals.get(id);
+                                    if (total != null) return total <= 0;
+                                    return !stats.supplementaryParticipants.has(id);
+                                }).length;
 
-                                const supplementaryTargetSet = stats.supplementaryTargets;
-                                const preventiveNonParticipants = supplementaryTargetSet.size > 0
-                                    ? [...supplementaryTargetSet].filter(id => !preventiveParticipantSet.has(id))
-                                    : [];
+                                const preventiveParticipantList = completionIdList.filter(id => {
+                                    const hours = stats.preventiveHours.get(id);
+                                    if (hours != null) return hours > 0;
+                                    return stats.preventionParticipants.has(id);
+                                });
+                                const preventiveParticipantSet = new Set(preventiveParticipantList);
+                                const preventiveNonParticipants = completionIdList.filter(id => !preventiveParticipantSet.has(id));
+
+                                const maxPreventiveHours = preventiveParticipantList.length > 0
+                                    ? preventiveParticipantList.reduce((max, id) => {
+                                        const hours = stats.preventiveHours.get(id) || 0;
+                                        return Math.max(max, Number(hours) || 0);
+                                    }, 0)
+                                    : 0;
 
                                 subjectSummary.push({
                                     subjectName,
@@ -2351,17 +2392,11 @@
 
                                 preventionSummary.push({
                                     subjectName,
-                                    hasPrevention: totalPreventiveHours > 0 || preventiveParticipantSet.size > 0 || stats.preventionSessions > 0,
-                                    sessions: preventiveHoursDisplay,
+                                    hasPrevention: maxPreventiveHours > 0 || preventiveParticipantSet.size > 0 || stats.preventionSessions > 0,
+                                    sessions: Number(maxPreventiveHours.toFixed(1)),
                                     participants: preventiveParticipantSet.size,
                                     nonParticipants: preventiveNonParticipants.length
                                 });
-
-                                const supplementaryParticipantList = [...supplementaryParticipantSet];
-                                const supplementaryParticipantsCount = supplementaryParticipantList.length;
-                                const supplementaryNonParticipantsCount = attendanceIds.length > 0
-                                    ? attendanceIds.filter(id => !supplementaryParticipantSet.has(id)).length
-                                    : 0;
 
                                 additionalSummary.push({
                                     subjectName,
@@ -2374,10 +2409,16 @@
                                     incompleteCount: incompleteCountAttendance
                                 });
 
-                                const gradeParticipantCount = supplementaryParticipantList.filter(id => stats.gradeUnderachievers.has(id)).length;
-                                const gradeNonParticipantCount = gradeIds.length > 0
-                                    ? gradeIds.filter(id => !supplementaryParticipantSet.has(id)).length
-                                    : 0;
+                                const gradeParticipantCount = completionIdList.filter(id =>
+                                    stats.gradeUnderachievers.has(id) && (
+                                        (stats.completionTotals.get(id) || 0) > 0 || stats.supplementaryParticipants.has(id)
+                                    )
+                                ).length;
+                                const gradeNonParticipantCount = completionIdList.filter(id =>
+                                    stats.gradeUnderachievers.has(id) && !(
+                                        (stats.completionTotals.get(id) || 0) > 0 || stats.supplementaryParticipants.has(id)
+                                    )
+                                ).length;
 
                                 remedialSummary.push({
                                     subjectName,
