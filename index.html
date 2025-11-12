@@ -2409,16 +2409,16 @@
                                     incompleteCount: incompleteCountAttendance
                                 });
 
-                                const gradeParticipantCount = completionIdList.filter(id =>
-                                    stats.gradeUnderachievers.has(id) && (
-                                        (stats.completionTotals.get(id) || 0) > 0 || stats.supplementaryParticipants.has(id)
-                                    )
-                                ).length;
-                                const gradeNonParticipantCount = completionIdList.filter(id =>
-                                    stats.gradeUnderachievers.has(id) && !(
-                                        (stats.completionTotals.get(id) || 0) > 0 || stats.supplementaryParticipants.has(id)
-                                    )
-                                ).length;
+                                const gradeParticipantCount = gradeIds.filter(id => {
+                                    const total = stats.completionTotals.get(id);
+                                    if (total != null) return total > 0;
+                                    return stats.supplementaryParticipants.has(id);
+                                }).length;
+                                const gradeNonParticipantCount = gradeIds.filter(id => {
+                                    const total = stats.completionTotals.get(id);
+                                    if (total != null) return total <= 0;
+                                    return !stats.supplementaryParticipants.has(id);
+                                }).length;
 
                                 remedialSummary.push({
                                     subjectName,
