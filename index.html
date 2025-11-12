@@ -2204,6 +2204,7 @@
                                                 if (!student || !student.id) return;
                                                 const id = String(student.id);
                                                 stats.supplementaryTargets.add(id);
+                                                stats.supplementaryParticipants.add(id);
                                                 if (student.exceptionReason) {
                                                     stats.exceptions.add(id);
                                                 } else if (student.isException && student.reason) {
