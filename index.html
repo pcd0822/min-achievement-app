@@ -2241,13 +2241,13 @@
                                             let savedPreventiveCount = 0;
                                             preventiveSessions.forEach(session => {
                                                 if (!session || !session.attendance) return;
-                                                if (session.isSaved) {
-                                                    savedPreventiveCount++;
-                                                }
                                                 Object.entries(session.attendance).forEach(([studentId, methodName]) => {
                                                     if (!studentId || !methodName) return;
                                                     preventiveParticipants.add(String(studentId));
                                                 });
+                                                if (session.isSaved) {
+                                                    savedPreventiveCount++;
+                                                }
                                             });
                                             if (savedPreventiveCount > 0) {
                                                 stats.preventionSessions += savedPreventiveCount;
