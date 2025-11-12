@@ -2069,7 +2069,13 @@
                                 curriculumMap.set(subjectName, isNaN(credits) ? 0 : credits);
                             });
                             const recognizedHoursConfig = Array.isArray(this.moduleConfig?.recognizedHours) ? this.moduleConfig.recognizedHours : [];
-                            const recognizedHoursMap = new Map(recognizedHoursConfig.map(item => [item?.name, Number(item?.hours) || 0]));
+                            const recognizedHoursMap = new Map();
+                            recognizedHoursConfig.forEach(item => {
+                                const name = item && item.name ? String(item.name).trim() : '';
+                                if (!name) return;
+                                const hours = Number(item.hours) || 0;
+                                recognizedHoursMap.set(name, hours);
+                            });
                             const ensureSubject = (subjectName) => {
                                 const key = subjectName ? String(subjectName).trim() : '';
                                 if (!key) return null;
@@ -2233,11 +2239,14 @@
                                             supplementarySessions.forEach(session => {
                                                 if (!session || !session.attendance) return;
                                                 Object.entries(session.attendance).forEach(([studentId, methodName]) => {
-                                                    if (!studentId || !methodName) return;
-                                                    let hours = recognizedHoursMap.has(methodName) ? recognizedHoursMap.get(methodName) : 1;
+                                                    if (studentId == null || methodName == null) return;
+                                                    const normalizedId = String(studentId).trim();
+                                                    if (!normalizedId) return;
+                                                    const methodKey = String(methodName).trim();
+                                                    if (!methodKey) return;
+                                                    let hours = recognizedHoursMap.has(methodKey) ? recognizedHoursMap.get(methodKey) : 1;
                                                     hours = Number(hours) || 0;
                                                     if (hours <= 0) return;
-                                                    const normalizedId = String(studentId);
                                                     supplementaryParticipants.add(normalizedId);
                                                     const currentHours = stats.supplementaryHours.get(normalizedId) || 0;
                                                     stats.supplementaryHours.set(normalizedId, currentHours + hours);
@@ -2254,11 +2263,14 @@
                                                 if (!session || !session.attendance) return;
                                                 let sessionHasHours = false;
                                                 Object.entries(session.attendance).forEach(([studentId, methodName]) => {
-                                                    if (!studentId || !methodName) return;
-                                                    let hours = recognizedHoursMap.has(methodName) ? recognizedHoursMap.get(methodName) : 1;
+                                                    if (studentId == null || methodName == null) return;
+                                                    const normalizedId = String(studentId).trim();
+                                                    if (!normalizedId) return;
+                                                    const methodKey = String(methodName).trim();
+                                                    if (!methodKey) return;
+                                                    let hours = recognizedHoursMap.has(methodKey) ? recognizedHoursMap.get(methodKey) : 1;
                                                     hours = Number(hours) || 0;
                                                     if (hours <= 0) return;
-                                                    const normalizedId = String(studentId);
                                                     preventiveParticipants.add(normalizedId);
                                                     const currentHours = stats.preventionHours.get(normalizedId) || 0;
                                                     stats.preventionHours.set(normalizedId, currentHours + hours);
