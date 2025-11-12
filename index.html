@@ -91,6 +91,16 @@
         .stats-chart-label {
             font-size: 0.85rem;
         }
+        .table-wide-cell {
+            min-width: 220px;
+            max-width: 320px;
+            white-space: normal;
+            word-break: keep-all;
+        }
+        .table-exception-cell {
+            min-width: 180px;
+            max-width: 260px;
+        }
         /* A4 비율과 유사한 미리보기 모달창 스타일 */
         .modal-preview {
              width: 210mm; /* A4 width */
@@ -546,7 +556,7 @@
                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">이름</th>
                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">특기사항</th>
                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">미도달내역</th>
-                                                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">미도달 과목(학점수)</th>
+                                                   <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider table-wide-cell">미도달 과목(학점수)</th>
                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">보충지도(추가학습) 내역</th>
                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">예외처리</th>
                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">조치</th>
@@ -557,20 +567,20 @@
                                                    <td v-if="detailIndex === 0" :rowspan="student.details.length" class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200">{{ student.id }}</td>
                                                    <td v-if="detailIndex === 0" :rowspan="student.details.length" class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200">{{ student.name }}</td>
                                                    <td v-if="detailIndex === 0" :rowspan="student.details.length" class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200">{{ student.specialNotes }}</td>
-                                                   <td class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200">{{ detail.reason }}</td>
-                                                   <td class="px-6 py-4 whitespace-normal align-top border-b border-gray-200">{{ detail.subjects }}</td>
+                                                        <td class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200">{{ detail.reason }}</td>
+                                                        <td class="px-6 py-4 whitespace-normal align-top border-b border-gray-200 table-wide-cell">{{ detail.subjects }}</td>
                                                    <td class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200">{{ detail.lessonDetails }}</td>
-                                                       <td class="px-6 py-4 whitespace-normal align-top border-b border-gray-200">
-                                                           <div v-for="subjectInfo in detail.originalSubjects" :key="subjectInfo.name" class="py-2 border-b border-gray-100 last:border-b-0">
-                                                               <div class="flex items-center justify-between gap-2">
+                                                       <td class="px-6 py-4 whitespace-normal align-top border-b border-gray-200 table-exception-cell">
+                                                           <div v-for="subjectInfo in detail.originalSubjects" :key="subjectInfo.name" class="py-1.5 border-b border-gray-100 last:border-b-0">
+                                                               <div class="flex items-start justify-between gap-2">
                                                                    <div class="text-left">
-                                                                       <p class="text-sm font-semibold text-gray-700">{{ subjectInfo.name }}</p>
-                                                                       <p class="text-xs text-gray-500">
+                                                                       <p class="text-xs font-semibold text-gray-700 leading-5 break-words">{{ subjectInfo.name }}</p>
+                                                                       <p class="text-[11px] text-gray-500 leading-4">
                                                                            {{ getExceptionReason(detail.id, subjectInfo.name) ? `예외처리: ${getExceptionReason(detail.id, subjectInfo.name)}` : '예외처리 없음' }}
                                                                        </p>
                                                                    </div>
                                                                    <select
-                                                                       class="border border-gray-300 rounded-md text-xs px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                                                       class="border border-gray-300 rounded-md text-[11px] px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                                                                        :value="getExceptionReason(detail.id, subjectInfo.name)"
                                                                        @change="updateExceptionReason(detail.id, subjectInfo.name, $event.target.value)"
                                                                    >
@@ -1228,7 +1238,8 @@
                                     <tr>
                                         <th>과목</th>
                                         <th>학점</th>
-                                        <th>미도달 인원</th>
+                                        <th>학업성취율 미도달</th>
+                                        <th>과목출석률 미도달</th>
                                         <th>예외처리 인원</th>
                                         <th>미이수</th>
                                         <th>이수</th>
@@ -1238,13 +1249,14 @@
                                     <tr v-for="row in statisticsState.subjectSummary" :key="row.subjectName">
                                         <td>{{ row.subjectName }}</td>
                                         <td>{{ row.credits }}</td>
-                                        <td>{{ row.underachieverCount }}</td>
+                                        <td>{{ row.gradeCount }}</td>
+                                        <td>{{ row.attendanceCount }}</td>
                                         <td>{{ row.exceptionCount }}</td>
                                         <td>{{ row.incompleteCount }}</td>
                                         <td>{{ row.completeCount }}</td>
                                     </tr>
                                     <tr v-if="statisticsState.subjectSummary.length === 0">
-                                        <td colspan="6">표시할 데이터가 없습니다.</td>
+                                        <td colspan="7">표시할 데이터가 없습니다.</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -1258,6 +1270,7 @@
                                         <th>과목</th>
                                         <th>진행 여부</th>
                                         <th>진행 차시</th>
+                                        <th>대상 인원</th>
                                         <th>참여 인원</th>
                                         <th>미참여 인원</th>
                                     </tr>
@@ -1267,11 +1280,12 @@
                                         <td>{{ row.subjectName }}</td>
                                         <td>{{ row.hasPrevention ? '진행' : '미진행' }}</td>
                                         <td>{{ row.sessions }}</td>
+                                        <td>{{ row.targets }}</td>
                                         <td>{{ row.participants }}</td>
                                         <td>{{ row.nonParticipants }}</td>
                                     </tr>
                                     <tr v-if="statisticsState.preventionSummary.length === 0">
-                                        <td colspan="5">표시할 데이터가 없습니다.</td>
+                                        <td colspan="6">표시할 데이터가 없습니다.</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -1284,7 +1298,8 @@
                                     <tr>
                                         <th>과목</th>
                                         <th>학점</th>
-                                        <th>추가학습 인원</th>
+                                        <th>추가학습 대상(과목출석률)</th>
+                                        <th>추가학습 참여 인원</th>
                                         <th>예외처리 인원</th>
                                         <th>미이수</th>
                                         <th>이수</th>
@@ -1294,13 +1309,45 @@
                                     <tr v-for="row in statisticsState.additionalSummary" :key="row.subjectName">
                                         <td>{{ row.subjectName }}</td>
                                         <td>{{ row.credits }}</td>
-                                        <td>{{ row.supplementaryParticipants }}</td>
+                                        <td>{{ row.attendanceTargets }}</td>
+                                        <td>{{ row.participants }}</td>
                                         <td>{{ row.exceptionCount }}</td>
                                         <td>{{ row.incompleteCount }}</td>
                                         <td>{{ row.completeCount }}</td>
                                     </tr>
                                     <tr v-if="statisticsState.additionalSummary.length === 0">
-                                        <td colspan="6">표시할 데이터가 없습니다.</td>
+                                        <td colspan="7">표시할 데이터가 없습니다.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </section>
+
+                        <section>
+                            <h4 class="stats-section-title">과목별 보충지도(학업성취율) 참여 현황</h4>
+                            <table class="stats-table">
+                                <thead>
+                                    <tr>
+                                        <th>과목</th>
+                                        <th>학점</th>
+                                        <th>보충지도 대상(학업성취율)</th>
+                                        <th>보충지도 참여 인원</th>
+                                        <th>예외처리 인원</th>
+                                        <th>미이수</th>
+                                        <th>이수</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="row in statisticsState.remedialSummary" :key="row.subjectName">
+                                        <td>{{ row.subjectName }}</td>
+                                        <td>{{ row.credits }}</td>
+                                        <td>{{ row.gradeTargets }}</td>
+                                        <td>{{ row.participants }}</td>
+                                        <td>{{ row.exceptionCount }}</td>
+                                        <td>{{ row.incompleteCount }}</td>
+                                        <td>{{ row.completeCount }}</td>
+                                    </tr>
+                                    <tr v-if="statisticsState.remedialSummary.length === 0">
+                                        <td colspan="7">표시할 데이터가 없습니다.</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -1525,6 +1572,7 @@
                             subjectSummary: [],
                             preventionSummary: [],
                             additionalSummary: [],
+                            remedialSummary: [],
                             deficitSummary: [],
                             multiSubjectBuckets: [],
                             gradePreventionRatios: [],
@@ -2044,6 +2092,7 @@
                                         attendanceUnderachievers: new Set(),
                                         exceptions: new Map(),
                                         completion: { complete: new Set(), incomplete: new Set() },
+                                        preventionTargets: new Set(),
                                         preventionParticipants: new Set(),
                                         preventionSessions: 0,
                                         supplementaryParticipants: new Set(),
@@ -2174,6 +2223,13 @@
                                                 }
                                             });
 
+                                            const preventiveStudents = guidanceData.preventive?.students || [];
+                                            preventiveStudents.forEach(student => {
+                                                if (!student || !student.id) return;
+                                                const id = String(student.id);
+                                                stats.preventionTargets.add(id);
+                                            });
+
                                             const supplementarySessions = guidanceData.supplementary?.sessions || [];
                                             const supplementaryParticipants = new Set();
                                             supplementarySessions.forEach(session => {
@@ -2194,8 +2250,7 @@
                                                 if (!session || !session.isSaved) return;
                                                 savedPreventiveCount++;
                                                 if (session.attendance) {
-                                                    Object.entries(session.attendance).forEach(([studentId, methodName]) => {
-                                                        if (!methodName) return;
+                                                    Object.keys(session.attendance).forEach(studentId => {
                                                         preventiveParticipants.add(String(studentId));
                                                     });
                                                 }
@@ -2212,6 +2267,16 @@
                                                     gradeParticipants[gradeValue].add(id);
                                                 }
                                             });
+                                            preventiveStudents.forEach(student => {
+                                                const id = String(student.id);
+                                                if (id) {
+                                                    stats.preventionParticipants.add(id);
+                                                    const gradeValue = this.getStudentGrade(id);
+                                                    if (gradeParticipants[gradeValue]) {
+                                                        gradeParticipants[gradeValue].add(id);
+                                                    }
+                                                }
+                                            });
                                         }
                                     } catch (guidanceError) {
                                         console.warn('교과교사 guidance 로드 실패:', guidanceError);
@@ -2224,6 +2289,7 @@
                             const subjectSummary = [];
                             const preventionSummary = [];
                             const additionalSummary = [];
+                            const remedialSummary = [];
                             const deficitSummary = [];
                             const mismatchRows = [];
                             let totalParticipantsPairs = 0;
@@ -2231,26 +2297,44 @@
 
                             subjectStats.forEach(stats => {
                                 const subjectName = stats.subjectName;
-                                const underachieverCount = stats.underachievers.size;
-                                const exceptionCount = stats.exceptions.size;
-                                const completeCount = stats.completion.complete.size;
-                                const incompleteCount = stats.completion.incomplete.size;
+                                const gradeIds = Array.from(stats.gradeUnderachievers);
+                                const attendanceIds = Array.from(stats.attendanceUnderachievers);
+                                const exceptionEntries = Array.from(stats.exceptions.entries());
+                                const completeIds = Array.from(stats.completion.complete);
+                                const incompleteIds = Array.from(stats.completion.incomplete);
+
+                                const exceptionCount = exceptionEntries.length;
+                                const exceptionCountAttendance = exceptionEntries.filter(([id]) => stats.attendanceUnderachievers.has(id)).length;
+                                const exceptionCountGrade = exceptionEntries.filter(([id]) => stats.gradeUnderachievers.has(id)).length;
+
+                                const completeCount = completeIds.length;
+                                const incompleteCount = incompleteIds.length;
+                                const completeCountAttendance = completeIds.filter(id => stats.attendanceUnderachievers.has(id)).length;
+                                const incompleteCountAttendance = incompleteIds.filter(id => stats.attendanceUnderachievers.has(id)).length;
+                                const completeCountGrade = completeIds.filter(id => stats.gradeUnderachievers.has(id)).length;
+                                const incompleteCountGrade = incompleteIds.filter(id => stats.gradeUnderachievers.has(id)).length;
+
+                                const attendanceParticipants = new Set(Array.from(stats.supplementaryParticipants).filter(id => stats.attendanceUnderachievers.has(id)));
+                                const gradeParticipants = new Set(Array.from(stats.supplementaryParticipants).filter(id => stats.gradeUnderachievers.has(id)));
 
                                 subjectSummary.push({
                                     subjectName,
                                     credits: stats.credits,
-                                    underachieverCount,
+                                    gradeCount: gradeIds.length,
+                                    attendanceCount: attendanceIds.length,
                                     exceptionCount,
                                     completeCount,
                                     incompleteCount
                                 });
 
+                                const preventionTargetCount = stats.preventionTargets.size;
                                 const preventionParticipantsCount = stats.preventionParticipants.size;
-                                const preventionNonParticipantsCount = Math.max(stats.supplementaryTargets.size - preventionParticipantsCount, 0);
+                                const preventionNonParticipantsCount = Math.max(preventionTargetCount - preventionParticipantsCount, 0);
                                 preventionSummary.push({
                                     subjectName,
                                     hasPrevention: stats.preventionSessions > 0,
                                     sessions: stats.preventionSessions,
+                                    targets: preventionTargetCount,
                                     participants: preventionParticipantsCount,
                                     nonParticipants: preventionNonParticipantsCount
                                 });
@@ -2258,10 +2342,21 @@
                                 additionalSummary.push({
                                     subjectName,
                                     credits: stats.credits,
-                                    supplementaryParticipants: stats.supplementaryParticipants.size,
-                                    exceptionCount,
-                                    completeCount,
-                                    incompleteCount
+                                    attendanceTargets: attendanceIds.length,
+                                    participants: attendanceParticipants.size,
+                                    exceptionCount: exceptionCountAttendance,
+                                    completeCount: completeCountAttendance,
+                                    incompleteCount: incompleteCountAttendance
+                                });
+
+                                remedialSummary.push({
+                                    subjectName,
+                                    credits: stats.credits,
+                                    gradeTargets: gradeIds.length,
+                                    participants: gradeParticipants.size,
+                                    exceptionCount: exceptionCountGrade,
+                                    completeCount: completeCountGrade,
+                                    incompleteCount: incompleteCountGrade
                                 });
 
                                 const gradeCount = stats.gradeUnderachievers.size;
@@ -2275,7 +2370,7 @@
                                 });
 
                                 if (preventionParticipantsCount > 0) {
-                                    const nonSupplementaryCount = [...stats.preventionParticipants].filter(studentId => !stats.supplementaryTargets.has(studentId)).length;
+                                    const nonSupplementaryCount = [...stats.preventionParticipants].filter(studentId => !stats.attendanceUnderachievers.has(studentId)).length;
                                     const percentage = nonSupplementaryCount > 0
                                         ? Number(((nonSupplementaryCount / preventionParticipantsCount) * 100).toFixed(1))
                                         : 0;
@@ -2293,6 +2388,7 @@
                             subjectSummary.sort((a, b) => a.subjectName.localeCompare(b.subjectName, 'ko'));
                             preventionSummary.sort((a, b) => a.subjectName.localeCompare(b.subjectName, 'ko'));
                             additionalSummary.sort((a, b) => a.subjectName.localeCompare(b.subjectName, 'ko'));
+                            remedialSummary.sort((a, b) => a.subjectName.localeCompare(b.subjectName, 'ko'));
                             deficitSummary.sort((a, b) => a.subjectName.localeCompare(b.subjectName, 'ko'));
                             mismatchRows.sort((a, b) => b.percentage - a.percentage);
 
@@ -2340,6 +2436,7 @@
                             this.statisticsState.subjectSummary = subjectSummary;
                             this.statisticsState.preventionSummary = preventionSummary;
                             this.statisticsState.additionalSummary = additionalSummary;
+                            this.statisticsState.remedialSummary = remedialSummary;
                             this.statisticsState.deficitSummary = deficitSummary;
                             this.statisticsState.multiSubjectBuckets = multiSubjectBuckets;
                             this.statisticsState.gradePreventionRatios = gradePreventionRatios;
