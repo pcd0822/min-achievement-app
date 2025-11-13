@@ -2555,6 +2555,28 @@
                                     const total = stats.completionTotals.get(id);
                                     return total == null || total <= 0;
                                 }).length;
+                                
+                                // 추가학습 대상자: 과목출석률만 미도달한 학생 (학업성취율 미도달 제외)
+                                const additionalLearningTargets = attendanceIds.filter(id => 
+                                    !stats.gradeUnderachievers.has(id)
+                                );
+                                
+                                // 추가학습 참여 인원: 추가학습 대상자 중 보충지도 이수시간이 있는 학생 수
+                                const additionalParticipantsCount = additionalLearningTargets.filter(id => {
+                                    const total = stats.completionTotals.get(id);
+                                    return total != null && total > 0;
+                                }).length;
+                                
+                                // 추가학습 미참여 인원: 추가학습 대상자 중 보충지도 이수시간이 없는 학생 수
+                                const additionalNonParticipantsCount = additionalLearningTargets.filter(id => {
+                                    const total = stats.completionTotals.get(id);
+                                    return total == null || total <= 0;
+                                }).length;
+                                
+                                // 추가학습 예외처리 인원: 추가학습 대상자 중 예외처리된 학생 수
+                                const additionalExceptionCount = additionalLearningTargets.filter(id => 
+                                    stats.exceptions.has(id)
+                                ).length;
 
                                 // 예방지도 참여 인원: preventiveHours에서 hours > 0인 학생 수
                                 const preventiveParticipantList = Array.from(stats.preventiveHours.entries())
@@ -2589,15 +2611,23 @@
                                     nonParticipants: preventiveNonParticipants.length
                                 });
 
+                                // 추가학습 이수/미이수 인원: 추가학습 대상자 중 이수/미이수 학생 수
+                                const additionalCompleteCount = additionalLearningTargets.filter(id => 
+                                    stats.completion.complete.has(id)
+                                ).length;
+                                const additionalIncompleteCount = additionalLearningTargets.filter(id => 
+                                    stats.completion.incomplete.has(id)
+                                ).length;
+                                
                                 additionalSummary.push({
                                     subjectName,
                                     credits: stats.credits,
-                                    attendanceTargets: attendanceIds.length,
-                                    participants: supplementaryParticipantsCount,
-                                    exceptionCount: exceptionCountAttendance,
-                                    nonParticipants: supplementaryNonParticipantsCount,
-                                    completeCount: completeCountAttendance,
-                                    incompleteCount: incompleteCountAttendance
+                                    attendanceTargets: additionalLearningTargets.length,
+                                    participants: additionalParticipantsCount,
+                                    exceptionCount: additionalExceptionCount,
+                                    nonParticipants: additionalNonParticipantsCount,
+                                    completeCount: additionalCompleteCount,
+                                    incompleteCount: additionalIncompleteCount
                                 });
 
                                 const gradeParticipantCount = gradeIds.filter(id => {
