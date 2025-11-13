@@ -2406,19 +2406,36 @@
                                     try {
                                         const completionStatusRef = collection(teacherDoc.ref, 'completionStatus');
                                         const completionStatusSnap = await getDocs(completionStatusRef);
-                                        console.log(`[통계] completionStatus 컬렉션 직접 읽기: 교사=${teacherDoc.id}, 문서 수=${completionStatusSnap.docs.length}`);
+                                        console.log(`[통계] completionStatus 컬렉션 직접 읽기: 교사=${teacherDoc.id}, 문서 수=${completionStatusSnap.docs.length}`, {
+                                            activeSchoolId,
+                                            teacherUid: teacherDoc.id,
+                                            fullPath: `schools/${activeSchoolId}/teacherData/${teacherDoc.id}/completionStatus`
+                                        });
                                         
                                         for (const completionDoc of completionStatusSnap.docs) {
                                             const docKey = `${teacherDoc.id}/${completionDoc.id}`;
-                                            if (processedCompletionDocs.has(docKey)) continue;
+                                            if (processedCompletionDocs.has(docKey)) {
+                                                console.log(`[통계] completionStatus 중복 스킵: ${docKey}`);
+                                                continue;
+                                            }
                                             processedCompletionDocs.add(docKey);
                                             
                                             const subjectName = this.decodeSubjectName(completionDoc.id);
                                             const stats = ensureSubject(subjectName);
-                                            if (!stats) continue;
+                                            if (!stats) {
+                                                console.warn(`[통계] stats가 null: 과목=${subjectName}`);
+                                                continue;
+                                            }
                                             
-                                            const completionData = completionDoc.data();
-                                            const completionEntries = completionData.data || {};
+                                            const completionDocData = completionDoc.data();
+                                            console.log(`[통계] completionStatus 문서 데이터:`, {
+                                                docId: completionDoc.id,
+                                                subjectName,
+                                                hasData: !!completionDocData.data,
+                                                dataKeys: completionDocData.data ? Object.keys(completionDocData.data).slice(0, 3) : [],
+                                                fullData: completionDocData
+                                            });
+                                            const completionEntries = completionDocData.data || {};
                                             
                                             console.log(`[통계] completionStatus 직접 처리: 과목=${subjectName}, 학생 수=${Object.keys(completionEntries).length}`);
                                             
@@ -2438,6 +2455,13 @@
                                                 const preventiveHoursFromCompletion = (entry && typeof entry === 'object' && entry.preventiveHours != null)
                                                     ? Number(entry.preventiveHours) || 0
                                                     : 0;
+                                                
+                                                console.log(`[통계] completionStatus 엔트리 처리: 학생=${normalizedId}`, {
+                                                    entry,
+                                                    completionStatusValue,
+                                                    totalHours,
+                                                    preventiveHoursFromCompletion
+                                                });
                                                 
                                                 if (completionStatusValue === '이수') {
                                                     stats.completion.complete.add(normalizedId);
@@ -2460,6 +2484,13 @@
                                                         console.log(`[통계] 예방지도 이수시간 저장(직접): 학생=${normalizedId}, 시간=${preventiveHoursFromCompletion}`);
                                                     }
                                                 }
+                                            });
+                                            
+                                            console.log(`[통계] completionStatus 처리 완료(직접): 과목=${subjectName}`, {
+                                                completionTotals: stats.completionTotals.size,
+                                                preventiveHours: stats.preventiveHours.size,
+                                                completionTotalsSample: Array.from(stats.completionTotals.entries()).slice(0, 3),
+                                                preventiveHoursSample: Array.from(stats.preventiveHours.entries()).slice(0, 3)
                                             });
                                         }
                                     } catch (completionDirectError) {
@@ -4432,17 +4463,46 @@
                             }
                             
                             // 2. teacherData/completionStatus에 저장 (관리자가 통계 대시보드에서 읽을 수 있도록)
+                            // teacherData 문서가 없으면 생성 (하위 컬렉션 접근을 위해 필요)
                             try {
+                                const teacherDataDocRef = doc(db, `schools/${activeSchoolId}/teacherData`, this.user.uid);
+                                const teacherDataDocSnap = await getDoc(teacherDataDocRef);
+                                if (!teacherDataDocSnap.exists()) {
+                                    // teacherData 문서가 없으면 생성 (빈 문서로)
+                                    await setDoc(teacherDataDocRef, {
+                                        createdAt: new Date().toISOString(),
+                                        lastUpdated: new Date().toISOString()
+                                    });
+                                    console.log('[내보내기] teacherData 문서 생성:', this.user.uid);
+                                }
+                                
                                 const completionDocRef = doc(db, `schools/${activeSchoolId}/teacherData/${this.user.uid}/completionStatus`, encodedSubjectName);
-                                await setDoc(completionDocRef, { 
+                                const completionDocData = { 
                                     subjectName: subjectName,
                                     data: completionData,
                                     lastUpdated: new Date().toISOString(),
                                     sentToHomeroom: true
-                                }, { merge: true });
-                                console.log('teacherData/completionStatus 저장 완료');
+                                };
+                                await setDoc(completionDocRef, completionDocData, { merge: true });
+                                console.log('[내보내기] teacherData/completionStatus 저장 완료', {
+                                    activeSchoolId,
+                                    teacherUid: this.user.uid,
+                                    subjectName,
+                                    encodedSubjectName,
+                                    docPath: `schools/${activeSchoolId}/teacherData/${this.user.uid}/completionStatus/${encodedSubjectName}`,
+                                    studentCount: Object.keys(completionData).length,
+                                    sampleData: Object.keys(completionData).slice(0, 3).map(id => ({
+                                        id,
+                                        total: completionData[id].total,
+                                        preventiveHours: completionData[id].preventiveHours
+                                    }))
+                                });
                             } catch (teacherDataError) {
-                                console.error('teacherData/completionStatus 저장 실패:', teacherDataError);
+                                console.error('[내보내기] teacherData/completionStatus 저장 실패:', teacherDataError, {
+                                    activeSchoolId,
+                                    teacherUid: this.user.uid,
+                                    subjectName
+                                });
                             }
                             
                             alert('이수현황표가 내보내기 되었습니다. 담임교사와 관리자가 확인할 수 있습니다.');
