@@ -2264,11 +2264,20 @@
                                             });
 
                                             // completionStatus 데이터(교과교사가 전송한 이수현황)에서 참여자 추출
+                                            // guidance에서 계산한 preventiveHours를 먼저 저장 (completionStatus에 없을 때 사용)
+                                            const guidancePreventiveHoursMap = new Map();
+                                            stats.preventiveHours.forEach((hours, studentId) => {
+                                                guidancePreventiveHoursMap.set(studentId, hours);
+                                            });
+                                            
                                             try {
                                                 const completionDocRef = doc(teacherDoc.ref, 'completionStatus', guidanceDoc.id);
                                                 const completionDocSnap = await getDoc(completionDocRef);
                                                 if (completionDocSnap.exists()) {
                                                     const completionEntries = completionDocSnap.data().data || {};
+                                                    const completionStudentIds = new Set(Object.keys(completionEntries));
+                                                    
+                                                    // completionStatus에 있는 학생들 처리
                                                     Object.keys(completionEntries).forEach(studentId => {
                                                         const normalizedId = String(studentId);
                                                         const entry = completionEntries[studentId];
@@ -2290,16 +2299,19 @@
                                                         } else if (completionStatusValue === '미이수') {
                                                             stats.completion.incomplete.add(normalizedId);
                                                         }
-                                                    // completionTotals는 completionStatus의 값이 있으면 우선 사용, 없으면 guidance에서 계산한 값 유지
+                                                    // completionTotals는 completionStatus의 값이 있으면 우선 사용
                                                     if (totalHours > 0) {
                                                         stats.completionTotals.set(normalizedId, totalHours);
                                                     }
-                                                    // preventiveHours는 completionStatus의 값이 있으면 사용, 없으면 guidance에서 계산한 값 유지
-                                                    const currentPreventiveHours = stats.preventiveHours.get(normalizedId) || 0;
+                                                    // preventiveHours는 completionStatus의 값이 있으면 사용, 없으면 guidance에서 계산한 값 사용
                                                     if (preventiveHoursFromCompletion > 0) {
                                                         stats.preventiveHours.set(normalizedId, preventiveHoursFromCompletion);
-                                                    } else if (currentPreventiveHours > 0) {
-                                                        // guidance에서 계산한 값 유지 (이미 설정되어 있음)
+                                                    } else {
+                                                        // completionStatus에 preventiveHours가 없으면 guidance에서 계산한 값 사용
+                                                        const guidanceHours = guidancePreventiveHoursMap.get(normalizedId) || 0;
+                                                        if (guidanceHours > 0) {
+                                                            stats.preventiveHours.set(normalizedId, guidanceHours);
+                                                        }
                                                     }
                                                         if (totalHours > 0 || completionStatusValue === '이수' || completionStatusValue === '미이수') {
                                                             stats.supplementaryParticipants.add(normalizedId);
@@ -2307,13 +2319,27 @@
                                                                 stats.preventionParticipants.add(normalizedId);
                                                             }
                                                         }
-                                                    if (preventiveHoursFromCompletion > 0 || currentPreventiveHours > 0) {
+                                                    const finalPreventiveHours = stats.preventiveHours.get(normalizedId) || 0;
+                                                    if (finalPreventiveHours > 0) {
                                                         stats.preventionParticipants.add(normalizedId);
                                                     }
                                                     });
+                                                    
+                                                    // completionStatus에 없지만 guidance에 있는 학생들 처리 (guidance에서 계산한 값 유지)
+                                                    guidancePreventiveHoursMap.forEach((hours, studentId) => {
+                                                        if (!completionStudentIds.has(studentId) && hours > 0) {
+                                                            // completionStatus에 없지만 guidance에 예방지도 이수시간이 있는 경우
+                                                            stats.preventiveHours.set(studentId, hours);
+                                                            stats.preventionParticipants.add(studentId);
+                                                        }
+                                                    });
+                                                } else {
+                                                    // completionStatus 문서가 없으면 guidance에서 계산한 값만 사용
+                                                    // 이미 guidance에서 계산한 값이 stats.preventiveHours에 저장되어 있음
                                                 }
                                             } catch (completionDocError) {
                                                 console.warn('completionStatus 문서 읽기 실패:', completionDocError);
+                                                // 에러 발생 시 guidance에서 계산한 값만 사용
                                             }
                                         }
                                     } catch (guidanceError) {
