@@ -3233,9 +3233,11 @@
 
                     // --- Data Loading/Saving (Teacher) ---
                     async loadTeacherPlan() {
-                        if (!this.user || !db || !this.schoolId || this.role !== '교과교사') return;
+                        // currentSchoolCode를 우선 사용, 없으면 schoolId 사용 (관리자가 통계 대시보드에서 읽을 수 있도록)
+                        const activeSchoolId = this.currentSchoolCode || this.schoolId;
+                        if (!this.user || !db || !activeSchoolId || this.role !== '교과교사') return;
                         // 경로 오류 방지를 위해 하위 컬렉션 구조 사용
-                        const planDocRef = doc(db, `schools/${this.schoolId}/teacherData/${this.user.uid}/plans/teacherPlan`);
+                        const planDocRef = doc(db, `schools/${activeSchoolId}/teacherData/${this.user.uid}/plans/teacherPlan`);
                         try {
                             const docSnap = await getDoc(planDocRef);
                             const defaultPlan = this.getInitialTeacherPlan();
@@ -3285,14 +3287,16 @@
                         this.$nextTick(() => { this.initFlatpickr(); });
                     },
                     async saveTeacherPlan() {
-                        if (!this.user || !db || !this.schoolId || this.role !== '교과교사') return;
+                        // currentSchoolCode를 우선 사용, 없으면 schoolId 사용 (관리자가 통계 대시보드에서 읽을 수 있도록)
+                        const activeSchoolId = this.currentSchoolCode || this.schoolId;
+                        if (!this.user || !db || !activeSchoolId || this.role !== '교과교사') return;
                         if (!this.teacherPlan.subjectName) {
                             this.teacherPlanStatus = "과목명을 먼저 입력해주세요.";
                             setTimeout(() => this.teacherPlanStatus = '', 3000);
                             return;
                         }
                         this.teacherPlanStatus = "계획안 저장 중...";
-                        const planDocRef = doc(db, `schools/${this.schoolId}/teacherData/${this.user.uid}/plans/teacherPlan`);
+                        const planDocRef = doc(db, `schools/${activeSchoolId}/teacherData/${this.user.uid}/plans/teacherPlan`);
                         try {
                             const planToSave = { ...JSON.parse(JSON.stringify(this.teacherPlan)) };
                             const formatDates = (period) => (period || []).map(d => (d instanceof Date && !isNaN(d.getTime())) ? d.toISOString() : null).filter(Boolean);
@@ -3326,11 +3330,15 @@
                         }
                     },
                     async loadGuidanceData(){
-                        if (!this.user || !db || !this.schoolId || this.role !== '교과교사') {
+                        // currentSchoolCode를 우선 사용, 없으면 schoolId 사용 (관리자가 통계 대시보드에서 읽을 수 있도록)
+                        const activeSchoolId = this.currentSchoolCode || this.schoolId;
+                        if (!this.user || !db || !activeSchoolId || this.role !== '교과교사') {
                             console.warn("loadGuidanceData: 로드 조건 불만족", {
                                 hasUser: !!this.user,
                                 hasDb: !!db,
-                                hasSchoolId: !!this.schoolId,
+                                activeSchoolId: activeSchoolId,
+                                currentSchoolCode: this.currentSchoolCode,
+                                schoolId: this.schoolId,
                                 role: this.role
                             });
                             this.teacherGuidanceData = this.getInitialGuidanceData();
@@ -3343,8 +3351,8 @@
                         }
                         const encodedSubjectName = this.encodeSubjectName(this.teacherPlan.subjectName);
                         // Firestore 경로는 컬렉션-문서-컬렉션-문서 형태(짝수 세그먼트)여야 함
-                        // schools/{schoolId}/teacherData/{uid}/guidance/{subjectName} 형태로 변경
-                        const docPath = `schools/${this.schoolId}/teacherData/${this.user.uid}/guidance/${encodedSubjectName}`;
+                        // schools/{activeSchoolId}/teacherData/{uid}/guidance/{subjectName} 형태로 변경
+                        const docPath = `schools/${activeSchoolId}/teacherData/${this.user.uid}/guidance/${encodedSubjectName}`;
                         try {
                             console.log("loadGuidanceData: 로드 시도", { docPath, subjectName: this.teacherPlan.subjectName, encodedSubjectName });
                             const docSnap = await getDoc(doc(db, docPath));
@@ -3416,11 +3424,17 @@
                             console.warn("saveGuidanceData: 과목명이 없어 저장하지 않음");
                             return { success: false, message: '과목명을 입력해주세요.' };
                         }
+                        // currentSchoolCode를 우선 사용, 없으면 schoolId 사용 (관리자가 통계 대시보드에서 읽을 수 있도록)
+                        const activeSchoolId = this.currentSchoolCode || this.schoolId;
+                        if (!activeSchoolId) {
+                            console.warn("saveGuidanceData: 학교 ID가 없어 저장하지 않음");
+                            return { success: false, message: '학교 코드를 설정해주세요.' };
+                        }
                         // 과목명을 안전한 문서 ID로 인코딩
                         const encodedSubjectName = this.encodeSubjectName(this.teacherPlan.subjectName);
                         // Firestore 경로는 컬렉션-문서-컬렉션-문서 형태(짝수 세그먼트)여야 함
-                        // schools/{schoolId}/teacherData/{uid}/guidance/{subjectName} 형태로 변경
-                        const docPath = `schools/${this.schoolId}/teacherData/${this.user.uid}/guidance/${encodedSubjectName}`;
+                        // schools/{activeSchoolId}/teacherData/{uid}/guidance/{subjectName} 형태로 변경
+                        const docPath = `schools/${activeSchoolId}/teacherData/${this.user.uid}/guidance/${encodedSubjectName}`;
                         try {
                             console.log("saveGuidanceData: 저장 시도", { 
                                 docPath, 
@@ -4373,13 +4387,19 @@
                                 if (!student || !student.id) return;
                                 const studentId = String(student.id);
                                 const status = this.guidanceCompletionStatus[studentId];
-                                if (status && status.completionStatus) {
+                                // completionStatus가 있거나, total이나 preventiveHours가 있으면 저장
+                                if (status && (status.completionStatus || (status.total && status.total > 0) || (status.preventiveHours && status.preventiveHours > 0))) {
                                     completionData[studentId] = {
-                                        completionStatus: status.completionStatus,
+                                        completionStatus: status.completionStatus || null,
                                         total: status.total || 0,
                                         preventiveHours: status.preventiveHours || 0,
                                         lastUpdated: new Date().toISOString()
                                     };
+                                    console.log(`[내보내기] 학생 데이터 저장: ${studentId}`, {
+                                        completionStatus: status.completionStatus,
+                                        total: status.total,
+                                        preventiveHours: status.preventiveHours
+                                    });
                                 }
                             });
                             
