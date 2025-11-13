@@ -2282,7 +2282,7 @@
                                                         } else if (typeof entry === 'number') {
                                                             totalHours = Number(entry);
                                                         }
-                                                    const preventiveHours = (entry && typeof entry === 'object' && entry.preventiveHours != null)
+                                                    const preventiveHoursFromCompletion = (entry && typeof entry === 'object' && entry.preventiveHours != null)
                                                         ? Number(entry.preventiveHours) || 0
                                                         : 0;
                                                         if (completionStatusValue === '이수') {
@@ -2290,15 +2290,24 @@
                                                         } else if (completionStatusValue === '미이수') {
                                                             stats.completion.incomplete.add(normalizedId);
                                                         }
-                                                    stats.completionTotals.set(normalizedId, totalHours);
-                                                    stats.preventiveHours.set(normalizedId, preventiveHours);
+                                                    // completionTotals는 completionStatus의 값이 있으면 우선 사용, 없으면 guidance에서 계산한 값 유지
+                                                    if (totalHours > 0) {
+                                                        stats.completionTotals.set(normalizedId, totalHours);
+                                                    }
+                                                    // preventiveHours는 completionStatus의 값이 있으면 사용, 없으면 guidance에서 계산한 값 유지
+                                                    const currentPreventiveHours = stats.preventiveHours.get(normalizedId) || 0;
+                                                    if (preventiveHoursFromCompletion > 0) {
+                                                        stats.preventiveHours.set(normalizedId, preventiveHoursFromCompletion);
+                                                    } else if (currentPreventiveHours > 0) {
+                                                        // guidance에서 계산한 값 유지 (이미 설정되어 있음)
+                                                    }
                                                         if (totalHours > 0 || completionStatusValue === '이수' || completionStatusValue === '미이수') {
                                                             stats.supplementaryParticipants.add(normalizedId);
                                                             if (stats.preventionTargets.has(normalizedId)) {
                                                                 stats.preventionParticipants.add(normalizedId);
                                                             }
                                                         }
-                                                    if (preventiveHours > 0) {
+                                                    if (preventiveHoursFromCompletion > 0 || currentPreventiveHours > 0) {
                                                         stats.preventionParticipants.add(normalizedId);
                                                     }
                                                     });
