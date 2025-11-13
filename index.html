@@ -872,7 +872,7 @@
                                <div class="flex justify-between items-center mb-4">
                                    <h4 class="text-lg font-semibold">{{ teacherTab === 'preventive' ? '예방지도' : '보충지도(추가학습)' }} 이수현황표</h4>
                                    <button v-if="teacherTab === 'supplementary'" @click="sendCompletionStatusToHomeroom" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition text-sm font-semibold">
-                                       담임교사 대시보드로 전송
+                                       이수현황표 내보내기
                                    </button>
                                </div>
                                <div class="overflow-x-auto">
@@ -4351,7 +4351,9 @@
                     },
                     async sendCompletionStatusToHomeroom() {
                         if (this.role !== '교과교사' || this.teacherTab !== 'supplementary') return;
-                        if (!this.teacherPlan.subjectName || !this.schoolId || !this.user || !db) {
+                        // currentSchoolCode를 우선 사용, 없으면 schoolId 사용 (관리자가 통계 대시보드에서 읽을 수 있도록)
+                        const activeSchoolId = this.currentSchoolCode || this.schoolId;
+                        if (!this.teacherPlan.subjectName || !activeSchoolId || !this.user || !db) {
                             alert('과목명을 입력하고 저장해주세요.');
                             return;
                         }
@@ -4360,7 +4362,7 @@
                             // 먼저 출석부 데이터를 저장 (최신 상태 반영)
                             await this.saveGuidanceData();
                             
-                            // 이수현황 데이터를 교과교사의 teacherData 하위에 저장 (권한 문제 해결)
+                            // 이수현황 데이터를 교과교사의 teacherData 하위에 저장 (관리자가 통계 대시보드에서 읽을 수 있도록)
                             const subjectName = this.teacherPlan.subjectName;
                             const encodedSubjectName = this.encodeSubjectName(subjectName);
                             const completionData = {};
@@ -4384,7 +4386,7 @@
                             // 1. commonData/completionStatus에 저장 (담임교사가 읽을 수 있도록)
                             // 구조: { data: { subjectName: { studentId: completionStatus } } }
                             try {
-                                const commonCompletionDocRef = doc(db, `schools/${this.schoolId}/commonData`, 'completionStatus');
+                                const commonCompletionDocRef = doc(db, `schools/${activeSchoolId}/commonData`, 'completionStatus');
                                 const existingDoc = await getDoc(commonCompletionDocRef);
                                 const existingData = existingDoc.exists() ? existingDoc.data().data || {} : {};
                                 
@@ -4409,9 +4411,9 @@
                                 // 권한 오류가 발생해도 teacherData에는 저장 시도
                             }
                             
-                            // 2. teacherData/completionStatus에도 백업 저장 (자신의 데이터는 쓰기 가능)
+                            // 2. teacherData/completionStatus에 저장 (관리자가 통계 대시보드에서 읽을 수 있도록)
                             try {
-                                const completionDocRef = doc(db, `schools/${this.schoolId}/teacherData/${this.user.uid}/completionStatus`, encodedSubjectName);
+                                const completionDocRef = doc(db, `schools/${activeSchoolId}/teacherData/${this.user.uid}/completionStatus`, encodedSubjectName);
                                 await setDoc(completionDocRef, { 
                                     subjectName: subjectName,
                                     data: completionData,
@@ -4423,11 +4425,12 @@
                                 console.error('teacherData/completionStatus 저장 실패:', teacherDataError);
                             }
                             
-                            alert('이수현황 데이터가 담임교사 대시보드로 전송되었습니다.');
+                            alert('이수현황표가 내보내기 되었습니다. 담임교사와 관리자가 확인할 수 있습니다.');
                             console.log('이수현황 데이터 전송 완료:', {
                                 subjectName: subjectName,
                                 encodedSubjectName: encodedSubjectName,
-                                docPath: `schools/${this.schoolId}/teacherData/${this.user.uid}/completionStatus/${encodedSubjectName}`,
+                                activeSchoolId: activeSchoolId,
+                                docPath: `schools/${activeSchoolId}/teacherData/${this.user.uid}/completionStatus/${encodedSubjectName}`,
                                 studentCount: Object.keys(completionData).length,
                                 completionData: completionData
                             });
