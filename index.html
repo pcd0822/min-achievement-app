@@ -2154,8 +2154,11 @@
 
                             try {
                                 const teacherDataRef = collection(db, `schools/${this.schoolId}/teacherData`);
+                                console.log(`[통계] teacherData 컬렉션 읽기 시도: schoolId=${this.schoolId}`);
                                 const teacherDataSnap = await getDocs(teacherDataRef);
+                                console.log(`[통계] teacherData 컬렉션 읽기 완료: 교사 수=${teacherDataSnap.docs.length}`);
                                 for (const teacherDoc of teacherDataSnap.docs) {
+                                    console.log(`[통계] 교사 문서 처리 시작: teacherUid=${teacherDoc.id}`);
                                     try {
                                         const planDocRef = doc(teacherDoc.ref, 'plans', 'teacherPlan');
                                         const planSnap = await getDoc(planDocRef);
@@ -2377,11 +2380,15 @@
                                             }
                                         }
                                     } catch (guidanceError) {
-                                        console.warn('교과교사 guidance 로드 실패:', guidanceError);
+                                        console.error('교과교사 guidance 로드 실패:', guidanceError, {
+                                            teacherUid: teacherDoc.id
+                                        });
                                     }
                                 }
                             } catch (teacherDataError) {
-                                console.warn('teacherData 로드 실패:', teacherDataError);
+                                console.error('teacherData 컬렉션 읽기 실패:', teacherDataError, {
+                                    schoolId: this.schoolId
+                                });
                             }
 
                             const subjectSummary = [];
