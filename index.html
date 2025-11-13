@@ -2032,10 +2032,21 @@
                         this.showStatisticsModal = false;
                     },
                     async computeStatisticsData() {
-                        if (this.role !== '관리자' || !this.schoolId || !db) return;
+                        // currentSchoolCode를 우선 사용, 없으면 schoolId 사용
+                        const activeSchoolId = this.currentSchoolCode || this.schoolId;
+                        if (this.role !== '관리자' || !activeSchoolId || !db) {
+                            console.warn('[통계] computeStatisticsData 조건 불만족:', {
+                                role: this.role,
+                                currentSchoolCode: this.currentSchoolCode,
+                                schoolId: this.schoolId,
+                                activeSchoolId
+                            });
+                            return;
+                        }
                         if (this.statisticsState.loading) return;
                         this.statisticsState.loading = true;
                         this.statisticsState.error = '';
+                        console.log(`[통계] computeStatisticsData 시작: activeSchoolId=${activeSchoolId}`);
                         try {
                             const subjectStats = new Map();
                             const curriculumMap = new Map();
@@ -2127,7 +2138,7 @@
                             });
 
                             try {
-                                const completionDocRef = doc(db, `schools/${this.schoolId}/commonData`, 'completionStatus');
+                                const completionDocRef = doc(db, `schools/${activeSchoolId}/commonData`, 'completionStatus');
                                 const completionSnap = await getDoc(completionDocRef);
                                 const completionData = completionSnap.exists() ? completionSnap.data().data || {} : {};
                                 Object.keys(completionData || {}).forEach(subjectName => {
@@ -2153,8 +2164,8 @@
                             const gradeParticipants = { '1': new Set(), '2': new Set(), '3': new Set() };
 
                             try {
-                                const teacherDataRef = collection(db, `schools/${this.schoolId}/teacherData`);
-                                console.log(`[통계] teacherData 컬렉션 읽기 시도: schoolId=${this.schoolId}`);
+                                const teacherDataRef = collection(db, `schools/${activeSchoolId}/teacherData`);
+                                console.log(`[통계] teacherData 컬렉션 읽기 시도: activeSchoolId=${activeSchoolId}`);
                                 const teacherDataSnap = await getDocs(teacherDataRef);
                                 console.log(`[통계] teacherData 컬렉션 읽기 완료: 교사 수=${teacherDataSnap.docs.length}`);
                                 for (const teacherDoc of teacherDataSnap.docs) {
@@ -2281,8 +2292,8 @@
                                                 const completionDocRef = doc(teacherDoc.ref, 'completionStatus', guidanceDoc.id);
                                                 console.log(`[통계] completionStatus 문서 읽기 시도: 과목=${subjectName}, docId=${guidanceDoc.id}`, {
                                                     teacherUid: teacherDoc.id,
-                                                    schoolId: this.schoolId,
-                                                    fullPath: `schools/${this.schoolId}/teacherData/${teacherDoc.id}/completionStatus/${guidanceDoc.id}`
+                                                    activeSchoolId,
+                                                    fullPath: `schools/${activeSchoolId}/teacherData/${teacherDoc.id}/completionStatus/${guidanceDoc.id}`
                                                 });
                                                 const completionDocSnap = await getDoc(completionDocRef);
                                                 if (completionDocSnap.exists()) {
@@ -2387,6 +2398,8 @@
                                 }
                             } catch (teacherDataError) {
                                 console.error('teacherData 컬렉션 읽기 실패:', teacherDataError, {
+                                    activeSchoolId,
+                                    currentSchoolCode: this.currentSchoolCode,
                                     schoolId: this.schoolId
                                 });
                             }
