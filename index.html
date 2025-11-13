@@ -1266,7 +1266,6 @@
                                     <tr>
                                         <th>과목</th>
                                         <th>진행 여부</th>
-                                        <th>예방지도 이수시간(시수)</th>
                                         <th>참여 인원</th>
                                         <th>미참여 인원</th>
                                     </tr>
@@ -1275,12 +1274,11 @@
                                     <tr v-for="row in statisticsState.preventionSummary" :key="row.subjectName">
                                         <td>{{ row.subjectName }}</td>
                                         <td>{{ row.hasPrevention ? '진행' : '미진행' }}</td>
-                                        <td>{{ row.sessions }}</td>
                                         <td>{{ row.participants }}</td>
                                         <td>{{ row.nonParticipants }}</td>
                                     </tr>
                                     <tr v-if="statisticsState.preventionSummary.length === 0">
-                                        <td colspan="5">표시할 데이터가 없습니다.</td>
+                                        <td colspan="4">표시할 데이터가 없습니다.</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -2299,12 +2297,13 @@
                                                         } else if (completionStatusValue === '미이수') {
                                                             stats.completion.incomplete.add(normalizedId);
                                                         }
-                                                    // completionTotals는 completionStatus의 값이 있으면 우선 사용
-                                                    if (totalHours > 0) {
+                                                    // completionTotals는 completionStatus의 값이 있으면 저장 (보충지도 이수현황표 기준)
+                                                    if (totalHours != null && !isNaN(totalHours)) {
                                                         stats.completionTotals.set(normalizedId, totalHours);
                                                     }
                                                     // preventiveHours는 completionStatus의 값이 있으면 사용, 없으면 guidance에서 계산한 값 사용
-                                                    if (preventiveHoursFromCompletion > 0) {
+                                                    if (preventiveHoursFromCompletion != null && !isNaN(preventiveHoursFromCompletion)) {
+                                                        // completionStatus에 preventiveHours가 있으면 사용 (0이어도 저장)
                                                         stats.preventiveHours.set(normalizedId, preventiveHoursFromCompletion);
                                                     } else {
                                                         // completionStatus에 preventiveHours가 없으면 guidance에서 계산한 값 사용
@@ -2375,43 +2374,33 @@
                                 const completeCountGrade = completeIds.filter(id => stats.gradeUnderachievers.has(id)).length;
                                 const incompleteCountGrade = incompleteIds.filter(id => stats.gradeUnderachievers.has(id)).length;
 
+                                // 보충지도 이수현황표(completionStatus) 기준으로 참여 인원 집계
+                                // completionTotals와 preventiveHours에 있는 모든 학생 ID 수집
                                 const completionStudentIds = new Set([
-                                    ...completeIds,
-                                    ...incompleteIds,
                                     ...stats.completionTotals.keys(),
                                     ...stats.preventiveHours.keys()
                                 ]);
-                                if (completionStudentIds.size === 0) {
-                                    stats.supplementaryParticipants.forEach(id => completionStudentIds.add(id));
-                                }
-                                const completionIdList = [...completionStudentIds];
-
-                                const supplementaryParticipantsCount = completionIdList.filter(id => {
+                                
+                                // 보충지도 참여 인원: completionTotals에서 total > 0인 학생 수
+                                const supplementaryParticipantsCount = Array.from(stats.completionTotals.values())
+                                    .filter(total => total > 0).length;
+                                
+                                // 보충지도 미참여 인원: 대상자 중 참여하지 않은 학생 수
+                                const supplementaryNonParticipantsCount = attendanceIds.filter(id => {
                                     const total = stats.completionTotals.get(id);
-                                    if (total != null) return total > 0;
-                                    return stats.supplementaryParticipants.has(id);
+                                    return total == null || total <= 0;
                                 }).length;
 
-                                const supplementaryNonParticipantsCount = completionIdList.filter(id => {
-                                    const total = stats.completionTotals.get(id);
-                                    if (total != null) return total <= 0;
-                                    return !stats.supplementaryParticipants.has(id);
-                                }).length;
-
-                                const preventiveParticipantList = completionIdList.filter(id => {
-                                    const hours = stats.preventiveHours.get(id);
-                                    if (hours != null) return hours > 0;
-                                    return stats.preventionParticipants.has(id);
-                                });
+                                // 예방지도 참여 인원: preventiveHours에서 hours > 0인 학생 수
+                                const preventiveParticipantList = Array.from(stats.preventiveHours.entries())
+                                    .filter(([id, hours]) => hours > 0)
+                                    .map(([id]) => id);
                                 const preventiveParticipantSet = new Set(preventiveParticipantList);
-                                const preventiveNonParticipants = completionIdList.filter(id => !preventiveParticipantSet.has(id));
-
-                                const maxPreventiveHours = preventiveParticipantList.length > 0
-                                    ? preventiveParticipantList.reduce((max, id) => {
-                                        const hours = stats.preventiveHours.get(id) || 0;
-                                        return Math.max(max, Number(hours) || 0);
-                                    }, 0)
-                                    : 0;
+                                
+                                // 예방지도 미참여 인원: 대상자 중 참여하지 않은 학생 수
+                                const preventiveNonParticipants = Array.from(stats.preventionTargets).filter(id => 
+                                    !preventiveParticipantSet.has(id)
+                                );
 
                                 subjectSummary.push({
                                     subjectName,
@@ -2425,8 +2414,7 @@
 
                                 preventionSummary.push({
                                     subjectName,
-                                    hasPrevention: maxPreventiveHours > 0 || preventiveParticipantSet.size > 0 || stats.preventionSessions > 0,
-                                    sessions: Number(maxPreventiveHours.toFixed(1)),
+                                    hasPrevention: preventiveParticipantSet.size > 0 || stats.preventionSessions > 0,
                                     participants: preventiveParticipantSet.size,
                                     nonParticipants: preventiveNonParticipants.length
                                 });
