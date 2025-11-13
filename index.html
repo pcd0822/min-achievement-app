@@ -2177,10 +2177,15 @@
                                     try {
                                         const guidanceRef = collection(teacherDoc.ref, 'guidance');
                                         const guidanceSnap = await getDocs(guidanceRef);
+                                        console.log(`[통계] guidance 문서 읽기: 교사=${teacherDoc.id}, 문서 수=${guidanceSnap.docs.length}`);
                                         for (const guidanceDoc of guidanceSnap.docs) {
                                             const subjectName = this.decodeSubjectName(guidanceDoc.id);
+                                            console.log(`[통계] guidance 문서 처리: 과목=${subjectName}, docId=${guidanceDoc.id}`);
                                             const stats = ensureSubject(subjectName);
-                                            if (!stats) continue;
+                                            if (!stats) {
+                                                console.warn(`[통계] stats가 null: 과목=${subjectName}`);
+                                                continue;
+                                            }
                                             const guidanceData = guidanceDoc.data() || {};
 
                                             const supplementaryStudents = guidanceData.supplementary?.students || [];
@@ -2268,11 +2273,22 @@
                                                 guidancePreventiveHoursMap.set(studentId, hours);
                                             });
                                             
+                                            // completionStatus 문서 읽기 (guidance 문서 ID와 동일한 인코딩된 과목명 사용)
                                             try {
                                                 const completionDocRef = doc(teacherDoc.ref, 'completionStatus', guidanceDoc.id);
+                                                console.log(`[통계] completionStatus 문서 읽기 시도: 과목=${subjectName}, docId=${guidanceDoc.id}`, {
+                                                    teacherUid: teacherDoc.id,
+                                                    schoolId: this.schoolId,
+                                                    fullPath: `schools/${this.schoolId}/teacherData/${teacherDoc.id}/completionStatus/${guidanceDoc.id}`
+                                                });
                                                 const completionDocSnap = await getDoc(completionDocRef);
                                                 if (completionDocSnap.exists()) {
                                                     const completionData = completionDocSnap.data();
+                                                    console.log(`[통계] completionStatus 문서 데이터 구조:`, {
+                                                        hasData: !!completionData.data,
+                                                        dataKeys: completionData.data ? Object.keys(completionData.data).slice(0, 3) : [],
+                                                        fullData: completionData
+                                                    });
                                                     const completionEntries = completionData.data || {};
                                                     const completionStudentIds = new Set(Object.keys(completionEntries));
                                                     
