@@ -2272,8 +2272,14 @@
                                                 const completionDocRef = doc(teacherDoc.ref, 'completionStatus', guidanceDoc.id);
                                                 const completionDocSnap = await getDoc(completionDocRef);
                                                 if (completionDocSnap.exists()) {
-                                                    const completionEntries = completionDocSnap.data().data || {};
+                                                    const completionData = completionDocSnap.data();
+                                                    const completionEntries = completionData.data || {};
                                                     const completionStudentIds = new Set(Object.keys(completionEntries));
+                                                    
+                                                    console.log(`[통계] completionStatus 문서 읽기 성공: 과목=${subjectName}, 학생 수=${completionStudentIds.size}`, {
+                                                        docId: guidanceDoc.id,
+                                                        entries: Object.keys(completionEntries).slice(0, 3) // 처음 3개만 로그
+                                                    });
                                                     
                                                     // completionStatus에 있는 학생들 처리
                                                     Object.keys(completionEntries).forEach(studentId => {
@@ -2300,11 +2306,17 @@
                                                     // completionTotals는 completionStatus의 값이 있으면 저장 (보충지도 이수현황표 기준)
                                                     if (totalHours != null && !isNaN(totalHours)) {
                                                         stats.completionTotals.set(normalizedId, totalHours);
+                                                        if (totalHours > 0) {
+                                                            console.log(`[통계] 보충지도 이수시간 저장: 학생=${normalizedId}, 시간=${totalHours}`);
+                                                        }
                                                     }
                                                     // preventiveHours는 completionStatus의 값이 있으면 사용, 없으면 guidance에서 계산한 값 사용
                                                     if (preventiveHoursFromCompletion != null && !isNaN(preventiveHoursFromCompletion)) {
                                                         // completionStatus에 preventiveHours가 있으면 사용 (0이어도 저장)
                                                         stats.preventiveHours.set(normalizedId, preventiveHoursFromCompletion);
+                                                        if (preventiveHoursFromCompletion > 0) {
+                                                            console.log(`[통계] 예방지도 이수시간 저장: 학생=${normalizedId}, 시간=${preventiveHoursFromCompletion}`);
+                                                        }
                                                     } else {
                                                         // completionStatus에 preventiveHours가 없으면 guidance에서 계산한 값 사용
                                                         const guidanceHours = guidancePreventiveHoursMap.get(normalizedId) || 0;
@@ -2332,12 +2344,19 @@
                                                             stats.preventionParticipants.add(studentId);
                                                         }
                                                     });
+                                                    
+                                                    console.log(`[통계] completionStatus 처리 완료: 과목=${subjectName}, completionTotals=${stats.completionTotals.size}, preventiveHours=${stats.preventiveHours.size}`);
                                                 } else {
+                                                    console.log(`[통계] completionStatus 문서 없음: 과목=${subjectName}, docId=${guidanceDoc.id}`);
                                                     // completionStatus 문서가 없으면 guidance에서 계산한 값만 사용
                                                     // 이미 guidance에서 계산한 값이 stats.preventiveHours에 저장되어 있음
                                                 }
                                             } catch (completionDocError) {
-                                                console.warn('completionStatus 문서 읽기 실패:', completionDocError);
+                                                console.error('completionStatus 문서 읽기 실패:', completionDocError, {
+                                                    subjectName,
+                                                    docId: guidanceDoc.id,
+                                                    teacherUid: teacherDoc.id
+                                                });
                                                 // 에러 발생 시 guidance에서 계산한 값만 사용
                                             }
                                         }
@@ -2381,6 +2400,13 @@
                                     ...stats.preventiveHours.keys()
                                 ]);
                                 
+                                console.log(`[통계] 참여 인원 집계 시작: 과목=${subjectName}`, {
+                                    completionTotalsSize: stats.completionTotals.size,
+                                    preventiveHoursSize: stats.preventiveHours.size,
+                                    completionTotalsSample: Array.from(stats.completionTotals.entries()).slice(0, 3),
+                                    preventiveHoursSample: Array.from(stats.preventiveHours.entries()).slice(0, 3)
+                                });
+                                
                                 // 보충지도 참여 인원: completionTotals에서 total > 0인 학생 수
                                 const supplementaryParticipantsCount = Array.from(stats.completionTotals.values())
                                     .filter(total => total > 0).length;
@@ -2401,6 +2427,11 @@
                                 const preventiveNonParticipants = Array.from(stats.preventionTargets).filter(id => 
                                     !preventiveParticipantSet.has(id)
                                 );
+                                
+                                console.log(`[통계] 참여 인원 집계 완료: 과목=${subjectName}`, {
+                                    supplementaryParticipants: supplementaryParticipantsCount,
+                                    preventiveParticipants: preventiveParticipantSet.size
+                                });
 
                                 subjectSummary.push({
                                     subjectName,
