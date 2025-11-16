@@ -195,6 +195,7 @@
             font-weight: bold;
             margin-top: 30px;
          }
+
         [v-cloak] { display: none; }
 
         .table-cell-content {
@@ -370,6 +371,7 @@
                 </div>
             </div>
         </header>
+
         <!-- Main Content -->
         <main class="flex-grow container mx-auto p-4 sm:p-6 lg:p-8">
             <!-- Loading Indicator -->
@@ -533,6 +535,7 @@
                                <button @click="saveModuleConfig" class="mt-6 px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition">운영 모듈 저장</button>
                                 <p v-if="moduleConfigStatus" class="mt-2 text-sm font-medium text-green-600">{{ moduleConfigStatus }}</p>
                            </div>
+
                            <!-- 4. 대상자 선정 -->
                            <div class="bg-white p-6 rounded-lg shadow-md">
                                <h3 class="text-xl font-semibold mb-4">4. 대상자 선정</h3>
@@ -694,6 +697,7 @@
                                    <button @click="addTeacher" class="mt-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">+ 교과교사 추가</button>
                                </div>
                            </div>
+
                            <div class="bg-white p-6 rounded-lg shadow-md space-y-4">
                                <h3 class="text-lg font-semibold">성취기준 및 최소 성취수준 진술문</h3>
                                <div v-for="(achievement, index) in teacherPlan.achievements" :key="index" class="p-4 border rounded-md space-y-2">
@@ -847,6 +851,7 @@
                                 <p v-if="teacherPlanStatus" class="mt-2 text-sm text-green-600">{{ teacherPlanStatus }}</p>
                            </div>
                        </div>
+
                        <!-- 지도 출석부 & 수업일지 -->
                         <div v-if="currentGuidanceData && teacherTab !== 'plan'" class="space-y-8">
                            <div class="bg-white p-6 rounded-lg shadow-md flex justify-between items-start">
@@ -1036,6 +1041,7 @@
                             <p>출석부 및 수업일지를 보려면 먼저 '계획서 작성' 탭에서 과목명을 입력하고 저장해주세요.</p>
                         </div>
                  </div>
+
                  <!-- Homeroom Teacher View -->
                  <div v-if="role === '담임교사' && schoolId" class="space-y-6">
                      <h2 class="text-3xl font-bold text-gray-800">담임교사 대시보드 (학교코드: {{ currentSchoolCode || schoolId || '미설정' }})</h2>
@@ -1198,6 +1204,7 @@
                 </div>
             </div>
         </div>    
+        
         <!-- Statistics Dashboard Modal -->
         <div v-if="showStatisticsModal" class="modal-overlay" @click.self="closeStatisticsModal">
             <div class="modal-content modal-large">
@@ -1388,6 +1395,7 @@
                                 </tbody>
                             </table>
                         </section>
+
                         <section>
                             <h4 class="stats-section-title">학년별 예방지도 참가자 비율</h4>
                             <table class="stats-table">
@@ -1748,6 +1756,7 @@
                                 }
                             });
                         }
+
                         if (this.teacherTab === 'supplementary' && requiredSubjectCredits > 0) {
                             data.students.forEach(student => {
                                 if (!student || !status[student.id]) return;
@@ -1757,39 +1766,30 @@
                                     currentStudentTotal += (status[student.id][rh.name] || 0);
                                 });
 
-                                // 예방지도 이수시간 (연계 비율 적용)
                                 const totalPreventiveHoursForStudent = preventiveTotals[student.id] || 0;
+                                // 예방지도 및 정서지원 연계 규칙 적용
+                                // 1) 예방지도 최대 연계 가능 시수(학생별): 학습지원대상자는 별도 비율 적용
+                                const studentInfo = this.studentData.find(s => String(s['학번']) === student.id);
+                                const isSpecialSupport = studentInfo && studentInfo['특기사항'] === '학습지원대상';
+                                const maxPreventiveLinkedHours = supplementaryHours * ((isSpecialSupport ? this.moduleConfig.specialPreventiveRatio : this.moduleConfig.preventiveRatio) / 100);
+                                
+                                // 2) 예방지도 인정 시간: 예방지도 총 이수시간을 최대 연계 가능 시수로 캡
                                 let creditedPreventiveHours = 0;
-                                let preventiveMaxLinkedHours = 0;
                                 if (totalPreventiveHoursForStudent > 0) {
-                                    const studentInfo = this.studentData.find(s => String(s['학번']) === student.id);
-                                    const isSpecialSupport = studentInfo && studentInfo['특기사항'] === '학습지원대상';
-                                    if (isSpecialSupport) {
-                                        preventiveMaxLinkedHours = supplementaryHours * (this.moduleConfig.specialPreventiveRatio / 100);
-                                        creditedPreventiveHours = Math.min(totalPreventiveHoursForStudent, preventiveMaxLinkedHours);
-                                    } else {
-                                        preventiveMaxLinkedHours = supplementaryHours * (this.moduleConfig.preventiveRatio / 100);
-                                        creditedPreventiveHours = Math.floor(Math.min(totalPreventiveHoursForStudent, preventiveMaxLinkedHours));
-                                    }
-                                    status[student.id].preventiveHours = parseFloat(creditedPreventiveHours.toFixed(2));
-                                    currentStudentTotal += creditedPreventiveHours;
-                                } else {
-                                    // 총 허용 가능한 예방지도 연계 최대시간(정서지원 합산용) 산출
-                                    const studentInfo = this.studentData.find(s => String(s['학번']) === student.id);
-                                    const isSpecialSupport = studentInfo && studentInfo['특기사항'] === '학습지원대상';
-                                    preventiveMaxLinkedHours = isSpecialSupport
-                                        ? (supplementaryHours * (this.moduleConfig.specialPreventiveRatio / 100))
-                                        : (supplementaryHours * (this.moduleConfig.preventiveRatio / 100));
+                                    creditedPreventiveHours = Math.min(totalPreventiveHoursForStudent, maxPreventiveLinkedHours);
                                 }
+                                status[student.id].preventiveHours = parseFloat(creditedPreventiveHours.toFixed(2));
+                                currentStudentTotal += creditedPreventiveHours;
 
-                                // 정서지원 이수시간 (연계 비율 및 예방지도 최대 연계 가능시간 내 합산)
+                                // 3) 정서지원 인정 시간: 자체 비율 캡을 적용하되,
+                                //    (예방지도 인정 + 정서지원 인정) 합이 예방지도 최대 연계 가능 시간을 초과하지 않도록 추가 캡 적용
                                 const emotionalData = this.emotionalSupportData.find(e => String(e['학번']) === student.id);
                                 const uploadedHours = emotionalData ? Number(emotionalData['정서지원프로그램 참여시간']) : 0;
-                                // 정서지원 자체 상한
-                                const emotionalCap = maxEmotionalSupportHours;
-                                // 예방지도 최대 연계 가능량 중 남은 용량 계산
-                                const remainingLinkedCapacity = Math.max(0, preventiveMaxLinkedHours - creditedPreventiveHours);
-                                const creditedEmotionalHours = Math.min(uploadedHours, emotionalCap, remainingLinkedCapacity);
+                                // 비율 기반 1차 캡
+                                const baseEmotionalHours = Math.min(uploadedHours, maxEmotionalSupportHours);
+                                // 예방지도 최대 연계 가능 시수 내에서 남은 여유
+                                const remainingPreventiveCapacity = Math.max(0, maxPreventiveLinkedHours - creditedPreventiveHours);
+                                const creditedEmotionalHours = Math.min(baseEmotionalHours, remainingPreventiveCapacity);
                                 status[student.id].emotionalSupportHours = parseFloat(creditedEmotionalHours.toFixed(2));
                                 currentStudentTotal += creditedEmotionalHours;
 
@@ -2296,6 +2296,7 @@
                                             stats.preventiveHours.forEach((hours, studentId) => {
                                                 guidancePreventiveHoursMap.set(studentId, hours);
                                             });
+                                            
                                             // completionStatus 문서 읽기 (guidance 문서 ID와 동일한 인코딩된 과목명 사용)
                                             try {
                                                 const completionDocRef = doc(teacherDoc.ref, 'completionStatus', guidanceDoc.id);
@@ -2496,200 +2497,207 @@
                                                 preventiveHoursSample: Array.from(stats.preventiveHours.entries()).slice(0, 3)
                                             });
                                         }
-                                    } catch (teacherDataError) {
-                                        console.error('teacherData 컬렉션 읽기 실패:', teacherDataError, {
-                                            activeSchoolId,
-                                            currentSchoolCode: this.currentSchoolCode,
-                                            schoolId: this.schoolId
+                                    } catch (completionDirectError) {
+                                        console.warn('completionStatus 직접 읽기 실패:', completionDirectError, {
+                                            teacherUid: teacherDoc.id
                                         });
                                     }
+                                }
+                            } catch (teacherDataError) {
+                                console.error('teacherData 컬렉션 읽기 실패:', teacherDataError, {
+                                    activeSchoolId,
+                                    currentSchoolCode: this.currentSchoolCode,
+                                    schoolId: this.schoolId
+                                });
+                            }
 
-                                    const subjectSummary = [];
-                                    const preventionSummary = [];
-                                    const additionalSummary = [];
-                                    const remedialSummary = [];
-                                    const deficitSummary = [];
+                            const subjectSummary = [];
+                            const preventionSummary = [];
+                            const additionalSummary = [];
+                            const remedialSummary = [];
+                            const deficitSummary = [];
 
-                                    subjectStats.forEach(stats => {
-                                        const subjectName = stats.subjectName;
-                                        const gradeIds = Array.from(stats.gradeUnderachievers);
-                                        const attendanceIds = Array.from(stats.attendanceUnderachievers);
-                                        const exceptionEntries = Array.from(stats.exceptions);
-                                        const completeIds = Array.from(stats.completion.complete);
-                                        const incompleteIds = Array.from(stats.completion.incomplete);
+                            subjectStats.forEach(stats => {
+                                const subjectName = stats.subjectName;
+                                const gradeIds = Array.from(stats.gradeUnderachievers);
+                                const attendanceIds = Array.from(stats.attendanceUnderachievers);
+                                const exceptionEntries = Array.from(stats.exceptions);
+                                const completeIds = Array.from(stats.completion.complete);
+                                const incompleteIds = Array.from(stats.completion.incomplete);
 
-                                        const exceptionCount = exceptionEntries.length;
-                                        const exceptionCountAttendance = exceptionEntries.filter(id => stats.attendanceUnderachievers.has(id)).length;
-                                        const exceptionCountGrade = exceptionEntries.filter(id => stats.gradeUnderachievers.has(id)).length;
+                                const exceptionCount = exceptionEntries.length;
+                                const exceptionCountAttendance = exceptionEntries.filter(id => stats.attendanceUnderachievers.has(id)).length;
+                                const exceptionCountGrade = exceptionEntries.filter(id => stats.gradeUnderachievers.has(id)).length;
 
-                                        const completeCount = completeIds.length;
-                                        const incompleteCount = incompleteIds.length;
-                                        const completeCountAttendance = completeIds.filter(id => stats.attendanceUnderachievers.has(id)).length;
-                                        const incompleteCountAttendance = incompleteIds.filter(id => stats.attendanceUnderachievers.has(id)).length;
-                                        const completeCountGrade = completeIds.filter(id => stats.gradeUnderachievers.has(id)).length;
-                                        const incompleteCountGrade = incompleteIds.filter(id => stats.gradeUnderachievers.has(id)).length;
+                                const completeCount = completeIds.length;
+                                const incompleteCount = incompleteIds.length;
+                                const completeCountAttendance = completeIds.filter(id => stats.attendanceUnderachievers.has(id)).length;
+                                const incompleteCountAttendance = incompleteIds.filter(id => stats.attendanceUnderachievers.has(id)).length;
+                                const completeCountGrade = completeIds.filter(id => stats.gradeUnderachievers.has(id)).length;
+                                const incompleteCountGrade = incompleteIds.filter(id => stats.gradeUnderachievers.has(id)).length;
 
-                                        // 보충지도 이수현황표(completionStatus) 기준으로 참여 인원 집계
-                                        // completionTotals와 preventiveHours에 있는 모든 학생 ID 수집
-                                        const completionStudentIds = new Set([
-                                            ...stats.completionTotals.keys(),
-                                            ...stats.preventiveHours.keys()
-                                        ]);
-                                        
-                                        console.log(`[통계] 참여 인원 집계 시작: 과목=${subjectName}`, {
-                                            completionTotalsSize: stats.completionTotals.size,
-                                            preventiveHoursSize: stats.preventiveHours.size,
-                                            completionTotalsSample: Array.from(stats.completionTotals.entries()).slice(0, 3),
-                                            preventiveHoursSample: Array.from(stats.preventiveHours.entries()).slice(0, 3)
-                                        });
-                                        
-                                        // 보충지도 참여 인원: completionTotals에서 total > 0인 학생 수
-                                        const supplementaryParticipantsCount = Array.from(stats.completionTotals.values())
-                                            .filter(total => total > 0).length;
-                                        
-                                        // 보충지도 미참여 인원: 대상자 중 참여하지 않은 학생 수
-                                        const supplementaryNonParticipantsCount = attendanceIds.filter(id => {
-                                            const total = stats.completionTotals.get(id);
-                                            return total == null || total <= 0;
-                                        }).length;
-                                        
-                                        // 추가학습 대상자: 과목출석률만 미도달한 학생 (학업성취율 미도달 제외)
-                                        const additionalLearningTargets = attendanceIds.filter(id => 
-                                            !stats.gradeUnderachievers.has(id)
-                                        );
-                                        
-                                        // 추가학습 참여 인원: 추가학습 대상자 중 보충지도 이수시간이 있는 학생 수
-                                        const additionalParticipantsCount = additionalLearningTargets.filter(id => {
-                                            const total = stats.completionTotals.get(id);
-                                            return total != null && total > 0;
-                                        }).length;
-                                        
-                                        // 추가학습 미참여 인원: 추가학습 대상자 중 보충지도 이수시간이 없는 학생 수
-                                        const additionalNonParticipantsCount = additionalLearningTargets.filter(id => {
-                                            const total = stats.completionTotals.get(id);
-                                            return total == null || total <= 0;
-                                        }).length;
-                                        
-                                        // 추가학습 예외처리 인원: 추가학습 대상자 중 예외처리된 학생 수
-                                        const additionalExceptionCount = additionalLearningTargets.filter(id => 
-                                            stats.exceptions.has(id)
-                                        ).length;
+                                // 보충지도 이수현황표(completionStatus) 기준으로 참여 인원 집계
+                                // completionTotals와 preventiveHours에 있는 모든 학생 ID 수집
+                                const completionStudentIds = new Set([
+                                    ...stats.completionTotals.keys(),
+                                    ...stats.preventiveHours.keys()
+                                ]);
+                                
+                                console.log(`[통계] 참여 인원 집계 시작: 과목=${subjectName}`, {
+                                    completionTotalsSize: stats.completionTotals.size,
+                                    preventiveHoursSize: stats.preventiveHours.size,
+                                    completionTotalsSample: Array.from(stats.completionTotals.entries()).slice(0, 3),
+                                    preventiveHoursSample: Array.from(stats.preventiveHours.entries()).slice(0, 3)
+                                });
+                                
+                                // 보충지도 참여 인원: completionTotals에서 total > 0인 학생 수
+                                const supplementaryParticipantsCount = Array.from(stats.completionTotals.values())
+                                    .filter(total => total > 0).length;
+                                
+                                // 보충지도 미참여 인원: 대상자 중 참여하지 않은 학생 수
+                                const supplementaryNonParticipantsCount = attendanceIds.filter(id => {
+                                    const total = stats.completionTotals.get(id);
+                                    return total == null || total <= 0;
+                                }).length;
+                                
+                                // 추가학습 대상자: 과목출석률만 미도달한 학생 (학업성취율 미도달 제외)
+                                const additionalLearningTargets = attendanceIds.filter(id => 
+                                    !stats.gradeUnderachievers.has(id)
+                                );
+                                
+                                // 추가학습 참여 인원: 추가학습 대상자 중 보충지도 이수시간이 있는 학생 수
+                                const additionalParticipantsCount = additionalLearningTargets.filter(id => {
+                                    const total = stats.completionTotals.get(id);
+                                    return total != null && total > 0;
+                                }).length;
+                                
+                                // 추가학습 미참여 인원: 추가학습 대상자 중 보충지도 이수시간이 없는 학생 수
+                                const additionalNonParticipantsCount = additionalLearningTargets.filter(id => {
+                                    const total = stats.completionTotals.get(id);
+                                    return total == null || total <= 0;
+                                }).length;
+                                
+                                // 추가학습 예외처리 인원: 추가학습 대상자 중 예외처리된 학생 수
+                                const additionalExceptionCount = additionalLearningTargets.filter(id => 
+                                    stats.exceptions.has(id)
+                                ).length;
 
-                                        // 예방지도 참여 인원: preventiveHours에서 hours > 0인 학생 수
-                                        const preventiveParticipantList = Array.from(stats.preventiveHours.entries())
-                                            .filter(([id, hours]) => hours > 0)
-                                            .map(([id]) => id);
-                                        const preventiveParticipantSet = new Set(preventiveParticipantList);
-                                        
-                                        // 예방지도 미참여 인원: 대상자 중 참여하지 않은 학생 수
-                                        const preventiveNonParticipants = Array.from(stats.preventionTargets).filter(id => 
-                                            !preventiveParticipantSet.has(id)
-                                        );
-                                        
-                                        console.log(`[통계] 참여 인원 집계 완료: 과목=${subjectName}`, {
-                                            supplementaryParticipants: supplementaryParticipantsCount,
-                                            preventiveParticipants: preventiveParticipantSet.size
-                                        });
+                                // 예방지도 참여 인원: preventiveHours에서 hours > 0인 학생 수
+                                const preventiveParticipantList = Array.from(stats.preventiveHours.entries())
+                                    .filter(([id, hours]) => hours > 0)
+                                    .map(([id]) => id);
+                                const preventiveParticipantSet = new Set(preventiveParticipantList);
+                                
+                                // 예방지도 미참여 인원: 대상자 중 참여하지 않은 학생 수
+                                const preventiveNonParticipants = Array.from(stats.preventionTargets).filter(id => 
+                                    !preventiveParticipantSet.has(id)
+                                );
+                                
+                                console.log(`[통계] 참여 인원 집계 완료: 과목=${subjectName}`, {
+                                    supplementaryParticipants: supplementaryParticipantsCount,
+                                    preventiveParticipants: preventiveParticipantSet.size
+                                });
 
-                                        subjectSummary.push({
-                                            subjectName,
-                                            credits: stats.credits,
-                                            gradeCount: gradeIds.length,
-                                            attendanceCount: attendanceIds.length,
-                                            exceptionCount,
-                                            completeCount,
-                                            incompleteCount
-                                        });
+                                subjectSummary.push({
+                                    subjectName,
+                                    credits: stats.credits,
+                                    gradeCount: gradeIds.length,
+                                    attendanceCount: attendanceIds.length,
+                                    exceptionCount,
+                                    completeCount,
+                                    incompleteCount
+                                });
 
-                                        preventionSummary.push({
-                                            subjectName,
-                                            hasPrevention: preventiveParticipantSet.size > 0 || stats.preventionSessions > 0,
-                                            participants: preventiveParticipantSet.size,
-                                            nonParticipants: preventiveNonParticipants.length
-                                        });
+                                preventionSummary.push({
+                                    subjectName,
+                                    hasPrevention: preventiveParticipantSet.size > 0 || stats.preventionSessions > 0,
+                                    participants: preventiveParticipantSet.size,
+                                    nonParticipants: preventiveNonParticipants.length
+                                });
 
-                                        // 추가학습 이수/미이수 인원: 추가학습 대상자 중 이수/미이수 학생 수
-                                        const additionalCompleteCount = additionalLearningTargets.filter(id => 
-                                            stats.completion.complete.has(id)
-                                        ).length;
-                                        const additionalIncompleteCount = additionalLearningTargets.filter(id => 
-                                            stats.completion.incomplete.has(id)
-                                        ).length;
-                                        
-                                        additionalSummary.push({
-                                            subjectName,
-                                            credits: stats.credits,
-                                            attendanceTargets: additionalLearningTargets.length,
-                                            participants: additionalParticipantsCount,
-                                            exceptionCount: additionalExceptionCount,
-                                            nonParticipants: additionalNonParticipantsCount,
-                                            completeCount: additionalCompleteCount,
-                                            incompleteCount: additionalIncompleteCount
-                                        });
+                                // 추가학습 이수/미이수 인원: 추가학습 대상자 중 이수/미이수 학생 수
+                                const additionalCompleteCount = additionalLearningTargets.filter(id => 
+                                    stats.completion.complete.has(id)
+                                ).length;
+                                const additionalIncompleteCount = additionalLearningTargets.filter(id => 
+                                    stats.completion.incomplete.has(id)
+                                ).length;
+                                
+                                additionalSummary.push({
+                                    subjectName,
+                                    credits: stats.credits,
+                                    attendanceTargets: additionalLearningTargets.length,
+                                    participants: additionalParticipantsCount,
+                                    exceptionCount: additionalExceptionCount,
+                                    nonParticipants: additionalNonParticipantsCount,
+                                    completeCount: additionalCompleteCount,
+                                    incompleteCount: additionalIncompleteCount
+                                });
 
-                                        const gradeParticipantCount = gradeIds.filter(id => {
-                                            const total = stats.completionTotals.get(id);
-                                            if (total != null) return total > 0;
-                                            return stats.supplementaryParticipants.has(id);
-                                        }).length;
-                                        const gradeNonParticipantCount = gradeIds.filter(id => {
-                                            const total = stats.completionTotals.get(id);
-                                            if (total != null) return total <= 0;
-                                            return !stats.supplementaryParticipants.has(id);
-                                        }).length;
+                                const gradeParticipantCount = gradeIds.filter(id => {
+                                    const total = stats.completionTotals.get(id);
+                                    if (total != null) return total > 0;
+                                    return stats.supplementaryParticipants.has(id);
+                                }).length;
+                                const gradeNonParticipantCount = gradeIds.filter(id => {
+                                    const total = stats.completionTotals.get(id);
+                                    if (total != null) return total <= 0;
+                                    return !stats.supplementaryParticipants.has(id);
+                                }).length;
 
-                                        remedialSummary.push({
-                                            subjectName,
-                                            credits: stats.credits,
-                                            gradeTargets: gradeIds.length,
-                                            participants: gradeParticipantCount,
-                                            nonParticipants: gradeNonParticipantCount,
-                                            exceptionCount: exceptionCountGrade,
-                                            completeCount: completeCountGrade,
-                                            incompleteCount: incompleteCountGrade
-                                        });
+                                remedialSummary.push({
+                                    subjectName,
+                                    credits: stats.credits,
+                                    gradeTargets: gradeIds.length,
+                                    participants: gradeParticipantCount,
+                                    nonParticipants: gradeNonParticipantCount,
+                                    exceptionCount: exceptionCountGrade,
+                                    completeCount: completeCountGrade,
+                                    incompleteCount: incompleteCountGrade
+                                });
 
-                                        const gradeCount = stats.gradeUnderachievers.size;
-                                        const attendanceCount = stats.attendanceUnderachievers.size;
-                                        const bothCount = [...stats.gradeUnderachievers].filter(studentId => stats.attendanceUnderachievers.has(studentId)).length;
-                                        deficitSummary.push({
-                                            subjectName,
-                                            gradeCount,
-                                            attendanceCount,
-                                            bothCount
-                                        });
-                                    });
+                                const gradeCount = stats.gradeUnderachievers.size;
+                                const attendanceCount = stats.attendanceUnderachievers.size;
+                                const bothCount = [...stats.gradeUnderachievers].filter(studentId => stats.attendanceUnderachievers.has(studentId)).length;
+                                deficitSummary.push({
+                                    subjectName,
+                                    gradeCount,
+                                    attendanceCount,
+                                    bothCount
+                                });
+                            });
 
-                                    subjectSummary.sort((a, b) => a.subjectName.localeCompare(b.subjectName, 'ko'));
-                                    preventionSummary.sort((a, b) => a.subjectName.localeCompare(b.subjectName, 'ko'));
-                                    additionalSummary.sort((a, b) => a.subjectName.localeCompare(b.subjectName, 'ko'));
-                                    remedialSummary.sort((a, b) => a.subjectName.localeCompare(b.subjectName, 'ko'));
-                                    deficitSummary.sort((a, b) => a.subjectName.localeCompare(b.subjectName, 'ko'));
+                            subjectSummary.sort((a, b) => a.subjectName.localeCompare(b.subjectName, 'ko'));
+                            preventionSummary.sort((a, b) => a.subjectName.localeCompare(b.subjectName, 'ko'));
+                            additionalSummary.sort((a, b) => a.subjectName.localeCompare(b.subjectName, 'ko'));
+                            remedialSummary.sort((a, b) => a.subjectName.localeCompare(b.subjectName, 'ko'));
+                            deficitSummary.sort((a, b) => a.subjectName.localeCompare(b.subjectName, 'ko'));
 
-                                    const multiSubjectBuckets = [
-                                        { label: '1과목', count: 0 },
-                                        { label: '2~3과목', count: 0 },
-                                        { label: '4~5과목', count: 0 },
-                                        { label: '6과목 이상', count: 0 }
-                                    ];
-                                    gradeSubjectCounter.forEach(count => {
-                                        if (count === 1) multiSubjectBuckets[0].count += 1;
-                                        else if (count >= 2 && count <= 3) multiSubjectBuckets[1].count += 1;
-                                        else if (count >= 4 && count <= 5) multiSubjectBuckets[2].count += 1;
-                                        else if (count >= 6) multiSubjectBuckets[3].count += 1;
-                                    });
+                            const multiSubjectBuckets = [
+                                { label: '1과목', count: 0 },
+                                { label: '2~3과목', count: 0 },
+                                { label: '4~5과목', count: 0 },
+                                { label: '6과목 이상', count: 0 }
+                            ];
+                            gradeSubjectCounter.forEach(count => {
+                                if (count === 1) multiSubjectBuckets[0].count += 1;
+                                else if (count >= 2 && count <= 3) multiSubjectBuckets[1].count += 1;
+                                else if (count >= 4 && count <= 5) multiSubjectBuckets[2].count += 1;
+                                else if (count >= 6) multiSubjectBuckets[3].count += 1;
+                            });
 
-                                    const gradePreventionRatios = ['1', '2', '3'].map(grade => {
-                                        const total = gradeTotals[grade]?.size || 0;
-                                        const participants = gradeParticipants[grade]?.size || 0;
-                                        const percentage = total > 0 ? Number(((participants / total) * 100).toFixed(1)) : 0;
-                                        return {
-                                            grade: `${grade}학년`,
-                                            total,
-                                            participants,
-                                            percentage
-                                        };
-                                    });
+                            const gradePreventionRatios = ['1', '2', '3'].map(grade => {
+                                const total = gradeTotals[grade]?.size || 0;
+                                const participants = gradeParticipants[grade]?.size || 0;
+                                const percentage = total > 0 ? Number(((participants / total) * 100).toFixed(1)) : 0;
+                                return {
+                                    grade: `${grade}학년`,
+                                    total,
+                                    participants,
+                                    percentage
+                                };
+                            });
+
                             const preventionCourseRatio = {
                                 totalSubjects: planSubjects.size,
                                 activeSubjects: preventionSubjects.size,
@@ -3054,6 +3062,7 @@
                             }
                         } catch (error) { console.error("Error loading user data:", error); this.role = null; this.schoolId = null; }
                     },
+
                     // --- Data Loading (Common) ---
                     async loadCommonData() {
                         if (!db) {
@@ -3602,6 +3611,7 @@
                         await this.loadGuidanceData();
                         this.filterSupplementaryStudents();
                     },
+
                     // --- Helper and UI Methods ---
                     formatDateRange(period) {
                         if (!period || !Array.isArray(period) || period.length === 0) return '';
@@ -4732,6 +4742,7 @@
                             } catch (e) {
                                 console.log('commonData/completionStatus 읽기 실패 (무시 가능):', e);
                             }
+                            
                             // commonData/completionStatus에서 전송된 데이터 우선 읽기
                             // collectionGroup 대신 직접 경로 접근 방식 사용
                             try {
@@ -4868,35 +4879,24 @@
                                                         currentStudentTotal += (methodHours[rh.name] || 0);
                                                     });
                                                     
-                                                    // 예방지도 시간 추가 (연계 비율 적용 및 합산 한도 계산)
-                                                    let creditedPreventiveHours = 0;
-                                                    let preventiveMaxLinkedHours = 0;
-                                                    if (totalPreventiveHoursForStudent > 0) {
-                                                        const studentInfo = this.studentData.find(s => String(s['학번']) === studentId);
-                                                        const isSpecialSupport = studentInfo && studentInfo['특기사항'] === '학습지원대상';
-                                                        if (isSpecialSupport) {
-                                                            preventiveMaxLinkedHours = supplementaryHours * (this.moduleConfig.specialPreventiveRatio / 100);
-                                                            creditedPreventiveHours = Math.min(totalPreventiveHoursForStudent, preventiveMaxLinkedHours);
-                                                        } else {
-                                                            preventiveMaxLinkedHours = supplementaryHours * (this.moduleConfig.preventiveRatio / 100);
-                                                            creditedPreventiveHours = Math.floor(Math.min(totalPreventiveHoursForStudent, preventiveMaxLinkedHours));
-                                                        }
-                                                        currentStudentTotal += creditedPreventiveHours;
-                                                    } else {
-                                                        // 총 허용 가능한 예방지도 연계 최대시간(정서지원 합산용) 산출
-                                                        const studentInfo = this.studentData.find(s => String(s['학번']) === studentId);
-                                                        const isSpecialSupport = studentInfo && studentInfo['특기사항'] === '학습지원대상';
-                                                        preventiveMaxLinkedHours = isSpecialSupport
-                                                            ? (supplementaryHours * (this.moduleConfig.specialPreventiveRatio / 100))
-                                                            : (supplementaryHours * (this.moduleConfig.preventiveRatio / 100));
-                                                    }
+                                                    // 예방지도 시간 추가 (guidanceCompletionStatus와 동일한 로직)
+                                                    const totalPreventiveHoursForStudent = preventiveTotals[studentId] || 0;
+                                                    // 학생별 예방지도 최대 연계 가능 시수 산정
+                                                    const studentInfo = this.studentData.find(s => String(s['학번']) === studentId);
+                                                    const isSpecialSupport = studentInfo && studentInfo['특기사항'] === '학습지원대상';
+                                                    const maxPreventiveLinkedHours = supplementaryHours * ((isSpecialSupport ? this.moduleConfig.specialPreventiveRatio : this.moduleConfig.preventiveRatio) / 100);
+                                                    // 예방지도 인정 시간
+                                                    const creditedPreventiveHours = Math.min(totalPreventiveHoursForStudent, maxPreventiveLinkedHours);
+                                                    currentStudentTotal += creditedPreventiveHours;
                                                     
-                                                    // 정서지원 시간 추가 (정서지원 상한 + 예방지도 최대 연계 가능시간의 남은 용량 내에서만 합산)
+                                                    // 정서지원 시간 추가 (guidanceCompletionStatus와 동일한 로직)
                                                     const emotionalData = this.emotionalSupportData.find(e => String(e['학번']) === studentId);
                                                     const uploadedHours = emotionalData ? Number(emotionalData['정서지원프로그램 참여시간']) : 0;
-                                                    const emotionalCap = maxEmotionalSupportHours;
-                                                    const remainingLinkedCapacity = Math.max(0, preventiveMaxLinkedHours - creditedPreventiveHours);
-                                                    const creditedEmotionalHours = Math.min(uploadedHours, emotionalCap, remainingLinkedCapacity);
+                                                    // 비율 기반 1차 캡
+                                                    const baseEmotionalHours = Math.min(uploadedHours, maxEmotionalSupportHours);
+                                                    // 예방지도 최대 연계 가능 시수 내에서 남은 여유
+                                                    const remainingPreventiveCapacity = Math.max(0, maxPreventiveLinkedHours - creditedPreventiveHours);
+                                                    const creditedEmotionalHours = Math.min(baseEmotionalHours, remainingPreventiveCapacity);
                                                     currentStudentTotal += creditedEmotionalHours;
                                                     
                                                     // 최종 합계 계산 (소수점 2자리)
@@ -4939,6 +4939,7 @@
                                 subjects: Object.keys(this.allTeacherCompletionData),
                                 data: this.allTeacherCompletionData
                             });
+                            
                             // 각 과목별로 학생 수 확인
                             Object.keys(this.allTeacherCompletionData).forEach(subj => {
                                 const studentCount = Object.keys(this.allTeacherCompletionData[subj]).length;
@@ -5098,3 +5099,4 @@
 
 </body>
 </html>
+
