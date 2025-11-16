@@ -1773,24 +1773,25 @@
                                 const isSpecialSupport = studentInfo && studentInfo['특기사항'] === '학습지원대상';
                                 const maxPreventiveLinkedHours = supplementaryHours * ((isSpecialSupport ? this.moduleConfig.specialPreventiveRatio : this.moduleConfig.preventiveRatio) / 100);
                                 
-                                // 2) 예방지도 인정 시간: 예방지도 총 이수시간을 최대 연계 가능 시수로 캡
-                                let creditedPreventiveHours = 0;
-                                if (totalPreventiveHoursForStudent > 0) {
-                                    creditedPreventiveHours = Math.min(totalPreventiveHoursForStudent, maxPreventiveLinkedHours);
-                                }
-                                status[student.id].preventiveHours = parseFloat(creditedPreventiveHours.toFixed(2));
+                                // 표시용(원자료) 시간은 그대로 보여주되,
+                                // 총계 합산 시에만 최대 연계 가능 시수로 제한하여 반영
+                                const displayPreventiveHours = totalPreventiveHoursForStudent;
+                                status[student.id].preventiveHours = parseFloat((displayPreventiveHours || 0).toFixed(2));
+                                const creditedPreventiveHours = Math.min(displayPreventiveHours || 0, maxPreventiveLinkedHours);
                                 currentStudentTotal += creditedPreventiveHours;
 
                                 // 3) 정서지원 인정 시간: 자체 비율 캡을 적용하되,
                                 //    (예방지도 인정 + 정서지원 인정) 합이 예방지도 최대 연계 가능 시간을 초과하지 않도록 추가 캡 적용
                                 const emotionalData = this.emotionalSupportData.find(e => String(e['학번']) === student.id);
                                 const uploadedHours = emotionalData ? Number(emotionalData['정서지원프로그램 참여시간']) : 0;
-                                // 비율 기반 1차 캡
-                                const baseEmotionalHours = Math.min(uploadedHours, maxEmotionalSupportHours);
+                                // 표시용(원자료) 시간
+                                const displayEmotionalHours = uploadedHours;
+                                status[student.id].emotionalSupportHours = parseFloat((displayEmotionalHours || 0).toFixed(2));
+                                // 합산용: 비율 기반 1차 캡
+                                const baseEmotionalHours = Math.min(displayEmotionalHours || 0, maxEmotionalSupportHours);
                                 // 예방지도 최대 연계 가능 시수 내에서 남은 여유
                                 const remainingPreventiveCapacity = Math.max(0, maxPreventiveLinkedHours - creditedPreventiveHours);
                                 const creditedEmotionalHours = Math.min(baseEmotionalHours, remainingPreventiveCapacity);
-                                status[student.id].emotionalSupportHours = parseFloat(creditedEmotionalHours.toFixed(2));
                                 currentStudentTotal += creditedEmotionalHours;
 
                                 status[student.id].total = parseFloat(currentStudentTotal.toFixed(2));
