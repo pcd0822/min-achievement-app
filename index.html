@@ -279,7 +279,7 @@
             /* 2. 인쇄 불필요 UI 요소 명시적 숨기기 */
             #app > header, 
             #app > main,
-            #app > footer, /* footer(저작권 문구) 숨기기 */
+            #app > footer, /* 저작권 문구가 있는 footer 숨기기 */
             div[v-if="showAttendanceModal"],
             div[v-if="showImportModal"],
             div[v-if="showSchoolIdModal"], /* 학교코드 모달 숨기기 */
@@ -325,11 +325,10 @@
             #print-area table { font-size: 9pt !important; }
             #print-area th, #print-area td { padding: 5px !important; }
 
-            /* 7. @page 설정 (A4 여백) - 헤더/푸터 영역 최소화 */
+            /* 7. @page 설정 (A4 여백) */
             @page {
                 size: A4 portrait;
-                margin: 20mm 20mm 20mm 20mm;
-                marks: none;
+                margin: 20mm;
             }
             .page-break {
                 page-break-after: always !important;
@@ -3811,17 +3810,7 @@
                         this.previewForm(type, [fullStudent]);
                     },
                     printPreviewModalContent() {
-                        // 인쇄 시 브라우저 헤더(제목, 날짜) 숨기기 위해 title 임시 변경
-                        const originalTitle = document.title;
-                        document.title = '';
-                        
-                        // 인쇄 실행
                         window.print();
-                        
-                        // 인쇄 후 원래 title 복원 (약간의 지연을 두어 인쇄 완료 후 복원)
-                        setTimeout(() => {
-                            document.title = originalTitle;
-                        }, 100);
                     },
                     closePreviewModal() {
                         this.showPreviewModal = false;
