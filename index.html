@@ -1991,6 +1991,28 @@
                         };
                         return findReason(this.underachievers) || findReason(this.deployedUnderachievers) || '';
                     },
+                    getStudentIdFromRow(tr) {
+                        // 테이블 행에서 학번 셀 찾기
+                        // 학번은 첫 번째 열이고, rowspan이 있으면 첫 번째 행에만 표시됨
+                        const firstTd = tr.querySelector('td:first-child');
+                        if (firstTd) {
+                            const text = firstTd.textContent.trim();
+                            if (text) return text;
+                        }
+                        // rowspan이 있는 경우 같은 tbody의 첫 번째 행에서 찾기
+                        const tbody = tr.closest('tbody');
+                        if (tbody) {
+                            const firstRow = tbody.querySelector('tr:first-child');
+                            if (firstRow) {
+                                const firstCell = firstRow.querySelector('td:first-child');
+                                if (firstCell) {
+                                    const text = firstCell.textContent.trim();
+                                    if (text) return text;
+                                }
+                            }
+                        }
+                        return null;
+                    },
                     async updateStudentExceptionReason(studentId, reason) {
                         if (this.role !== '관리자') return;
                         const id = studentId ? String(studentId) : '';
@@ -4002,7 +4024,46 @@
                             const table = document.getElementById('underachievers-table');
                             if (table) {
                                 const tableClone = table.cloneNode(true);
-                                tableClone.querySelector('th:last-child, td:last-child')?.remove();
+                                
+                                // 조치 열(삭제 버튼) 제거
+                                const actionHeaders = tableClone.querySelectorAll('th');
+                                const actionHeader = Array.from(actionHeaders).find(th => th.textContent.trim() === '조치');
+                                if (actionHeader) {
+                                    const actionIndex = Array.from(actionHeaders).indexOf(actionHeader);
+                                    actionHeader.remove();
+                                    // 모든 행에서 해당 인덱스의 td 제거
+                                    tableClone.querySelectorAll('tbody tr').forEach(tr => {
+                                        const tds = tr.querySelectorAll('td');
+                                        if (tds[actionIndex]) tds[actionIndex].remove();
+                                    });
+                                }
+                                
+                                // 예외처리 열을 비고 열로 변경
+                                const exceptionHeaders = tableClone.querySelectorAll('th');
+                                const exceptionHeader = Array.from(exceptionHeaders).find(th => th.textContent.trim() === '예외처리');
+                                if (exceptionHeader) {
+                                    exceptionHeader.textContent = '비고';
+                                    const exceptionIndex = Array.from(exceptionHeaders).indexOf(exceptionHeader);
+                                    
+                                    // 모든 행에서 예외처리 셀 처리
+                                    tableClone.querySelectorAll('tbody tr').forEach(tr => {
+                                        const tds = tr.querySelectorAll('td');
+                                        if (tds[exceptionIndex]) {
+                                            const exceptionCell = tds[exceptionIndex];
+                                            const studentId = this.getStudentIdFromRow(tr);
+                                            if (studentId) {
+                                                const exceptionReason = this.getStudentExceptionReason(studentId);
+                                                // 예외처리 대상자로 선택된 경우만 비고에 표시
+                                                if (exceptionReason && exceptionReason.trim() !== '') {
+                                                    exceptionCell.innerHTML = exceptionReason;
+                                                } else {
+                                                    exceptionCell.innerHTML = '';
+                                                }
+                                            }
+                                        }
+                                    });
+                                }
+                                
                                 this.previewHtml = `<div id="print-area"><h1>미도달 학생 현황</h1>${tableClone.outerHTML}</div>`;
                                 this.showPreviewModal = true;
                             }
