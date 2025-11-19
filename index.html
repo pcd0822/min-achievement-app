@@ -285,6 +285,7 @@
             div[v-if="showSchoolIdModal"], /* 학교코드 모달 숨기기 */
             #print-area-container, /* html2canvas용 컨테이너 숨기기 */
             .modal-overlay .modal-content > div:not(#print-area-container-in-modal), /* 모달 내 버튼, 상태메시지 숨기기 */
+            .modal-overlay .modal-content > p[v-if="statusText"], /* 상태 메시지 숨기기 */
             .scroll-arrow {
                 display: none !important;
             }
@@ -322,8 +323,63 @@
             }
             
             /* 6. 인쇄용 테이블/폰트 미세 조정 */
-            #print-area table { font-size: 9pt !important; }
-            #print-area th, #print-area td { padding: 5px !important; }
+            #print-area table { 
+                font-size: 8pt !important; 
+                width: 100% !important;
+                max-width: 100% !important;
+                min-width: 0 !important;
+                table-layout: auto !important;
+            }
+            #print-area th, #print-area td { 
+                padding: 4px 3px !important; 
+                font-size: 7.5pt !important;
+                word-wrap: break-word !important;
+                overflow-wrap: break-word !important;
+            }
+            #print-area th {
+                font-weight: 600 !important;
+            }
+            /* 테이블이 A4 가로폭에 맞도록 조정 */
+            #print-area #underachievers-table,
+            #print-area table {
+                width: 100% !important;
+                max-width: 100% !important;
+                min-width: 0 !important;
+            }
+            /* 인쇄 시 테이블 열 너비 최적화 */
+            #print-area #underachievers-table th:nth-child(1),
+            #print-area #underachievers-table td:nth-child(1) {
+                width: 8% !important; /* 학번 */
+            }
+            #print-area #underachievers-table th:nth-child(2),
+            #print-area #underachievers-table td:nth-child(2) {
+                width: 8% !important; /* 이름 */
+            }
+            #print-area #underachievers-table th:nth-child(3),
+            #print-area #underachievers-table td:nth-child(3) {
+                width: 10% !important; /* 특기사항 */
+            }
+            #print-area #underachievers-table th:nth-child(4),
+            #print-area #underachievers-table td:nth-child(4) {
+                width: 12% !important; /* 미도달내역 */
+            }
+            #print-area #underachievers-table th:nth-child(5),
+            #print-area #underachievers-table td:nth-child(5) {
+                width: 20% !important; /* 미도달 과목(학점수) */
+            }
+            #print-area #underachievers-table th:nth-child(6),
+            #print-area #underachievers-table td:nth-child(6) {
+                width: 20% !important; /* 보충지도(추가학습) 내역 */
+            }
+            #print-area #underachievers-table th:nth-child(7),
+            #print-area #underachievers-table td:nth-child(7) {
+                width: 12% !important; /* 비고 */
+            }
+            /* 긴 텍스트가 있는 셀 처리 */
+            #print-area #underachievers-table td {
+                white-space: normal !important;
+                line-height: 1.3 !important;
+            }
 
             /* 7. @page 설정 (A4 여백) */
             @page {
@@ -585,8 +641,8 @@
                                                                <p class="text-xs text-gray-500" v-else>학생이 예외처리 대상이 아니면 '예외처리 없음'으로 두세요.</p>
                                                            </div>
                                                        </td>
-                                                   <td class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200 text-sm font-medium">
-                                                       <button @click="deleteDetailGroup(detail)" class="text-red-600 hover:text-red-900">삭제</button>
+                                                   <td v-if="detailIndex === 0" :rowspan="student.details.length" class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200 text-sm font-medium">
+                                                       <button @click="deleteDetailGroup(student.details[0])" class="text-red-600 hover:text-red-900">삭제</button>
                                                    </td>
                                                </tr>
                                            </tbody>
