@@ -328,7 +328,7 @@
                 width: 100% !important;
                 max-width: 100% !important;
                 min-width: 0 !important;
-                table-layout: auto !important;
+                table-layout: fixed !important; /* 고정 레이아웃으로 열 너비 강제 */
             }
             #print-area th, #print-area td { 
                 padding: 4px 3px !important; 
@@ -345,35 +345,50 @@
                 width: 100% !important;
                 max-width: 100% !important;
                 min-width: 0 !important;
+                table-layout: fixed !important; /* 고정 레이아웃으로 열 너비 강제 */
             }
             /* 인쇄 시 테이블 열 너비 최적화 */
             #print-area #underachievers-table th:nth-child(1),
             #print-area #underachievers-table td:nth-child(1) {
                 width: 8% !important; /* 학번 */
+                min-width: 0 !important;
+                max-width: 8% !important;
             }
             #print-area #underachievers-table th:nth-child(2),
             #print-area #underachievers-table td:nth-child(2) {
                 width: 8% !important; /* 이름 */
+                min-width: 0 !important;
+                max-width: 8% !important;
             }
             #print-area #underachievers-table th:nth-child(3),
             #print-area #underachievers-table td:nth-child(3) {
                 width: 10% !important; /* 특기사항 */
+                min-width: 0 !important;
+                max-width: 10% !important;
             }
             #print-area #underachievers-table th:nth-child(4),
             #print-area #underachievers-table td:nth-child(4) {
-                width: 12% !important; /* 미도달내역 */
+                width: 16% !important; /* 미도달내역 */
+                min-width: 0 !important;
+                max-width: 16% !important;
             }
             #print-area #underachievers-table th:nth-child(5),
             #print-area #underachievers-table td:nth-child(5) {
                 width: 20% !important; /* 미도달 과목(학점수) */
+                min-width: 0 !important;
+                max-width: 20% !important;
             }
             #print-area #underachievers-table th:nth-child(6),
             #print-area #underachievers-table td:nth-child(6) {
                 width: 20% !important; /* 보충지도(추가학습) 내역 */
+                min-width: 0 !important;
+                max-width: 20% !important;
             }
             #print-area #underachievers-table th:nth-child(7),
             #print-area #underachievers-table td:nth-child(7) {
-                width: 12% !important; /* 비고 */
+                width: 8% !important; /* 비고 */
+                min-width: 0 !important;
+                max-width: 8% !important;
             }
             /* 긴 텍스트가 있는 셀 처리 */
             #print-area #underachievers-table td {
