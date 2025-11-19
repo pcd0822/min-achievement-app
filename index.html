@@ -571,8 +571,8 @@
                                                         <td class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200">{{ detail.reason }}</td>
                                                         <td class="px-6 py-4 whitespace-normal align-top border-b border-gray-200 table-wide-cell">{{ detail.subjects }}</td>
                                                    <td class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200">{{ detail.lessonDetails }}</td>
-                                                       <td class="px-6 py-4 whitespace-normal align-top border-b border-gray-200 table-exception-cell">
-                                                           <div v-if="detailIndex === 0" class="space-y-2">
+                                                       <td v-if="detailIndex === 0" :rowspan="student.details.length" class="px-6 py-4 whitespace-normal align-top border-b border-gray-200 table-exception-cell">
+                                                           <div class="space-y-2">
                                                                <select
                                                                    class="border border-gray-300 rounded-md text-sm px-3 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                                                                    :value="getStudentExceptionReason(student.id)"
@@ -583,9 +583,6 @@
                                                                </select>
                                                                <p class="text-xs text-gray-600" v-if="getStudentExceptionReason(student.id)">선택된 사유: {{ getStudentExceptionReason(student.id) }}</p>
                                                                <p class="text-xs text-gray-500" v-else>학생이 예외처리 대상이 아니면 '예외처리 없음'으로 두세요.</p>
-                                                           </div>
-                                                           <div v-else class="text-xs text-gray-600">
-                                                               {{ getStudentExceptionReason(student.id) ? `예외처리: ${getStudentExceptionReason(student.id)}` : '예외처리 없음' }}
                                                            </div>
                                                        </td>
                                                    <td class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200 text-sm font-medium">
@@ -3832,6 +3829,8 @@
                         this.previewForm(type, [fullStudent]);
                     },
                     printPreviewModalContent() {
+                        // 인쇄 시 상태 메시지 초기화
+                        this.adminActionStatus = '';
                         window.print();
                     },
                     closePreviewModal() {
@@ -4045,19 +4044,22 @@
                                     exceptionHeader.textContent = '비고';
                                     const exceptionIndex = Array.from(exceptionHeaders).indexOf(exceptionHeader);
                                     
-                                    // 모든 행에서 예외처리 셀 처리
-                                    tableClone.querySelectorAll('tbody tr').forEach(tr => {
-                                        const tds = tr.querySelectorAll('td');
-                                        if (tds[exceptionIndex]) {
-                                            const exceptionCell = tds[exceptionIndex];
-                                            const studentId = this.getStudentIdFromRow(tr);
-                                            if (studentId) {
-                                                const exceptionReason = this.getStudentExceptionReason(studentId);
-                                                // 예외처리 대상자로 선택된 경우만 비고에 표시
-                                                if (exceptionReason && exceptionReason.trim() !== '') {
-                                                    exceptionCell.innerHTML = exceptionReason;
-                                                } else {
-                                                    exceptionCell.innerHTML = '';
+                                    // 각 tbody별로 처리 (rowspan 때문에)
+                                    tableClone.querySelectorAll('tbody').forEach(tbody => {
+                                        const firstRow = tbody.querySelector('tr:first-child');
+                                        if (firstRow) {
+                                            const tds = firstRow.querySelectorAll('td');
+                                            if (tds[exceptionIndex]) {
+                                                const exceptionCell = tds[exceptionIndex];
+                                                const studentId = this.getStudentIdFromRow(firstRow);
+                                                if (studentId) {
+                                                    const exceptionReason = this.getStudentExceptionReason(studentId);
+                                                    // 예외처리 대상자로 선택된 경우만 비고에 표시
+                                                    if (exceptionReason && exceptionReason.trim() !== '') {
+                                                        exceptionCell.innerHTML = exceptionReason;
+                                                    } else {
+                                                        exceptionCell.innerHTML = '';
+                                                    }
                                                 }
                                             }
                                         }
@@ -4066,6 +4068,10 @@
                                 
                                 this.previewHtml = `<div id="print-area"><h1>미도달 학생 현황</h1>${tableClone.outerHTML}</div>`;
                                 this.showPreviewModal = true;
+                                // PDF 생성 완료 메시지
+                                this.$nextTick(() => {
+                                    this.adminActionStatus = 'PDF 생성 완료. 인쇄 버튼을 눌러 PDF로 저장하세요.';
+                                });
                             }
                         }
                         this.showExportOptions = false;
