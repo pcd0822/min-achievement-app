@@ -4139,9 +4139,9 @@
                                 
                                 this.previewHtml = `<div id="print-area"><h1>미도달 학생 현황</h1>${tableClone.outerHTML}</div>`;
                                 this.showPreviewModal = true;
-                                // PDF 생성 완료 메시지
+                                // PDF 생성 완료 후 상태 메시지 숨기기
                                 this.$nextTick(() => {
-                                    this.adminActionStatus = 'PDF 생성 완료. 인쇄 버튼을 눌러 PDF로 저장하세요.';
+                                    this.adminActionStatus = '';
                                 });
                             }
                         }
