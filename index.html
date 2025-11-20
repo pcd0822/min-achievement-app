@@ -3950,8 +3950,26 @@
                     },
                     findSubjectInCurriculum(subjectName, grade, semester, category) {
                         // 교육과정 편제표에서 과목명, 학년, 학기, 분류가 모두 일치하는 과목 검색
-                        if (!this.curriculumData || this.curriculumData.length === 0) return null;
-                        return this.curriculumData.find(row => {
+                        if (!this.curriculumData || this.curriculumData.length === 0) {
+                            console.warn('[findSubjectInCurriculum] curriculumData가 비어있습니다.');
+                            return null;
+                        }
+                        
+                        // 분류 정규화: 회계경영과, 웹디자인과는 전문계열로 변환
+                        let normalizedCategory = category;
+                        if (category === '회계경영' || category === '웹디자인') {
+                            normalizedCategory = '전문계열';
+                        }
+                        
+                        console.log('[findSubjectInCurriculum] 검색:', {
+                            subjectName,
+                            grade,
+                            semester,
+                            category,
+                            normalizedCategory
+                        });
+                        
+                        const result = this.curriculumData.find(row => {
                             if (!row || !row['과목명']) return false;
                             const nameMatch = String(row['과목명']).trim() === String(subjectName || '').trim();
                             if (!nameMatch) return false;
@@ -3969,13 +3987,42 @@
                             }
                             
                             // 분류 매칭 (있으면 일치해야 함)
-                            if (category && category.trim()) {
+                            if (normalizedCategory && normalizedCategory.trim()) {
                                 const rowCategory = row['분류'] ? String(row['분류']).trim() : '';
-                                if (!rowCategory || rowCategory !== String(category).trim()) return false;
+                                // 편제표의 분류와 정규화된 분류 비교
+                                if (!rowCategory || rowCategory !== String(normalizedCategory).trim()) {
+                                    return false;
+                                }
                             }
                             
                             return true;
                         });
+                        
+                        if (result) {
+                            console.log('[findSubjectInCurriculum] 찾음:', {
+                                subjectName: result['과목명'],
+                                grade: result['학년'],
+                                semester: result['학기'],
+                                category: result['분류'],
+                                credits: result['학점']
+                            });
+                        } else {
+                            console.warn('[findSubjectInCurriculum] 찾지 못함:', {
+                                subjectName,
+                                grade,
+                                semester,
+                                normalizedCategory,
+                                curriculumDataLength: this.curriculumData.length,
+                                sampleRows: this.curriculumData.slice(0, 3).map(r => ({
+                                    name: r['과목명'],
+                                    grade: r['학년'],
+                                    semester: r['학기'],
+                                    category: r['분류']
+                                }))
+                            });
+                        }
+                        
+                        return result;
                     },
                     async saveGuidanceDataManually(type = 'attendance') {
                         // type: 'attendance' 또는 'lessonLog'
@@ -4333,7 +4380,12 @@
                                     
                                     // 분류 추출: '과' 앞의 텍스트, 없으면 '인문계열'로 기본값
                                     const categoryMatch = classInfo.match(/([^과]+)\s*과/);
-                                    const category = categoryMatch ? categoryMatch[1].trim() : '인문계열';
+                                    let category = categoryMatch ? categoryMatch[1].trim() : '인문계열';
+                                    
+                                    // 회계경영과, 웹디자인과는 전문계열로 매칭
+                                    if (category === '회계경영' || category === '웹디자인') {
+                                        category = '전문계열';
+                                    }
 
                                     if (!classGrade || !classNum) throw new Error(`'${file.name}' 파일의 학급 정보 형식("${classInfo}")이 예상과 다릅니다. (예: '1학년 3반')`);
                                     
@@ -4347,8 +4399,8 @@
 
                                         const num = nameRow[0];
                                         const name = nameRow[1];
-                                        // 학번 형식: 학년(2자리) + 학급(2자리) + 번호(2자리)
-                                        const fullId = `${String(classGrade).padStart(2, "0")}${String(classNum).padStart(2, "0")}${String(num).padStart(2, "0")}`;
+                                        // 학번 형식: 학년*10000 + 반*100 + 번호 (5자리 숫자)
+                                        const fullId = String(Number(classGrade) * 10000 + Number(classNum) * 100 + Number(num));
                                         
                                         // studentData에서 정확한 학생 찾기 (학번으로 검색)
                                         const foundStudent = this.studentData.find(s => {
@@ -4374,10 +4426,12 @@
                                                 // 동명이인이 여러 명인 경우, 학급 정보로 추가 필터링
                                                 const classMatches = nameMatches.filter(s => {
                                                     const studentId = String(s['학번'] || '').trim();
-                                                    // 학번의 앞 4자리(학년+학급)가 일치하는지 확인
-                                                    const studentClassPrefix = studentId.substring(0, 4);
-                                                    const expectedClassPrefix = `${String(classGrade).padStart(2, "0")}${String(classNum).padStart(2, "0")}`;
-                                                    return studentClassPrefix === expectedClassPrefix;
+                                                    // 학번에서 학년과 학급 추출 (5자리: 학년*10000+반*100+번호)
+                                                    const studentIdNum = Number(studentId);
+                                                    if (isNaN(studentIdNum)) return false;
+                                                    const studentGrade = Math.floor(studentIdNum / 10000);
+                                                    const studentClass = Math.floor((studentIdNum % 10000) / 100);
+                                                    return studentGrade === Number(classGrade) && studentClass === Number(classNum);
                                                 });
                                                 
                                                 if (classMatches.length === 1) {
