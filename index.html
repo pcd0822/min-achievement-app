@@ -1272,7 +1272,7 @@
                         <!-- MODIFIED: Input is now disabled and bound to teacherPlan.subjectName -->
                          <label class="block text-sm font-medium text-gray-700">과목명</label>
                          <input :value="teacherPlan.subjectName" placeholder="먼저 '계획서 작성' 탭에서 과목명을 입력하세요" required class="w-full p-2 border rounded-md bg-gray-100" disabled>
-                         <div class="grid grid-cols-2 gap-4">
+                         <div class="grid grid-cols-3 gap-4">
                              <div>
                                  <label class="block text-sm font-medium text-gray-700">학년</label>
                                  <select v-model.number="importGrade" class="w-full p-2 border rounded-md">
@@ -1290,6 +1290,13 @@
                                      <option :value="2">2학기</option>
                                  </select>
                              </div>
+                             <div>
+                                 <label class="block text-sm font-medium text-gray-700">계열</label>
+                                 <select v-model="importCategory" class="w-full p-2 border rounded-md">
+                                     <option value="">선택</option>
+                                     <option v-for="category in availableCategories" :key="category" :value="category">{{ category }}</option>
+                                 </select>
+                             </div>
                          </div>
                          <div>
                              <label class="block text-sm font-medium text-gray-700">학급</label>
@@ -1304,7 +1311,7 @@
                      <p v-if="importModalError" class="text-red-500 text-sm mt-2">{{ importModalError }}</p>
                      <div class="mt-6 flex justify-end space-x-2">
                          <button type="button" @click="closeImportModal" class="px-4 py-2 bg-gray-300 rounded-md">취소</button>
-                         <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-md" :disabled="!teacherPlan.subjectName || !importGrade || !importSemester">가져오기</button>
+                         <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-md" :disabled="!teacherPlan.subjectName || !importGrade || !importSemester || !importCategory">가져오기</button>
                      </div>
                  </form>
              </div>
@@ -1742,6 +1749,7 @@
                         importClasses: [''],
                         importGrade: null,
                         importSemester: null,
+                        importCategory: '',
                         importModalError: '',
                         teacherPlan: {
                             subjectName: '', teacherNames: [''],
@@ -1805,8 +1813,15 @@
                             return this.statisticsState.subjectSummary || [];
                         }
                         const [grade, semester] = this.selectedStatisticsFilter.split('-');
+                        const filterGrade = Number(grade);
+                        const filterSemester = Number(semester);
                         return (this.statisticsState.subjectSummary || []).filter(row => {
-                            const subjectInfo = this.findSubjectInCurriculum(row.subjectName, Number(grade), Number(semester), null);
+                            // 통계 데이터에 저장된 학년/학기 정보와 필터가 일치하는지 확인
+                            if (row.grade != null && row.semester != null) {
+                                return row.grade === filterGrade && row.semester === filterSemester;
+                            }
+                            // 학년/학기 정보가 없으면 교육과정 편제표에서 확인
+                            const subjectInfo = this.findSubjectInCurriculum(row.subjectName, filterGrade, filterSemester, null);
                             return subjectInfo !== null;
                         });
                     },
@@ -1815,8 +1830,13 @@
                             return this.statisticsState.preventionSummary || [];
                         }
                         const [grade, semester] = this.selectedStatisticsFilter.split('-');
+                        const filterGrade = Number(grade);
+                        const filterSemester = Number(semester);
                         return (this.statisticsState.preventionSummary || []).filter(row => {
-                            const subjectInfo = this.findSubjectInCurriculum(row.subjectName, Number(grade), Number(semester), null);
+                            if (row.grade != null && row.semester != null) {
+                                return row.grade === filterGrade && row.semester === filterSemester;
+                            }
+                            const subjectInfo = this.findSubjectInCurriculum(row.subjectName, filterGrade, filterSemester, null);
                             return subjectInfo !== null;
                         });
                     },
@@ -1825,8 +1845,13 @@
                             return this.statisticsState.additionalSummary || [];
                         }
                         const [grade, semester] = this.selectedStatisticsFilter.split('-');
+                        const filterGrade = Number(grade);
+                        const filterSemester = Number(semester);
                         return (this.statisticsState.additionalSummary || []).filter(row => {
-                            const subjectInfo = this.findSubjectInCurriculum(row.subjectName, Number(grade), Number(semester), null);
+                            if (row.grade != null && row.semester != null) {
+                                return row.grade === filterGrade && row.semester === filterSemester;
+                            }
+                            const subjectInfo = this.findSubjectInCurriculum(row.subjectName, filterGrade, filterSemester, null);
                             return subjectInfo !== null;
                         });
                     },
@@ -1835,8 +1860,13 @@
                             return this.statisticsState.remedialSummary || [];
                         }
                         const [grade, semester] = this.selectedStatisticsFilter.split('-');
+                        const filterGrade = Number(grade);
+                        const filterSemester = Number(semester);
                         return (this.statisticsState.remedialSummary || []).filter(row => {
-                            const subjectInfo = this.findSubjectInCurriculum(row.subjectName, Number(grade), Number(semester), null);
+                            if (row.grade != null && row.semester != null) {
+                                return row.grade === filterGrade && row.semester === filterSemester;
+                            }
+                            const subjectInfo = this.findSubjectInCurriculum(row.subjectName, filterGrade, filterSemester, null);
                             return subjectInfo !== null;
                         });
                     },
@@ -1845,8 +1875,13 @@
                             return this.statisticsState.deficitSummary || [];
                         }
                         const [grade, semester] = this.selectedStatisticsFilter.split('-');
+                        const filterGrade = Number(grade);
+                        const filterSemester = Number(semester);
                         return (this.statisticsState.deficitSummary || []).filter(row => {
-                            const subjectInfo = this.findSubjectInCurriculum(row.subjectName, Number(grade), Number(semester), null);
+                            if (row.grade != null && row.semester != null) {
+                                return row.grade === filterGrade && row.semester === filterSemester;
+                            }
+                            const subjectInfo = this.findSubjectInCurriculum(row.subjectName, filterGrade, filterSemester, null);
                             return subjectInfo !== null;
                         });
                     },
@@ -1967,17 +2002,21 @@
                             this.teacherPlan.subjectGrade != null && 
                             this.teacherPlan.subjectSemester != null && 
                             this.teacherPlan.subjectCategory) {
-                            const subjectInfo = this.findSubjectInCurriculum(
-                                this.teacherPlan.subjectName,
-                                this.teacherPlan.subjectGrade,
-                                this.teacherPlan.subjectSemester,
-                                this.teacherPlan.subjectCategory
-                            );
-                            if (subjectInfo) {
-                                requiredSubjectCredits = Number(subjectInfo.학점) || 0;
-                                supplementaryHours = requiredSubjectCredits * this.moduleConfig.hoursPerCredit;
-                                requiredHoursForCompletion = Math.ceil((supplementaryHours * 2) / 3 * 10) / 10;
-                                maxEmotionalSupportHours = supplementaryHours * (this.moduleConfig.emotionalSupportRatio / 100);
+                            try {
+                                const subjectInfo = this.findSubjectInCurriculum(
+                                    this.teacherPlan.subjectName,
+                                    this.teacherPlan.subjectGrade,
+                                    this.teacherPlan.subjectSemester,
+                                    this.teacherPlan.subjectCategory
+                                );
+                                if (subjectInfo) {
+                                    requiredSubjectCredits = Number(subjectInfo.학점) || 0;
+                                    supplementaryHours = requiredSubjectCredits * this.moduleConfig.hoursPerCredit;
+                                    requiredHoursForCompletion = Math.ceil((supplementaryHours * 2) / 3 * 10) / 10;
+                                    maxEmotionalSupportHours = supplementaryHours * (this.moduleConfig.emotionalSupportRatio / 100);
+                                }
+                            } catch (error) {
+                                console.error('guidanceCompletionStatus에서 findSubjectInCurriculum 호출 오류:', error);
                             }
                         }
 
@@ -2342,12 +2381,22 @@
                         try {
                             const subjectStats = new Map();
                             const curriculumMap = new Map();
+                            const curriculumInfoMap = new Map(); // 과목명 -> {학년, 학기, 분류, 학점} 정보 저장
                             (this.curriculumData || []).forEach(row => {
                                 if (!row || !row['과목명']) return;
                                 const subjectName = String(row['과목명']).trim();
                                 if (!subjectName) return;
                                 const credits = Number(row['학점']);
                                 curriculumMap.set(subjectName, isNaN(credits) ? 0 : credits);
+                                // 과목명을 키로 하되, 학년/학기/분류 정보도 함께 저장
+                                const key = `${subjectName}_${row['학년'] || ''}_${row['학기'] || ''}_${row['분류'] || ''}`;
+                                curriculumInfoMap.set(key, {
+                                    subjectName: subjectName,
+                                    grade: row['학년'] != null ? Number(row['학년']) : null,
+                                    semester: row['학기'] != null ? Number(row['학기']) : null,
+                                    category: row['분류'] ? String(row['분류']).trim() : '',
+                                    credits: isNaN(credits) ? 0 : credits
+                                });
                             });
                             const recognizedHoursConfig = Array.isArray(this.moduleConfig?.recognizedHours) ? this.moduleConfig.recognizedHours : [];
                             const recognizedHoursMap = new Map();
@@ -2358,13 +2407,34 @@
                                 const hours = Number(item.hours);
                                 recognizedHoursMap.set(name, isNaN(hours) ? 0 : hours);
                             });
-                            const ensureSubject = (subjectName) => {
+                            const ensureSubject = (subjectName, grade = null, semester = null, category = null) => {
+                                // 과목명만으로 키를 생성하되, 학년/학기 정보는 별도로 저장
                                 const key = subjectName ? String(subjectName).trim() : '';
                                 if (!key) return null;
+                                
+                                // 교육과정 편제표에서 해당 과목의 학년/학기 정보 찾기
+                                let subjectInfo = null;
+                                if (grade != null && semester != null) {
+                                    subjectInfo = this.findSubjectInCurriculum(subjectName, grade, semester, category);
+                                } else {
+                                    // 학년/학기 정보가 없으면 첫 번째로 찾은 과목 정보 사용
+                                    subjectInfo = this.curriculumData.find(row => 
+                                        row && row['과목명'] && String(row['과목명']).trim() === key
+                                    );
+                                }
+                                
                                 if (!subjectStats.has(key)) {
+                                    const subjectGrade = subjectInfo ? (subjectInfo['학년'] != null ? Number(subjectInfo['학년']) : null) : null;
+                                    const subjectSemester = subjectInfo ? (subjectInfo['학기'] != null ? Number(subjectInfo['학기']) : null) : null;
+                                    const subjectCategory = subjectInfo ? (subjectInfo['분류'] ? String(subjectInfo['분류']).trim() : '') : '';
+                                    const subjectCredits = subjectInfo ? (Number(subjectInfo['학점']) || 0) : (curriculumMap.has(key) ? curriculumMap.get(key) : 0);
+                                    
                                     subjectStats.set(key, {
                                         subjectName: key,
-                                        credits: curriculumMap.has(key) ? curriculumMap.get(key) : 0,
+                                        credits: subjectCredits,
+                                        grade: subjectGrade,
+                                        semester: subjectSemester,
+                                        category: subjectCategory,
                                         underachievers: new Set(),
                                         gradeUnderachievers: new Set(),
                                         attendanceUnderachievers: new Set(),
@@ -2403,7 +2473,13 @@
                                     if (!subjectInfo || !subjectInfo.name) return;
                                     const subjectName = String(subjectInfo.name).trim();
                                     if (!subjectName) return;
-                                    const stats = ensureSubject(subjectName);
+                                    // 학생의 학년 정보를 사용하여 과목 검색
+                                    const studentGrade = gradeValue ? Number(gradeValue) : null;
+                                    // 미도달 학생 데이터에서 학년/학기 정보 추출 (있는 경우)
+                                    const subjectGrade = student.grade || studentGrade;
+                                    const subjectSemester = student.semester || null;
+                                    const subjectCategory = student.category || null;
+                                    const stats = ensureSubject(subjectName, subjectGrade, subjectSemester, subjectCategory);
                                     if (!stats) return;
                                     stats.underachievers.add(studentId);
                                     stats.gradeUnderachievers.add(studentId);
@@ -2889,6 +2965,9 @@
                                 subjectSummary.push({
                                     subjectName,
                                     credits: stats.credits,
+                                    grade: stats.grade,
+                                    semester: stats.semester,
+                                    category: stats.category,
                                     gradeCount: gradeIds.length,
                                     attendanceCount: attendanceIds.length,
                                     exceptionCount,
@@ -2898,6 +2977,9 @@
 
                                 preventionSummary.push({
                                     subjectName,
+                                    grade: stats.grade,
+                                    semester: stats.semester,
+                                    category: stats.category,
                                     hasPrevention: preventiveParticipantSet.size > 0 || stats.preventionSessions > 0,
                                     participants: preventiveParticipantSet.size,
                                     nonParticipants: preventiveNonParticipants.length
@@ -2914,6 +2996,9 @@
                                 additionalSummary.push({
                                     subjectName,
                                     credits: stats.credits,
+                                    grade: stats.grade,
+                                    semester: stats.semester,
+                                    category: stats.category,
                                     attendanceTargets: additionalLearningTargets.length,
                                     participants: additionalParticipantsCount,
                                     exceptionCount: additionalExceptionCount,
@@ -2936,6 +3021,9 @@
                                 remedialSummary.push({
                                     subjectName,
                                     credits: stats.credits,
+                                    grade: stats.grade,
+                                    semester: stats.semester,
+                                    category: stats.category,
                                     gradeTargets: gradeIds.length,
                                     participants: gradeParticipantCount,
                                     nonParticipants: gradeNonParticipantCount,
@@ -2949,6 +3037,9 @@
                                 const bothCount = [...stats.gradeUnderachievers].filter(studentId => stats.attendanceUnderachievers.has(studentId)).length;
                                 deficitSummary.push({
                                     subjectName,
+                                    grade: stats.grade,
+                                    semester: stats.semester,
+                                    category: stats.category,
                                     gradeCount,
                                     attendanceCount,
                                     bothCount
@@ -3836,6 +3927,35 @@
                             return { success: false, message: `저장 중 오류 발생: ${error.message || error.code || '알 수 없는 오류'}` };
                         }
                     },
+                    findSubjectInCurriculum(subjectName, grade, semester, category) {
+                        // 교육과정 편제표에서 과목명, 학년, 학기, 분류가 모두 일치하는 과목 검색
+                        if (!this.curriculumData || this.curriculumData.length === 0) return null;
+                        return this.curriculumData.find(row => {
+                            if (!row || !row['과목명']) return false;
+                            const nameMatch = String(row['과목명']).trim() === String(subjectName || '').trim();
+                            if (!nameMatch) return false;
+                            
+                            // 학년 매칭 (있으면 일치해야 함)
+                            if (grade != null && grade !== '') {
+                                const rowGrade = row['학년'] != null ? Number(row['학년']) : null;
+                                if (rowGrade === null || rowGrade !== Number(grade)) return false;
+                            }
+                            
+                            // 학기 매칭 (있으면 일치해야 함)
+                            if (semester != null && semester !== '') {
+                                const rowSemester = row['학기'] != null ? Number(row['학기']) : null;
+                                if (rowSemester === null || rowSemester !== Number(semester)) return false;
+                            }
+                            
+                            // 분류 매칭 (있으면 일치해야 함)
+                            if (category && category.trim()) {
+                                const rowCategory = row['분류'] ? String(row['분류']).trim() : '';
+                                if (!rowCategory || rowCategory !== String(category).trim()) return false;
+                            }
+                            
+                            return true;
+                        });
+                    },
                     async saveGuidanceDataManually(type = 'attendance') {
                         // type: 'attendance' 또는 'lessonLog'
                         const statusVar = type === 'lessonLog' ? 'lessonLogDataStatus' : 'guidanceDataStatus';
@@ -3893,7 +4013,53 @@
                         }
                         return merged;
                     },
+                    findSubjectInCurriculum(subjectName, grade, semester, category) {
+                        // 교육과정 편제표에서 과목명, 학년, 학기, 분류가 모두 일치하는 과목 검색
+                        if (!this.curriculumData || this.curriculumData.length === 0) return null;
+                        return this.curriculumData.find(row => {
+                            if (!row || !row['과목명']) return false;
+                            const nameMatch = String(row['과목명']).trim() === String(subjectName || '').trim();
+                            if (!nameMatch) return false;
+                            
+                            // 학년 매칭 (있으면 일치해야 함)
+                            if (grade != null && grade !== '') {
+                                const rowGrade = row['학년'] != null ? Number(row['학년']) : null;
+                                if (rowGrade === null || rowGrade !== Number(grade)) return false;
+                            }
+                            
+                            // 학기 매칭 (있으면 일치해야 함)
+                            if (semester != null && semester !== '') {
+                                const rowSemester = row['학기'] != null ? Number(row['학기']) : null;
+                                if (rowSemester === null || rowSemester !== Number(semester)) return false;
+                            }
+                            
+                            // 분류 매칭 (있으면 일치해야 함)
+                            if (category && category.trim()) {
+                                const rowCategory = row['분류'] ? String(row['분류']).trim() : '';
+                                if (!rowCategory || rowCategory !== String(category).trim()) return false;
+                            }
+                            
+                            return true;
+                        });
+                    },
                     async handleSubjectChange() {
+                        // 과목명, 학년, 학기, 분류가 모두 입력되었을 때만 학점 계산
+                        if (this.teacherPlan.subjectName && 
+                            this.teacherPlan.subjectGrade != null && 
+                            this.teacherPlan.subjectSemester != null && 
+                            this.teacherPlan.subjectCategory) {
+                            const subjectInfo = this.findSubjectInCurriculum(
+                                this.teacherPlan.subjectName,
+                                this.teacherPlan.subjectGrade,
+                                this.teacherPlan.subjectSemester,
+                                this.teacherPlan.subjectCategory
+                            );
+                            if (!subjectInfo) {
+                                this.teacherPlanError = '입력한 조건에 맞는 과목을 교육과정 편제표에서 찾을 수 없습니다. 과목명, 학년, 학기, 계열을 확인해주세요.';
+                            } else {
+                                this.teacherPlanError = '';
+                            }
+                        }
                         await this.saveTeacherPlan();
                         this.updateMaxHours();
                         await this.loadGuidanceData();
@@ -4191,14 +4357,26 @@
                                             const existingIndex = processedUnderachievers.findIndex(s => s.id === id);
                                             const gradeSubjectsData = Array.from(data.subjects).map(subjectName => {
                                                 // 학년, 학기, 분류 정보를 사용하여 정확한 과목 검색
-                                                const curriculumInfo = this.findSubjectInCurriculum(
-                                                    subjectName,
-                                                    data.grade,
-                                                    data.semester,
-                                                    data.category
-                                                );
-                                                return { name: subjectName, credits: curriculumInfo ? curriculumInfo.학점 : 'N/A' };
-                                            });
+                                                try {
+                                                    if (!this.findSubjectInCurriculum) {
+                                                        console.error('findSubjectInCurriculum 함수가 정의되지 않았습니다.');
+                                                        return { name: subjectName, credits: 'N/A' };
+                                                    }
+                                                    const curriculumInfo = this.findSubjectInCurriculum(
+                                                        subjectName,
+                                                        data.grade,
+                                                        data.semester,
+                                                        data.category
+                                                    );
+                                                    if (!curriculumInfo) {
+                                                        console.warn(`과목을 찾을 수 없음: ${subjectName}, 학년=${data.grade}, 학기=${data.semester}, 분류=${data.category}`);
+                                                    }
+                                                    return { name: subjectName, credits: curriculumInfo ? curriculumInfo.학점 : 'N/A' };
+                                                } catch (error) {
+                                                    console.error(`과목 검색 오류: ${subjectName}`, error);
+                                                    return { name: subjectName, credits: 'N/A' };
+                                                }
+                                            }).filter(gs => gs && gs.name); // 빈 과목명 제거
                                             
                                             if (existingIndex > -1) {
                                                 if (!processedUnderachievers[existingIndex].gradeSubjects) processedUnderachievers[existingIndex].gradeSubjects = [];
@@ -4985,7 +5163,7 @@
                         const finalHtml = `<div id="print-area"><h1>${title} 수업일지</h1><div style="font-size: 1rem; line-height: 1.6; border: 1px solid #ccc; padding: 10px; margin-bottom: 2rem;"><p><strong>과목명:</strong> ${this.teacherPlan.subjectName || '미입력'}</p><p><strong>지도교사:</strong> ${this.formattedTeacherNames}</p><p><strong>운영기간:</strong> ${this.guidanceOperationPeriod}</p></div>${lessonLogHtml.length > 0 ? lessonLogHtml : '<p style="text-align: center;">저장된 수업일지가 없습니다.</p>'}</div>`;
                         this.generatePdfFromHtml(finalHtml);
                     },
-                    closeImportModal() { this.showImportModal = false; this.importClasses = ['']; this.importGrade = null; this.importSemester = null; this.importModalError = ''; },
+                    closeImportModal() { this.showImportModal = false; this.importClasses = ['']; this.importGrade = null; this.importSemester = null; this.importCategory = ''; this.importModalError = ''; },
                     addImportClassInput() { this.importClasses.push(''); },
                     removeImportClassInput(index) { this.importClasses.splice(index, 1); },
                     async importUnderachievers() {
@@ -4993,7 +5171,10 @@
                         this.importModalError = '';
                         const subject = this.teacherPlan.subjectName.trim();
                         if (!subject) { this.importModalError = '먼저 과목명을 입력하고 저장해주세요.'; return; }
-                        if (!this.importGrade || !this.importSemester) { this.importModalError = '학년과 학기를 선택해주세요.'; return; }
+                        if (!this.importGrade || !this.importSemester || !this.importCategory) { 
+                            this.importModalError = '학년, 학기, 계열을 모두 선택해주세요.'; 
+                            return; 
+                        }
                         
                         const classes = this.importClasses.map(c => c.trim()).filter(Boolean);
                         if (classes.length === 0) { this.importModalError = '학급을 입력해주세요.'; return; }
@@ -5004,32 +5185,38 @@
                             const deployedData = underachieversSnap.exists() ? underachieversSnap.data().data || [] : [];
                             this.deployedUnderachievers = this.normalizeUnderachieverList(deployedData);
                         } catch (e) {
+                            console.error('미도달 학생 명단 로드 오류:', e);
                             this.importModalError = '최신 명단을 불러오는 데 실패했습니다.';
                             return;
                         }
 
                         const allUnderachievers = this.deployedUnderachievers;
-                        if (!allUnderachievers || allUnderachievers.length === 0) { this.importModalError = '배포된 미도달 학생 명단이 없습니다.'; return; }
+                        if (!allUnderachievers || allUnderachievers.length === 0) { 
+                            this.importModalError = '배포된 미도달 학생 명단이 없습니다.'; 
+                            return; 
+                        }
 
-                        // 학년, 학기, 분류 정보를 사용하여 정확한 과목 매칭
+                        // 학년, 학기, 계열 정보를 사용하여 정확한 과목 매칭
                         const filteredStudents = allUnderachievers.filter(student => {
                             if (!student || !student.id) return false;
                             const studentClassId = student.id.substring(0, 3);
                             const classMatch = classes.includes(studentClassId);
                             if (!classMatch) return false;
                             
-                            // 학년, 학기, 분류 정보를 사용하여 과목 검색
+                            // 학년, 학기, 계열 정보를 사용하여 과목 검색
                             const subjectInfo = this.findSubjectInCurriculum(
                                 subject,
                                 this.importGrade,
                                 this.importSemester,
-                                this.teacherPlan.subjectCategory
+                                this.importCategory
                             );
                             
-                            // 과목명만으로 매칭 (학년, 학기, 분류는 이미 findSubjectInCurriculum에서 확인됨)
+                            if (!subjectInfo) return false;
+                            
+                            // 과목명만으로 매칭 (학년, 학기, 계열은 이미 findSubjectInCurriculum에서 확인됨)
                             const gradeMatch = (student.gradeSubjects || []).some(s => s && s.name === subject);
                             const attendanceMatch = (student.attendanceSubjects || []).includes(subject);
-                            return (gradeMatch || attendanceMatch) && subjectInfo !== null;
+                            return gradeMatch || attendanceMatch;
                         });
 
                         if (filteredStudents.length === 0) { this.importModalError = '해당 조건에 맞는 학생을 찾을 수 없습니다.'; return; }
