@@ -3448,8 +3448,10 @@
                             console.error("Firestore db가 초기화되지 않았습니다.");
                             return;
                         }
-                        if (!this.schoolId) {
-                            console.error("schoolId가 설정되지 않았습니다. 데이터를 로드할 수 없습니다.");
+                        // currentSchoolCode를 우선 사용, 없으면 schoolId 사용
+                        const activeSchoolId = this.currentSchoolCode || this.schoolId;
+                        if (!activeSchoolId) {
+                            console.error("schoolId 또는 currentSchoolCode가 설정되지 않았습니다. 데이터를 로드할 수 없습니다.");
                             // schoolId가 없으면 데이터만 초기화 (role과 schoolId는 유지)
                             this.curriculumData = []; 
                             this.studentData = []; 
@@ -3459,7 +3461,12 @@
                         }
                         this.statusMessage = '공용 데이터 로딩 중...';
                         try {
-                            const commonDataBasePath = `schools/${this.schoolId}/commonData`;
+                            const commonDataBasePath = `schools/${activeSchoolId}/commonData`;
+                            console.log('[loadCommonData] 데이터 로드 경로:', commonDataBasePath, {
+                                currentSchoolCode: this.currentSchoolCode,
+                                schoolId: this.schoolId,
+                                activeSchoolId: activeSchoolId
+                            });
                             const [
                                 curriculumSnap, studentsSnap, emotionalSupportSnap,
                                 moduleConfigSnap, formTemplatesSnap, underachieversSnap, underachieversProcessedSnap
@@ -3582,7 +3589,9 @@
 
                     // --- Data Saving (Admin) ---
                     async uploadFile(event, type) {
-                        if (!this.schoolId) { alert("학교코드가 설정되지 않았습니다. '학교 코드 수정 및 발급' 메뉴에서 코드를 먼저 설정해주세요."); event.target.value = null; return; }
+                        // currentSchoolCode를 우선 사용, 없으면 schoolId 사용
+                        const activeSchoolId = this.currentSchoolCode || this.schoolId;
+                        if (!activeSchoolId) { alert("학교코드가 설정되지 않았습니다. '학교 코드 수정 및 발급' 메뉴에서 코드를 먼저 설정해주세요."); event.target.value = null; return; }
                         if (this.role !== '관리자' || !db) { event.target.value = null; return; }
 
                         const file = event.target.files[0];
@@ -3605,7 +3614,13 @@
                                     'emotionalSupport': 'emotionalSupport'
                                 };
                                 const docName = docNameMap[type] || type;
-                                const docRef = doc(db, `schools/${this.schoolId}/commonData`, docName);
+                                const docRef = doc(db, `schools/${activeSchoolId}/commonData`, docName);
+                                console.log('[uploadFile] 데이터 저장 경로:', `schools/${activeSchoolId}/commonData/${docName}`, {
+                                    currentSchoolCode: this.currentSchoolCode,
+                                    schoolId: this.schoolId,
+                                    activeSchoolId: activeSchoolId,
+                                    type: type
+                                });
                                 await setDoc(docRef, { data: jsonData });
 
                                 if (type === 'curriculum') this.curriculumData = jsonData;
@@ -3628,11 +3643,13 @@
                         reader.readAsArrayBuffer(file);
                     },
                     async saveModuleConfig() {
-                        if (!this.schoolId) { alert("학교코드가 설정되지 않았습니다. '학교 코드 수정 및 발급' 메뉴에서 코드를 먼저 설정해주세요."); return; }
+                        // currentSchoolCode를 우선 사용, 없으면 schoolId 사용
+                        const activeSchoolId = this.currentSchoolCode || this.schoolId;
+                        if (!activeSchoolId) { alert("학교코드가 설정되지 않았습니다. '학교 코드 수정 및 발급' 메뉴에서 코드를 먼저 설정해주세요."); return; }
                         if (this.role !== '관리자' || !db) return;
                         this.moduleConfigStatus = "운영 모듈 설정 저장 중...";
                         try {
-                            const docRef = doc(db, `schools/${this.schoolId}/commonData`, "moduleConfig");
+                            const docRef = doc(db, `schools/${activeSchoolId}/commonData`, "moduleConfig");
                             const configToSave = JSON.parse(JSON.stringify(this.moduleConfig));
                             await setDoc(docRef, configToSave);
                             this.moduleConfigStatus = "운영 모듈 설정이 저장되었습니다.";
@@ -3640,11 +3657,13 @@
                         setTimeout(() => this.moduleConfigStatus = '', 3000);
                     },
                     async saveFormTemplates(){
-                        if (!this.schoolId) { alert("학교코드가 설정되지 않았습니다. '학교 코드 수정 및 발급' 메뉴에서 코드를 먼저 설정해주세요."); return; }
+                        // currentSchoolCode를 우선 사용, 없으면 schoolId 사용
+                        const activeSchoolId = this.currentSchoolCode || this.schoolId;
+                        if (!activeSchoolId) { alert("학교코드가 설정되지 않았습니다. '학교 코드 수정 및 발급' 메뉴에서 코드를 먼저 설정해주세요."); return; }
                         if (this.role !== '관리자' || !db) return;
                         this.adminActionStatus = '양식 저장 중...';
                         try {
-                            const docRef = doc(db, `schools/${this.schoolId}/commonData`, "formTemplates");
+                            const docRef = doc(db, `schools/${activeSchoolId}/commonData`, "formTemplates");
                             const templatesToSave = {
                                 newsletter: JSON.parse(JSON.stringify(this.newsletterForm)),
                                 pledge: JSON.parse(JSON.stringify(this.pledgeForm))
@@ -3656,13 +3675,15 @@
                         setTimeout(() => this.adminActionStatus = '', 3000);
                     },
                     async deployUnderachievers() {
-                        if (!this.schoolId) { alert("학교코드가 설정되지 않았습니다. '학교 코드 수정 및 발급' 메뉴에서 코드를 먼저 설정해주세요."); return; }
+                        // currentSchoolCode를 우선 사용, 없으면 schoolId 사용
+                        const activeSchoolId = this.currentSchoolCode || this.schoolId;
+                        if (!activeSchoolId) { alert("학교코드가 설정되지 않았습니다. '학교 코드 수정 및 발급' 메뉴에서 코드를 먼저 설정해주세요."); return; }
                         if (this.role !== '관리자' || !db) return;
                         this.underachieversStatus = "미도달 학생 명단 배포 중...";
                         try {
                             const normalizedUnderachievers = this.normalizeUnderachieverList(this.underachievers);
                             this.underachievers = normalizedUnderachievers;
-                            const docRef = doc(db, `schools/${this.schoolId}/commonData`, "underachievers");
+                            const docRef = doc(db, `schools/${activeSchoolId}/commonData`, "underachievers");
                             await setDoc(docRef, { data: JSON.parse(JSON.stringify(normalizedUnderachievers)) });
                             this.deployedUnderachievers = this.normalizeUnderachieverList(normalizedUnderachievers);
                             this.underachieversStatus = "대상자 명단이 Firestore에 배포되었습니다.";
@@ -4326,24 +4347,80 @@
 
                                         const num = nameRow[0];
                                         const name = nameRow[1];
-                                        const fullId = `${classGrade}${String(classNum).padStart(2, "0")}${String(num).padStart(2, "0")}`;
+                                        // 학번 형식: 학년(2자리) + 학급(2자리) + 번호(2자리)
+                                        const fullId = `${String(classGrade).padStart(2, "0")}${String(classNum).padStart(2, "0")}${String(num).padStart(2, "0")}`;
+                                        
+                                        // studentData에서 정확한 학생 찾기 (학번으로 검색)
+                                        const foundStudent = this.studentData.find(s => {
+                                            const studentId = String(s['학번'] || '').trim();
+                                            return studentId === fullId || studentId === String(fullId);
+                                        });
+                                        
+                                        // studentData에서 찾지 못한 경우, 이름으로도 검색 시도 (동명이인 처리)
+                                        let actualStudentId = fullId;
+                                        let actualStudentName = name;
+                                        if (!foundStudent && this.studentData && this.studentData.length > 0) {
+                                            // 이름이 정확히 일치하는 학생 찾기
+                                            const nameMatches = this.studentData.filter(s => {
+                                                const studentName = String(s['이름'] || '').trim();
+                                                return studentName === name || studentName === String(name);
+                                            });
+                                            
+                                            if (nameMatches.length === 1) {
+                                                // 이름이 정확히 일치하는 학생이 1명만 있으면 그 학생 사용
+                                                actualStudentId = String(nameMatches[0]['학번'] || '').trim();
+                                                actualStudentName = String(nameMatches[0]['이름'] || '').trim();
+                                            } else if (nameMatches.length > 1) {
+                                                // 동명이인이 여러 명인 경우, 학급 정보로 추가 필터링
+                                                const classMatches = nameMatches.filter(s => {
+                                                    const studentId = String(s['학번'] || '').trim();
+                                                    // 학번의 앞 4자리(학년+학급)가 일치하는지 확인
+                                                    const studentClassPrefix = studentId.substring(0, 4);
+                                                    const expectedClassPrefix = `${String(classGrade).padStart(2, "0")}${String(classNum).padStart(2, "0")}`;
+                                                    return studentClassPrefix === expectedClassPrefix;
+                                                });
+                                                
+                                                if (classMatches.length === 1) {
+                                                    actualStudentId = String(classMatches[0]['학번'] || '').trim();
+                                                    actualStudentName = String(classMatches[0]['이름'] || '').trim();
+                                                } else {
+                                                    console.warn(`학생을 찾을 수 없음: ${name} (${fullId}), 동명이인 ${nameMatches.length}명, 학급 일치 ${classMatches.length}명`);
+                                                }
+                                            }
+                                        } else if (foundStudent) {
+                                            actualStudentId = String(foundStudent['학번'] || '').trim();
+                                            actualStudentName = String(foundStudent['이름'] || '').trim();
+                                        }
 
                                         for (let c = 3; c < statusRow.length; c++) {
-                                            if (String(statusRow[c]).trim() === "미도달") {
+                                            const statusValue = String(statusRow[c] || '').trim();
+                                            if (statusValue === "미도달" || statusValue === "미도달 ") {
                                                 const subjectWithCredits = subjectHeaderRow[c];
                                                 if (!subjectWithCredits) continue;
                                                 const subject = String(subjectWithCredits).split('(')[0].trim();
                                                 
-                                                if (!resultData.has(fullId)) {
-                                                    resultData.set(fullId, { 
-                                                        name: name, 
-                                                        subjects: new Set(),
+                                                // 과목명, 학년, 학기, 분류를 모두 포함한 고유 키 생성
+                                                const subjectKey = `${subject}|${classGrade}|${semester}|${category}`;
+                                                
+                                                if (!resultData.has(actualStudentId)) {
+                                                    resultData.set(actualStudentId, { 
+                                                        name: actualStudentName, 
+                                                        subjects: new Map(), // Set 대신 Map 사용하여 과목별 학년/학기/분류 정보 저장
                                                         grade: classGrade ? Number(classGrade) : null,
                                                         semester: semester,
                                                         category: category
                                                     });
                                                 }
-                                                resultData.get(fullId).subjects.add(subject);
+                                                // 과목별로 학년/학기/분류 정보 저장
+                                                const studentData = resultData.get(actualStudentId);
+                                                if (!studentData.subjects.has(subjectKey)) {
+                                                    studentData.subjects.set(subjectKey, {
+                                                        name: subject,
+                                                        grade: classGrade ? Number(classGrade) : null,
+                                                        semester: semester,
+                                                        category: category
+                                                    });
+                                                }
                                             }
                                         }
                                     }
@@ -4355,34 +4432,59 @@
                                     if (filesProcessed === totalFiles) {
                                         resultData.forEach((data, id) => {
                                             const existingIndex = processedUnderachievers.findIndex(s => s.id === id);
-                                            const gradeSubjectsData = Array.from(data.subjects).map(subjectName => {
+                                            // Map에서 과목 정보 추출 (학년/학기/분류 정보 포함)
+                                            const gradeSubjectsData = Array.from(data.subjects.values()).map(subjectInfo => {
                                                 // 학년, 학기, 분류 정보를 사용하여 정확한 과목 검색
                                                 try {
                                                     if (!this.findSubjectInCurriculum) {
                                                         console.error('findSubjectInCurriculum 함수가 정의되지 않았습니다.');
-                                                        return { name: subjectName, credits: 'N/A' };
+                                                        return { 
+                                                            name: subjectInfo.name, 
+                                                            credits: 'N/A',
+                                                            grade: subjectInfo.grade,
+                                                            semester: subjectInfo.semester,
+                                                            category: subjectInfo.category
+                                                        };
                                                     }
                                                     const curriculumInfo = this.findSubjectInCurriculum(
-                                                        subjectName,
-                                                        data.grade,
-                                                        data.semester,
-                                                        data.category
+                                                        subjectInfo.name,
+                                                        subjectInfo.grade,
+                                                        subjectInfo.semester,
+                                                        subjectInfo.category
                                                     );
                                                     if (!curriculumInfo) {
-                                                        console.warn(`과목을 찾을 수 없음: ${subjectName}, 학년=${data.grade}, 학기=${data.semester}, 분류=${data.category}`);
+                                                        console.warn(`과목을 찾을 수 없음: ${subjectInfo.name}, 학년=${subjectInfo.grade}, 학기=${subjectInfo.semester}, 분류=${subjectInfo.category}`);
                                                     }
-                                                    return { name: subjectName, credits: curriculumInfo ? curriculumInfo.학점 : 'N/A' };
+                                                    return { 
+                                                        name: subjectInfo.name, 
+                                                        credits: curriculumInfo ? curriculumInfo.학점 : 'N/A',
+                                                        grade: subjectInfo.grade,
+                                                        semester: subjectInfo.semester,
+                                                        category: subjectInfo.category
+                                                    };
                                                 } catch (error) {
-                                                    console.error(`과목 검색 오류: ${subjectName}`, error);
-                                                    return { name: subjectName, credits: 'N/A' };
+                                                    console.error(`과목 검색 오류: ${subjectInfo.name}`, error);
+                                                    return { 
+                                                        name: subjectInfo.name, 
+                                                        credits: 'N/A',
+                                                        grade: subjectInfo.grade,
+                                                        semester: subjectInfo.semester,
+                                                        category: subjectInfo.category
+                                                    };
                                                 }
                                             }).filter(gs => gs && gs.name); // 빈 과목명 제거
                                             
                                             if (existingIndex > -1) {
                                                 if (!processedUnderachievers[existingIndex].gradeSubjects) processedUnderachievers[existingIndex].gradeSubjects = [];
-                                                const existingGradeSubjectsNames = new Set(processedUnderachievers[existingIndex].gradeSubjects.map(s => s.name));
+                                                // 기존 과목과 비교할 때 학년/학기/분류도 함께 비교
+                                                const existingGradeSubjectsKeys = new Set(
+                                                    processedUnderachievers[existingIndex].gradeSubjects.map(s => 
+                                                        `${s.name}|${s.grade || ''}|${s.semester || ''}|${s.category || ''}`
+                                                    )
+                                                );
                                                 gradeSubjectsData.forEach(gs => {
-                                                    if (!existingGradeSubjectsNames.has(gs.name)) {
+                                                    const subjectKey = `${gs.name}|${gs.grade || ''}|${gs.semester || ''}|${gs.category || ''}`;
+                                                    if (!existingGradeSubjectsKeys.has(subjectKey)) {
                                                         processedUnderachievers[existingIndex].gradeSubjects.push(gs);
                                                     }
                                                 });
@@ -4400,10 +4502,12 @@
                                         this.underachievers = processedUnderachievers;
                                         
                                         // Firestore에 저장 (로그아웃 후에도 유지)
-                                        if (this.schoolId && db && this.role === '관리자') {
+                                        // currentSchoolCode를 우선 사용, 없으면 schoolId 사용
+                                        const activeSchoolId = this.currentSchoolCode || this.schoolId;
+                                        if (activeSchoolId && db && this.role === '관리자') {
                                             (async () => {
                                                 try {
-                                                    const docRef = doc(db, `schools/${this.schoolId}/commonData`, "underachieversProcessed");
+                                                    const docRef = doc(db, `schools/${activeSchoolId}/commonData`, "underachieversProcessed");
                                                     await setDoc(docRef, { data: JSON.parse(JSON.stringify(processedUnderachievers)) });
                                                     this.fileProcessingError = '';
                                                     alert(`성적 파일 처리 완료: ${totalFiles}개 파일에서 ${processedUnderachievers.length}명의 미도달 학생이 확인되었습니다. 데이터가 저장되었습니다.`);
