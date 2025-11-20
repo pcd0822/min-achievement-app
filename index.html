@@ -757,6 +757,32 @@
                                    <label for="subjectName" class="block text-sm font-medium text-gray-700">과목명</label>
                                    <input type="text" id="subjectName" v-model="teacherPlan.subjectName" @change="handleSubjectChange" placeholder="편제표에 등록된 과목명을 정확히 입력하세요" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
                                </div>
+                               <div class="grid grid-cols-3 gap-4">
+                                   <div>
+                                       <label for="subjectGrade" class="block text-sm font-medium text-gray-700">학년</label>
+                                       <select id="subjectGrade" v-model.number="teacherPlan.subjectGrade" @change="handleSubjectChange" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                                           <option value="">선택</option>
+                                           <option :value="1">1학년</option>
+                                           <option :value="2">2학년</option>
+                                           <option :value="3">3학년</option>
+                                       </select>
+                                   </div>
+                                   <div>
+                                       <label for="subjectSemester" class="block text-sm font-medium text-gray-700">학기</label>
+                                       <select id="subjectSemester" v-model.number="teacherPlan.subjectSemester" @change="handleSubjectChange" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                                           <option value="">선택</option>
+                                           <option :value="1">1학기</option>
+                                           <option :value="2">2학기</option>
+                                       </select>
+                                   </div>
+                                   <div>
+                                       <label for="subjectCategory" class="block text-sm font-medium text-gray-700">계열(분류)</label>
+                                       <select id="subjectCategory" v-model="teacherPlan.subjectCategory" @change="handleSubjectChange" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                                           <option value="">선택</option>
+                                           <option v-for="category in availableCategories" :key="category" :value="category">{{ category }}</option>
+                                       </select>
+                                   </div>
+                               </div>
                                <div>
                                    <label class="block text-sm font-medium text-gray-700">교과교사명</label>
                                    <div v-for="(name, index) in teacherPlan.teacherNames" :key="index" class="flex items-center space-x-2 mt-2">
@@ -1178,7 +1204,32 @@
                  <form @submit.prevent="addAttendanceStudent">
                      <div class="space-y-4">
                          <input v-model="newAttendanceStudent.id" placeholder="학번" required class="w-full p-2 border rounded-md">
-
+                         <div class="grid grid-cols-3 gap-4">
+                             <div>
+                                 <label class="block text-sm font-medium text-gray-700">학년</label>
+                                 <select v-model.number="newAttendanceStudent.grade" class="w-full p-2 border rounded-md">
+                                     <option value="">선택</option>
+                                     <option :value="1">1학년</option>
+                                     <option :value="2">2학년</option>
+                                     <option :value="3">3학년</option>
+                                 </select>
+                             </div>
+                             <div>
+                                 <label class="block text-sm font-medium text-gray-700">학기</label>
+                                 <select v-model.number="newAttendanceStudent.semester" class="w-full p-2 border rounded-md">
+                                     <option value="">선택</option>
+                                     <option :value="1">1학기</option>
+                                     <option :value="2">2학기</option>
+                                 </select>
+                             </div>
+                             <div>
+                                 <label class="block text-sm font-medium text-gray-700">분류</label>
+                                 <select v-model="newAttendanceStudent.category" class="w-full p-2 border rounded-md">
+                                     <option value="">선택</option>
+                                     <option v-for="category in availableCategories" :key="category" :value="category">{{ category }}</option>
+                                 </select>
+                             </div>
+                         </div>
                          <div v-for="(subject, index) in newAttendanceStudent.subjects" :key="index" class="flex items-center space-x-2">
                              <input v-model="newAttendanceStudent.subjects[index]" placeholder="출석률 미도달 과목" required class="w-full p-2 border rounded-md">
                              <button type="button" v-if="newAttendanceStudent.subjects.length > 1" @click="removeAttendanceSubject(index)" class="px-2 py-1 bg-red-500 text-white rounded-md">-</button>
@@ -1221,6 +1272,25 @@
                         <!-- MODIFIED: Input is now disabled and bound to teacherPlan.subjectName -->
                          <label class="block text-sm font-medium text-gray-700">과목명</label>
                          <input :value="teacherPlan.subjectName" placeholder="먼저 '계획서 작성' 탭에서 과목명을 입력하세요" required class="w-full p-2 border rounded-md bg-gray-100" disabled>
+                         <div class="grid grid-cols-2 gap-4">
+                             <div>
+                                 <label class="block text-sm font-medium text-gray-700">학년</label>
+                                 <select v-model.number="importGrade" class="w-full p-2 border rounded-md">
+                                     <option value="">선택</option>
+                                     <option :value="1">1학년</option>
+                                     <option :value="2">2학년</option>
+                                     <option :value="3">3학년</option>
+                                 </select>
+                             </div>
+                             <div>
+                                 <label class="block text-sm font-medium text-gray-700">학기</label>
+                                 <select v-model.number="importSemester" class="w-full p-2 border rounded-md">
+                                     <option value="">선택</option>
+                                     <option :value="1">1학기</option>
+                                     <option :value="2">2학기</option>
+                                 </select>
+                             </div>
+                         </div>
                          <div>
                              <label class="block text-sm font-medium text-gray-700">학급</label>
                              <p class="text-xs text-gray-500 mb-2">한 칸에 하나의 학급만 입력해주세요. (예: 101)</p>
@@ -1234,7 +1304,7 @@
                      <p v-if="importModalError" class="text-red-500 text-sm mt-2">{{ importModalError }}</p>
                      <div class="mt-6 flex justify-end space-x-2">
                          <button type="button" @click="closeImportModal" class="px-4 py-2 bg-gray-300 rounded-md">취소</button>
-                         <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-md" :disabled="!teacherPlan.subjectName">가져오기</button>
+                         <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-md" :disabled="!teacherPlan.subjectName || !importGrade || !importSemester">가져오기</button>
                      </div>
                  </form>
              </div>
@@ -1291,6 +1361,25 @@
                         닫기
                     </button>
                 </div>
+                <!-- 학년/학기별 필터 -->
+                <div class="mb-6 p-4 bg-gray-50 rounded-lg">
+                    <h4 class="text-sm font-semibold text-gray-700 mb-3">학년/학기별 필터</h4>
+                    <div class="flex flex-wrap gap-2">
+                        <button
+                            v-for="filter in statisticsFilters"
+                            :key="filter.key"
+                            @click="selectedStatisticsFilter = filter.key"
+                            :class="[
+                                'px-4 py-2 rounded-md text-sm font-medium transition',
+                                selectedStatisticsFilter === filter.key
+                                    ? 'bg-indigo-600 text-white'
+                                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100'
+                            ]"
+                        >
+                            {{ filter.label }}
+                        </button>
+                    </div>
+                </div>
                 <div v-if="statisticsState.loading" class="py-12 text-center text-sm text-gray-600">
                     통계를 계산 중입니다. 잠시만 기다려주세요...
                 </div>
@@ -1312,7 +1401,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="row in statisticsState.subjectSummary" :key="row.subjectName">
+                                    <tr v-for="row in filteredSubjectSummary" :key="row.subjectName">
                                         <td>{{ row.subjectName }}</td>
                                         <td>{{ row.credits }}</td>
                                         <td>{{ row.gradeCount }}</td>
@@ -1321,7 +1410,7 @@
                                         <td>{{ row.incompleteCount }}</td>
                                         <td>{{ row.completeCount }}</td>
                                     </tr>
-                                    <tr v-if="statisticsState.subjectSummary.length === 0">
+                                    <tr v-if="filteredSubjectSummary.length === 0">
                                         <td colspan="7">표시할 데이터가 없습니다.</td>
                                     </tr>
                                 </tbody>
@@ -1340,13 +1429,13 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="row in statisticsState.preventionSummary" :key="row.subjectName">
+                                    <tr v-for="row in filteredPreventionSummary" :key="row.subjectName">
                                         <td>{{ row.subjectName }}</td>
                                         <td>{{ row.hasPrevention ? '진행' : '미진행' }}</td>
                                         <td>{{ row.participants }}</td>
                                         <td>{{ row.nonParticipants }}</td>
                                     </tr>
-                                    <tr v-if="statisticsState.preventionSummary.length === 0">
+                                    <tr v-if="filteredPreventionSummary.length === 0">
                                         <td colspan="4">표시할 데이터가 없습니다.</td>
                                     </tr>
                                 </tbody>
@@ -1369,7 +1458,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="row in statisticsState.additionalSummary" :key="row.subjectName">
+                                    <tr v-for="row in filteredAdditionalSummary" :key="row.subjectName">
                                         <td>{{ row.subjectName }}</td>
                                         <td>{{ row.credits }}</td>
                                         <td>{{ row.attendanceTargets }}</td>
@@ -1379,7 +1468,7 @@
                                         <td>{{ row.incompleteCount }}</td>
                                         <td>{{ row.completeCount }}</td>
                                     </tr>
-                                    <tr v-if="statisticsState.additionalSummary.length === 0">
+                                    <tr v-if="filteredAdditionalSummary.length === 0">
                                         <td colspan="8">표시할 데이터가 없습니다.</td>
                                     </tr>
                                 </tbody>
@@ -1402,7 +1491,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="row in statisticsState.remedialSummary" :key="row.subjectName">
+                                    <tr v-for="row in filteredRemedialSummary" :key="row.subjectName">
                                         <td>{{ row.subjectName }}</td>
                                         <td>{{ row.credits }}</td>
                                         <td>{{ row.gradeTargets }}</td>
@@ -1412,7 +1501,7 @@
                                         <td>{{ row.incompleteCount }}</td>
                                         <td>{{ row.completeCount }}</td>
                                     </tr>
-                                    <tr v-if="statisticsState.remedialSummary.length === 0">
+                                    <tr v-if="filteredRemedialSummary.length === 0">
                                         <td colspan="8">표시할 데이터가 없습니다.</td>
                                     </tr>
                                 </tbody>
@@ -1431,13 +1520,13 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="row in statisticsState.deficitSummary" :key="row.subjectName">
+                                    <tr v-for="row in filteredDeficitSummary" :key="row.subjectName">
                                         <td>{{ row.subjectName }}</td>
                                         <td>{{ row.gradeCount }}</td>
                                         <td>{{ row.attendanceCount }}</td>
                                         <td>{{ row.bothCount }}</td>
                                     </tr>
-                                    <tr v-if="statisticsState.deficitSummary.length === 0">
+                                    <tr v-if="filteredDeficitSummary.length === 0">
                                         <td colspan="4">표시할 데이터가 없습니다.</td>
                                     </tr>
                                 </tbody>
@@ -1612,6 +1701,16 @@
                             { value: '중장기적 정기적인 병원진료', label: '중장기적 정기적인 병원진료' }
                         ],
                         showStatisticsModal: false,
+                        selectedStatisticsFilter: 'all',
+                        statisticsFilters: [
+                            { key: 'all', label: '전체' },
+                            { key: '1-1', label: '1학년 1학기' },
+                            { key: '1-2', label: '1학년 2학기' },
+                            { key: '2-1', label: '2학년 1학기' },
+                            { key: '2-2', label: '2학년 2학기' },
+                            { key: '3-1', label: '3학년 1학기' },
+                            { key: '3-2', label: '3학년 2학기' }
+                        ],
                         statisticsState: {
                             loading: false,
                             error: '',
@@ -1623,17 +1722,26 @@
                             multiSubjectBuckets: [],
                             gradePreventionRatios: [],
                             preventionCourseRatio: { totalSubjects: 0, activeSubjects: 0, percentage: 0 },
-                            lastUpdated: ''
+                            lastUpdated: '',
+                            allData: {
+                                subjectSummary: [],
+                                preventionSummary: [],
+                                additionalSummary: [],
+                                remedialSummary: [],
+                                deficitSummary: []
+                            }
                         },
                         fileProcessingError: '',
                         showAttendanceModal: false,
-                        newAttendanceStudent: { id: '', subjects: [''] },
+                        newAttendanceStudent: { id: '', subjects: [''], grade: null, semester: null, category: '' },
                         attendanceModalError: '',
                         showExportOptions: false,
 
                         // --- Teacher Specific State ---
                         showImportModal: false,
                         importClasses: [''],
+                        importGrade: null,
+                        importSemester: null,
                         importModalError: '',
                         teacherPlan: {
                             subjectName: '', teacherNames: [''],
@@ -1667,6 +1775,81 @@
                 },
 
                 computed: {
+                    availableCategories() {
+                        // 교육과정 편제표에서 분류 열의 중복값을 제거하여 드롭다운 목록 생성
+                        if (!this.curriculumData || this.curriculumData.length === 0) return [];
+                        const categories = new Set();
+                        this.curriculumData.forEach(row => {
+                            if (row && row['분류']) {
+                                const category = String(row['분류']).trim();
+                                if (category) categories.add(category);
+                            }
+                        });
+                        // '과'가 없으면 '인문계열'을 기본값으로 추가
+                        if (categories.size === 0) categories.add('인문계열');
+                        return Array.from(categories).sort();
+                    },
+                    planTitle() {
+                        // 계획서 제목 생성: ~학년 ~학기 ~계열 최소 성취수준 보장지도 운영 계획(안)
+                        const parts = [];
+                        if (this.teacherPlan.subjectGrade) parts.push(`${this.teacherPlan.subjectGrade}학년`);
+                        if (this.teacherPlan.subjectSemester) parts.push(`${this.teacherPlan.subjectSemester}학기`);
+                        if (this.teacherPlan.subjectCategory) parts.push(this.teacherPlan.subjectCategory);
+                        if (parts.length > 0) {
+                            return `${parts.join(' ')} 최소 성취수준 보장지도 운영 계획(안)`;
+                        }
+                        return '최소 성취수준 보장지도 운영 계획(안)';
+                    },
+                    filteredSubjectSummary() {
+                        if (this.selectedStatisticsFilter === 'all') {
+                            return this.statisticsState.subjectSummary || [];
+                        }
+                        const [grade, semester] = this.selectedStatisticsFilter.split('-');
+                        return (this.statisticsState.subjectSummary || []).filter(row => {
+                            const subjectInfo = this.findSubjectInCurriculum(row.subjectName, Number(grade), Number(semester), null);
+                            return subjectInfo !== null;
+                        });
+                    },
+                    filteredPreventionSummary() {
+                        if (this.selectedStatisticsFilter === 'all') {
+                            return this.statisticsState.preventionSummary || [];
+                        }
+                        const [grade, semester] = this.selectedStatisticsFilter.split('-');
+                        return (this.statisticsState.preventionSummary || []).filter(row => {
+                            const subjectInfo = this.findSubjectInCurriculum(row.subjectName, Number(grade), Number(semester), null);
+                            return subjectInfo !== null;
+                        });
+                    },
+                    filteredAdditionalSummary() {
+                        if (this.selectedStatisticsFilter === 'all') {
+                            return this.statisticsState.additionalSummary || [];
+                        }
+                        const [grade, semester] = this.selectedStatisticsFilter.split('-');
+                        return (this.statisticsState.additionalSummary || []).filter(row => {
+                            const subjectInfo = this.findSubjectInCurriculum(row.subjectName, Number(grade), Number(semester), null);
+                            return subjectInfo !== null;
+                        });
+                    },
+                    filteredRemedialSummary() {
+                        if (this.selectedStatisticsFilter === 'all') {
+                            return this.statisticsState.remedialSummary || [];
+                        }
+                        const [grade, semester] = this.selectedStatisticsFilter.split('-');
+                        return (this.statisticsState.remedialSummary || []).filter(row => {
+                            const subjectInfo = this.findSubjectInCurriculum(row.subjectName, Number(grade), Number(semester), null);
+                            return subjectInfo !== null;
+                        });
+                    },
+                    filteredDeficitSummary() {
+                        if (this.selectedStatisticsFilter === 'all') {
+                            return this.statisticsState.deficitSummary || [];
+                        }
+                        const [grade, semester] = this.selectedStatisticsFilter.split('-');
+                        return (this.statisticsState.deficitSummary || []).filter(row => {
+                            const subjectInfo = this.findSubjectInCurriculum(row.subjectName, Number(grade), Number(semester), null);
+                            return subjectInfo !== null;
+                        });
+                    },
                     statusText() {
                         return this.teacherPlanError || this.adminActionStatus || this.moduleConfigStatus || this.underachieversStatus || this.teacherPlanStatus || '';
                     },
@@ -1780,8 +1963,16 @@
                         let supplementaryHours = 0;
                         let requiredSubjectCredits = 0;
 
-                        if (this.teacherPlan.subjectName) {
-                            const subjectInfo = this.curriculumData.find(s => s.과목명 === this.teacherPlan.subjectName);
+                        if (this.teacherPlan.subjectName && 
+                            this.teacherPlan.subjectGrade != null && 
+                            this.teacherPlan.subjectSemester != null && 
+                            this.teacherPlan.subjectCategory) {
+                            const subjectInfo = this.findSubjectInCurriculum(
+                                this.teacherPlan.subjectName,
+                                this.teacherPlan.subjectGrade,
+                                this.teacherPlan.subjectSemester,
+                                this.teacherPlan.subjectCategory
+                            );
                             if (subjectInfo) {
                                 requiredSubjectCredits = Number(subjectInfo.학점) || 0;
                                 supplementaryHours = requiredSubjectCredits * this.moduleConfig.hoursPerCredit;
@@ -1987,6 +2178,7 @@
                     getInitialTeacherPlan() {
                         return {
                             subjectName: '', teacherNames: [''],
+                            subjectGrade: null, subjectSemester: null, subjectCategory: '',
                             achievements: [createEmptyAchievement()],
                             gradeCalculation: '추정분할점수', conductPrevention: 'X',
                             preventionTarget: '', preventionMethods: [], preventionPeriod: [],
@@ -3934,17 +4126,29 @@
                                     const sheet = workbook.Sheets[workbook.SheetNames[0]];
                                     const sheetData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
 
+                                    // A3셀에서 학년, 학기, 분류 추출
+                                    // 예: "2025학년도   1학기   주간   상업계   1학년   웹디자인과  8반"
                                     const classInfoRow = sheetData[2];
                                     if (!classInfoRow || !classInfoRow[0]) throw new Error(`'${file.name}' 파일의 3행 A열에서 학급 정보를 찾을 수 없습니다.`);
                                     const classInfo = String(classInfoRow[0]);
 
+                                    // 학기 추출: '학기' 앞의 숫자
+                                    const semesterMatch = classInfo.match(/(\d+)\s*학기/);
+                                    const semester = semesterMatch ? Number(semesterMatch[1]) : null;
+                                    
+                                    // 학년 추출: '학년' 앞의 숫자 (단, '학년도'는 제외)
                                     const gradeMatch = classInfo.match(/(\d+)\s*학년(?!도)/);
+                                    const classGrade = gradeMatch ? gradeMatch[1] : null;
+                                    
+                                    // 학급 추출
                                     const classNumMatch = classInfo.match(/(\d{1,2})\s*반/);
+                                    const classNum = classNumMatch ? classNumMatch[1] : null;
+                                    
+                                    // 분류 추출: '과' 앞의 텍스트, 없으면 '인문계열'로 기본값
+                                    const categoryMatch = classInfo.match(/([^과]+)\s*과/);
+                                    const category = categoryMatch ? categoryMatch[1].trim() : '인문계열';
 
-                                    if (!gradeMatch || !classNumMatch) throw new Error(`'${file.name}' 파일의 학급 정보 형식("${classInfo}")이 예상과 다릅니다. (예: '1학년 3반')`);
-
-                                    const classGrade = gradeMatch[1];
-                                    const classNum = classNumMatch[1];
+                                    if (!classGrade || !classNum) throw new Error(`'${file.name}' 파일의 학급 정보 형식("${classInfo}")이 예상과 다릅니다. (예: '1학년 3반')`);
                                     
                                     const subjectHeaderRow = sheetData[3];
                                     if (!subjectHeaderRow) throw new Error(`'${file.name}' 파일의 4행에서 과목 정보를 찾을 수 없습니다.`);
@@ -3965,7 +4169,13 @@
                                                 const subject = String(subjectWithCredits).split('(')[0].trim();
                                                 
                                                 if (!resultData.has(fullId)) {
-                                                    resultData.set(fullId, { name: name, subjects: new Set() });
+                                                    resultData.set(fullId, { 
+                                                        name: name, 
+                                                        subjects: new Set(),
+                                                        grade: classGrade ? Number(classGrade) : null,
+                                                        semester: semester,
+                                                        category: category
+                                                    });
                                                 }
                                                 resultData.get(fullId).subjects.add(subject);
                                             }
@@ -3980,7 +4190,13 @@
                                         resultData.forEach((data, id) => {
                                             const existingIndex = processedUnderachievers.findIndex(s => s.id === id);
                                             const gradeSubjectsData = Array.from(data.subjects).map(subjectName => {
-                                                const curriculumInfo = this.curriculumData.find(c => c.과목명 === subjectName);
+                                                // 학년, 학기, 분류 정보를 사용하여 정확한 과목 검색
+                                                const curriculumInfo = this.findSubjectInCurriculum(
+                                                    subjectName,
+                                                    data.grade,
+                                                    data.semester,
+                                                    data.category
+                                                );
                                                 return { name: subjectName, credits: curriculumInfo ? curriculumInfo.학점 : 'N/A' };
                                             });
                                             
@@ -4027,7 +4243,11 @@
                             reader.readAsArrayBuffer(file);
                         });
                     },
-                    closeAttendanceModal() { this.showAttendanceModal = false; this.newAttendanceStudent = { id: '', subjects: [''] }; this.attendanceModalError = ''; },
+                    closeAttendanceModal() { 
+                        this.showAttendanceModal = false; 
+                        this.newAttendanceStudent = { id: '', subjects: [''], grade: null, semester: null, category: '' }; 
+                        this.attendanceModalError = ''; 
+                    },
                     addAttendanceSubject() { this.newAttendanceStudent.subjects.push(''); },
                     removeAttendanceSubject(index) { this.newAttendanceStudent.subjects.splice(index, 1); },
                     addAttendanceStudent() {
@@ -4035,14 +4255,30 @@
                         this.attendanceModalError = '';
                         const studentIdInput = this.newAttendanceStudent.id ? String(this.newAttendanceStudent.id).trim() : '';
                         const subjects = this.newAttendanceStudent.subjects;
-                        if (!studentIdInput || subjects.some(s => !s.trim())) { this.attendanceModalError = '학번과 모든 과목명을 입력해주세요.'; return; }
+                        const grade = this.newAttendanceStudent.grade;
+                        const semester = this.newAttendanceStudent.semester;
+                        const category = this.newAttendanceStudent.category;
+                        
+                        if (!studentIdInput || subjects.some(s => !s.trim()) || !grade || !semester || !category) { 
+                            this.attendanceModalError = '학번, 학년, 학기, 분류, 모든 과목명을 입력해주세요.'; 
+                            return; 
+                        }
                         const foundStudent = this.studentData.find(student => String(student['학번']) === studentIdInput);
-                        if (!foundStudent) { this.attendanceModalError = '해당 학번을 찾을 수 없습니다. 학적 정보를 먼저 업로드 해주세요.'; return; }
+                        if (!foundStudent) { 
+                            this.attendanceModalError = '해당 학번을 찾을 수 없습니다. 학적 정보를 먼저 업로드 해주세요.'; 
+                            return; 
+                        }
                         
                         const canonicalId = String(foundStudent['학번']);
                         const name = foundStudent['이름'];
                         const studentIndex = this.underachievers.findIndex(s => s.id === canonicalId);
                         const validSubjects = subjects.map(s => s.trim()).filter(s => s);
+                        
+                        // 각 과목에 대해 학년, 학기, 분류 정보를 사용하여 학점 검색
+                        const subjectsWithCredits = validSubjects.map(subjectName => {
+                            const curriculumInfo = this.findSubjectInCurriculum(subjectName, grade, semester, category);
+                            return { name: subjectName, credits: curriculumInfo ? curriculumInfo.학점 : 'N/A' };
+                        });
                         
                         if (studentIndex > -1) {
                             if (!this.underachievers[studentIndex].attendanceSubjects) this.underachievers[studentIndex].attendanceSubjects = [];
@@ -4209,12 +4445,22 @@
                         });
                     },
                     updateMaxHours() {
-                        const subject = this.curriculumData.find(s => s.과목명 === this.teacherPlan.subjectName);
                         let calculatedHours = 0;
-                        if (subject) {
-                            const credits = Number(subject.학점);
-                            if (!isNaN(credits) && credits > 0) {
-                                calculatedHours = credits * this.moduleConfig.hoursPerCredit;
+                        if (this.teacherPlan.subjectName && 
+                            this.teacherPlan.subjectGrade != null && 
+                            this.teacherPlan.subjectSemester != null && 
+                            this.teacherPlan.subjectCategory) {
+                            const subject = this.findSubjectInCurriculum(
+                                this.teacherPlan.subjectName,
+                                this.teacherPlan.subjectGrade,
+                                this.teacherPlan.subjectSemester,
+                                this.teacherPlan.subjectCategory
+                            );
+                            if (subject) {
+                                const credits = Number(subject.학점);
+                                if (!isNaN(credits) && credits > 0) {
+                                    calculatedHours = credits * this.moduleConfig.hoursPerCredit;
+                                }
                             }
                         }
                         this.teacherPlan.maxSupplementaryHours = calculatedHours;
@@ -4418,7 +4664,7 @@
                         const additionalLearningPlanHtml = createGuidancePlanHtml('6. 추가 학습 운영 계획', '과목출석률 2/3 미만', plan.additionalMethods, plan.additionalPeriod, plan.additionalSessions);
                         
                         this.previewHtml = `<div id="print-area">
-                            <h1>최소 성취수준 보장지도 운영 계획(안)</h1>
+                            <h1>${this.planTitle}</h1>
                             <div style="text-align: right; font-size: 1.1rem; line-height: 1.6; margin-bottom: 2rem;">
                                 <p><strong>과목명:</strong> ${plan.subjectName}</p>
                                 <p><strong>교과교사:</strong> ${this.formattedTeacherNames}</p>
@@ -4739,7 +4985,7 @@
                         const finalHtml = `<div id="print-area"><h1>${title} 수업일지</h1><div style="font-size: 1rem; line-height: 1.6; border: 1px solid #ccc; padding: 10px; margin-bottom: 2rem;"><p><strong>과목명:</strong> ${this.teacherPlan.subjectName || '미입력'}</p><p><strong>지도교사:</strong> ${this.formattedTeacherNames}</p><p><strong>운영기간:</strong> ${this.guidanceOperationPeriod}</p></div>${lessonLogHtml.length > 0 ? lessonLogHtml : '<p style="text-align: center;">저장된 수업일지가 없습니다.</p>'}</div>`;
                         this.generatePdfFromHtml(finalHtml);
                     },
-                    closeImportModal() { this.showImportModal = false; this.importClasses = ['']; this.importModalError = ''; },
+                    closeImportModal() { this.showImportModal = false; this.importClasses = ['']; this.importGrade = null; this.importSemester = null; this.importModalError = ''; },
                     addImportClassInput() { this.importClasses.push(''); },
                     removeImportClassInput(index) { this.importClasses.splice(index, 1); },
                     async importUnderachievers() {
@@ -4747,6 +4993,7 @@
                         this.importModalError = '';
                         const subject = this.teacherPlan.subjectName.trim();
                         if (!subject) { this.importModalError = '먼저 과목명을 입력하고 저장해주세요.'; return; }
+                        if (!this.importGrade || !this.importSemester) { this.importModalError = '학년과 학기를 선택해주세요.'; return; }
                         
                         const classes = this.importClasses.map(c => c.trim()).filter(Boolean);
                         if (classes.length === 0) { this.importModalError = '학급을 입력해주세요.'; return; }
@@ -4764,14 +5011,25 @@
                         const allUnderachievers = this.deployedUnderachievers;
                         if (!allUnderachievers || allUnderachievers.length === 0) { this.importModalError = '배포된 미도달 학생 명단이 없습니다.'; return; }
 
+                        // 학년, 학기, 분류 정보를 사용하여 정확한 과목 매칭
                         const filteredStudents = allUnderachievers.filter(student => {
                             if (!student || !student.id) return false;
                             const studentClassId = student.id.substring(0, 3);
                             const classMatch = classes.includes(studentClassId);
                             if (!classMatch) return false;
+                            
+                            // 학년, 학기, 분류 정보를 사용하여 과목 검색
+                            const subjectInfo = this.findSubjectInCurriculum(
+                                subject,
+                                this.importGrade,
+                                this.importSemester,
+                                this.teacherPlan.subjectCategory
+                            );
+                            
+                            // 과목명만으로 매칭 (학년, 학기, 분류는 이미 findSubjectInCurriculum에서 확인됨)
                             const gradeMatch = (student.gradeSubjects || []).some(s => s && s.name === subject);
                             const attendanceMatch = (student.attendanceSubjects || []).includes(subject);
-                            return gradeMatch || attendanceMatch;
+                            return (gradeMatch || attendanceMatch) && subjectInfo !== null;
                         });
 
                         if (filteredStudents.length === 0) { this.importModalError = '해당 조건에 맞는 학생을 찾을 수 없습니다.'; return; }
@@ -5244,4 +5502,5 @@
 
 </body>
 </html>
+
 
