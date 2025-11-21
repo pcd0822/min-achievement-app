@@ -471,6 +471,9 @@
                         </div>
                     </div>
                     <p v-if="statusMessage" class="mt-4 text-center text-sm text-blue-600">{{ statusMessage }}</p>
+                    <div class="mt-6 flex justify-end">
+                        <button @click="cancelRoleSelection" class="px-6 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition">취소</button>
+                    </div>
                 </div>
             </div>
 
@@ -1132,12 +1135,11 @@
                                                <div>
                                                    <label class="font-semibold text-sm block mb-1">지도내용:</label>
                                                    <textarea 
-                                                       :rows="Math.max(1, Math.ceil(((session.content || '').split('\n').length + (session.content || '').length / 50)))" 
-                                                       class="w-full p-2 border rounded text-sm resize-none" 
+                                                       class="w-full p-1 border rounded text-sm resize-none" 
                                                        v-model="session.content" 
                                                        @input="handleTextareaResize($event); saveGuidanceData()"
                                                        @change="saveGuidanceData"
-                                                       style="min-height: 1.5rem; line-height: 1.5;"
+                                                       style="min-height: 2rem; line-height: 1.5; height: auto;"
                                                        placeholder="지도내용을 입력하세요"></textarea>
                                                </div>
                                            </div>
@@ -1673,6 +1675,9 @@
                         role: null,
                         schoolId: null,
                         currentSchoolCode: '',
+                        previousRole: null,
+                        previousSchoolId: null,
+                        previousSchoolCode: '',
                         showAdminCodeInput: false,
                         adminCode: '',
                         adminCodeError: '',
@@ -2168,7 +2173,9 @@
                     handleTextareaResize(event) {
                         const textarea = event.target;
                         textarea.style.height = 'auto';
-                        textarea.style.height = Math.max(24, textarea.scrollHeight) + 'px';
+                        // 최소 높이를 입력칸과 비슷하게 설정 (약 2rem = 32px)
+                        const minHeight = 32;
+                        textarea.style.height = Math.max(minHeight, textarea.scrollHeight) + 'px';
                     },
                     // --- Initial Data Helpers ---
                     getInitialTeacherPlan() {
@@ -3384,11 +3391,34 @@
                         }
                     },
                     async resetRole() {
+                        // 원래 역할과 학교ID를 임시 저장 (취소 시 복원용)
+                        this.previousRole = this.role;
+                        this.previousSchoolId = this.schoolId;
+                        this.previousSchoolCode = this.currentSchoolCode;
+                        
                         this.role = null;
                         this.schoolId = null; // 메모리에서만 초기화 (DB에는 저장하지 않음)
                         this.currentSchoolCode = '';
                         // DB 저장은 사용자가 새 역할과 학교ID를 선택할 때만 수행
                         this.resetRoleSpecificData();
+                        this.showAdminCodeInput = false;
+                        this.adminCode = '';
+                        this.adminCodeError = '';
+                        this.statusMessage = '';
+                    },
+                    cancelRoleSelection() {
+                        // 이전 역할로 복원
+                        if (this.previousRole) {
+                            this.role = this.previousRole;
+                            this.schoolId = this.previousSchoolId;
+                            this.currentSchoolCode = this.previousSchoolCode || '';
+                            this.previousRole = null;
+                            this.previousSchoolId = null;
+                            this.previousSchoolCode = '';
+                        } else {
+                            // 이전 역할이 없으면 로그아웃
+                            this.logout();
+                        }
                         this.showAdminCodeInput = false;
                         this.adminCode = '';
                         this.adminCodeError = '';
@@ -5363,7 +5393,9 @@
                         
                         let lessonLogHtml = this.savedGuidanceSessions.map((session, index) => {
                             if (!session) return '';
-                            return `<div class="page-break" style="border: 1px solid #ccc; padding: 15px; margin-bottom: 15px;"><h3>${index + 1}차시 수업일지 (${session.date} / ${session.time})</h3><table style="font-size: 10pt;"><tr><th style="width: 20%;">장소</th><td class="text-left" style="width: 30%;">${session.place || ''}</td><th style="width: 20%;">수업방법</th><td class="text-left" style="width: 30%;">${[...new Set(Object.values(session.attendance || {}))].filter(Boolean).join(', ')}</td></tr><tr><th>지도내용</th><td colspan="3" class="text-left"><div class="whitespace-pre-wrap" style="min-height: 100px;">${session.content || ''}</div></td></tr></table></div>`;
+                            const isLast = index === this.savedGuidanceSessions.length - 1;
+                            const borderBottom = isLast ? '' : 'border-bottom: 1px solid #ccc; padding-bottom: 15px; margin-bottom: 15px;';
+                            return `<div style="${borderBottom}"><h3 style="margin-top: ${index === 0 ? '0' : '15px'}; margin-bottom: 10px;">${index + 1}차시 수업일지 (${session.date} / ${session.time})</h3><table style="font-size: 10pt; width: 100%;"><tr><th style="width: 20%;">장소</th><td class="text-left" style="width: 30%;">${session.place || ''}</td><th style="width: 20%;">수업방법</th><td class="text-left" style="width: 30%;">${[...new Set(Object.values(session.attendance || {}))].filter(Boolean).join(', ') || '미입력'}</td></tr><tr><th>지도내용</th><td colspan="3" class="text-left"><div class="whitespace-pre-wrap" style="padding: 5px;">${session.content || ''}</div></td></tr></table></div>`;
                         }).join('');
                         
                         const finalHtml = `<div id="print-area"><h1>${title} 수업일지</h1><div style="font-size: 1rem; line-height: 1.6; border: 1px solid #ccc; padding: 10px; margin-bottom: 2rem;"><p><strong>과목명:</strong> ${this.teacherPlan.subjectName || '미입력'}</p><p><strong>지도교사:</strong> ${this.formattedTeacherNames}</p><p><strong>운영기간:</strong> ${this.guidanceOperationPeriod}</p></div>${lessonLogHtml.length > 0 ? lessonLogHtml : '<p style="text-align: center;">저장된 수업일지가 없습니다.</p>'}</div>`;
