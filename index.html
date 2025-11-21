@@ -1110,22 +1110,40 @@
                                    <div><strong>지도교사:</strong> {{ formattedTeacherNames }}</div>
                                    <div><strong>운영기간:</strong> {{ guidanceOperationPeriod }}</div>
                                </div>
-                               <div class="space-y-4">
-                                   <div v-for="(session, index) in savedGuidanceSessions" :key="session.date + index" class="p-4 border rounded-md">
-                                       <p class="font-bold mb-2">{{ index + 1 }}차시 수업일지 ({{ session.date }} / {{ session.time }})</p>
-                                       <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                                           <p><strong>수업방법:</strong> {{ [...new Set(Object.values(session.attendance || {}))].filter(Boolean).join(', ') }}</p>
-                                           <div class="flex items-center">
-                                               <label class="font-semibold mr-2 shrink-0">장소:</label>
-                                               <input type="text" class="w-full p-1 border rounded" v-model="session.place" @change="saveGuidanceData">
+                               <div class="space-y-2">
+                                   <div v-for="(session, index) in savedGuidanceSessions" :key="session.date + index" class="border-b border-gray-200 pb-3 last:border-b-0 last:pb-0">
+                                       <div class="flex items-start gap-3 mb-2">
+                                           <span class="font-bold text-sm shrink-0">{{ index + 1 }}차시</span>
+                                           <div class="flex-1">
+                                               <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm mb-2">
+                                                   <div class="flex items-center gap-2">
+                                                       <span class="font-semibold shrink-0">날짜/시간:</span>
+                                                       <span class="text-gray-700">{{ session.date }} / {{ session.time }}</span>
+                                                   </div>
+                                                   <div class="flex items-center gap-2">
+                                                       <span class="font-semibold shrink-0">수업방법:</span>
+                                                       <span class="text-gray-700">{{ [...new Set(Object.values(session.attendance || {}))].filter(Boolean).join(', ') || '미입력' }}</span>
+                                                   </div>
+                                                   <div class="flex items-center gap-2">
+                                                       <label class="font-semibold shrink-0">장소:</label>
+                                                       <input type="text" class="flex-1 p-1 border rounded text-sm" v-model="session.place" @change="saveGuidanceData" placeholder="장소 입력">
+                                                   </div>
+                                               </div>
+                                               <div>
+                                                   <label class="font-semibold text-sm block mb-1">지도내용:</label>
+                                                   <textarea 
+                                                       :rows="Math.max(1, Math.ceil(((session.content || '').split('\n').length + (session.content || '').length / 50)))" 
+                                                       class="w-full p-2 border rounded text-sm resize-none" 
+                                                       v-model="session.content" 
+                                                       @input="handleTextareaResize($event); saveGuidanceData()"
+                                                       @change="saveGuidanceData"
+                                                       style="min-height: 1.5rem; line-height: 1.5;"
+                                                       placeholder="지도내용을 입력하세요"></textarea>
+                                               </div>
                                            </div>
                                        </div>
-                                       <div class="mt-2">
-                                           <label class="font-semibold text-sm">지도내용:</label>
-                                           <textarea rows="3" class="w-full p-1 border rounded mt-1 text-sm" v-model="session.content" @change="saveGuidanceData"></textarea>
-                                       </div>
                                    </div>
-                                   <p v-if="savedGuidanceSessions.length === 0" class="text-center text-gray-500">저장된 수업일지가 없습니다.</p>
+                                   <p v-if="savedGuidanceSessions.length === 0" class="text-center text-gray-500 py-4">저장된 수업일지가 없습니다.</p>
                                </div>
                                <div class="mt-4 flex items-center justify-end space-x-2">
                                    <button @click="saveGuidanceDataManually('lessonLog')" class="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition font-semibold">
@@ -2146,6 +2164,12 @@
                 },
 
                 methods: {
+                    // --- Textarea Resize Helper ---
+                    handleTextareaResize(event) {
+                        const textarea = event.target;
+                        textarea.style.height = 'auto';
+                        textarea.style.height = Math.max(24, textarea.scrollHeight) + 'px';
+                    },
                     // --- Initial Data Helpers ---
                     getInitialTeacherPlan() {
                         return {
@@ -5607,8 +5631,11 @@
                         
                         this.processedHomeroomStudents = tableRows;
                         
-                        if(tableRows.length > 0){
-                            this.homeroomMessage = `${classInput}반 미도달 학생 ${tableRows.length}명을 조회했습니다.`;
+                        // 학생 수 계산 (studentMap의 크기)
+                        const studentCount = studentMap.size;
+                        
+                        if(studentCount > 0){
+                            this.homeroomMessage = `${classInput}반 미도달 학생 ${studentCount}명을 조회했습니다.`;
                         } else {
                             this.homeroomMessage = `해당 학급에 미도달 학생이 없습니다.`;
                         }
