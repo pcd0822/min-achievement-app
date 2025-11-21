@@ -285,7 +285,8 @@
             div[v-if="showSchoolIdModal"], /* 학교코드 모달 숨기기 */
             #print-area-container, /* html2canvas용 컨테이너 숨기기 */
             .modal-overlay .modal-content > div:not(#print-area-container-in-modal), /* 모달 내 버튼, 상태메시지 숨기기 */
-            .modal-overlay .modal-content > p[v-if="statusText"], /* 상태 메시지 숨기기 */
+            .no-print-status, /* 상태 메시지 숨기기 */
+            .no-print-controls, /* 버튼 컨트롤 숨기기 */
             .scroll-arrow {
                 display: none !important;
             }
@@ -1259,8 +1260,8 @@
                     <div v-html="previewHtml"></div>
                  </div>
                  <!-- Combined status display -->
-                <p v-if="statusText" class="text-sm mt-4 text-center font-semibold" :class="statusClass">{{ statusText }}</p>
-                <div class="mt-6 mb-4 mr-4 flex justify-end space-x-2">
+                <p v-if="statusText" class="text-sm mt-4 text-center font-semibold no-print-status" :class="statusClass">{{ statusText }}</p>
+                <div class="mt-6 mb-4 mr-4 flex justify-end space-x-2 no-print-controls">
                     <button @click="closePreviewModal" class="px-4 py-2 bg-gray-300 rounded-md">닫기</button>
                      <!-- Use window.print() for native PDF generation/printing -->
                      <button @click="printPreviewModalContent" class="px-4 py-2 bg-indigo-600 text-white rounded-md">인쇄 / PDF 저장</button>
@@ -1780,6 +1781,7 @@
                         homeroomClassInput: '',
                         searchedStudents: [],
                         homeroomMessage: '',
+                        processedHomeroomStudents: [],
 
                         // --- Preview Modal State ---
                         showPreviewModal: false,
@@ -2140,80 +2142,6 @@
                             const endDate = validDates[validDates.length - 1].toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
                             return `${startDate} ~ ${endDate}`;
                         } catch (e) { console.error("Error formatting date:", e); return '날짜 형식 오류'; }
-                    },
-                    processedHomeroomStudents() {
-                        if(this.role !== '담임교사' || !this.homeroomClassInput.trim()) return [];
-
-                        const studentMap = new Map();
-                        const classInput = this.homeroomClassInput.trim();
-                        this.deployedUnderachievers.forEach(student => {
-                            if (!student || !student.id) return;
-                            const studentClassIdentifier = student.id.substring(0, 3);
-                            if (studentClassIdentifier !== classInput) return;
-
-                            const allSubjects = new Map();
-                            (student.gradeSubjects || []).forEach(subject => {
-                                if (!subject || !subject.name) return;
-                                if (!allSubjects.has(subject.name)) { allSubjects.set(subject.name, { grade: true, attendance: false }); }
-                                else { allSubjects.get(subject.name).grade = true; }
-                            });
-                            (student.attendanceSubjects || []).forEach(sName => {
-                                if (sName) { 
-                                    if (!allSubjects.has(sName)) { 
-                                        allSubjects.set(sName, { grade: false, attendance: true }); 
-                                    } else { 
-                                        allSubjects.get(sName).attendance = true; 
-                                    }
-                                }
-                            });
-
-                            const subjectsArray = Array.from(allSubjects.entries()).map(([name, reasons]) => {
-                                let reason = '';
-                                if (reasons.grade && reasons.attendance) reason = '학업성취율&과목출석률';
-                                else if (reasons.grade) reason = '학업성취율';
-                                else if (reasons.attendance) reason = '과목출석률';
-                                
-                                // 해당 과목의 이수 현황 확인
-                                // 학번을 문자열로 정규화하여 일관성 보장
-                                const studentId = String(student.id);
-                                let completion = { status: '확인필요', color: 'text-gray-500'};
-                                
-                                // 디버깅: 데이터 확인
-                                if (this.allTeacherCompletionData[name]) {
-                                    const completionStatus = this.allTeacherCompletionData[name][studentId];
-                                    if (completionStatus) {
-                                        console.log(`이수현황 매칭 성공: 과목=${name}, 학번=${studentId}, 상태=${completionStatus}`);
-                                        if (completionStatus === '이수') {
-                                            completion = { status: '이수확인', color: 'text-green-600'};
-                                        } else if (completionStatus === '미이수') {
-                                            completion = { status: '미이수', color: 'text-red-600'};
-                                        }
-                                    } else {
-                                        console.log(`이수현황 매칭 실패: 과목=${name}, 학번=${studentId}, 과목 데이터 존재하나 학생 데이터 없음`);
-                                    }
-                                } else {
-                                    console.log(`이수현황 매칭 실패: 과목=${name}, 학번=${studentId}, 과목 데이터 없음`);
-                                }
-                                return { subject: name, reason: reason, status: completion.status, statusColor: completion.color };
-                            });
-
-                            studentMap.set(student.id, {
-                                id: student.id, name: student.name, subjects: subjectsArray,
-                                originalStudent: student
-                            });
-                        });
-
-                        const tableRows = [];
-                        studentMap.forEach(studentData => {
-                            studentData.subjects.forEach((subjectInfo, index) => {
-                                tableRows.push({ ...studentData, ...subjectInfo, isFirstRow: index === 0, rowspan: studentData.subjects.length });
-                            });
-                        });
-                        tableRows.sort((a, b) => {
-                            if (!a || !a.id || !b || !b.id) return 0;
-                            if (a.id < b.id) return -1; if (a.id > b.id) return 1; return 0;
-                        });
-                        return tableRows;
                     },
                 },
 
@@ -4349,9 +4277,35 @@
                         this.previewForm(type, [fullStudent]);
                     },
                     printPreviewModalContent() {
-                        // 인쇄 시 상태 메시지 초기화
+                        // 인쇄 시 모든 상태 메시지 초기화
+                        const originalStatuses = {
+                            adminActionStatus: this.adminActionStatus,
+                            teacherPlanStatus: this.teacherPlanStatus,
+                            teacherPlanError: this.teacherPlanError,
+                            moduleConfigStatus: this.moduleConfigStatus,
+                            underachieversStatus: this.underachieversStatus
+                        };
+                        
+                        // 상태 메시지 임시 초기화
                         this.adminActionStatus = '';
-                        window.print();
+                        this.teacherPlanStatus = '';
+                        this.teacherPlanError = '';
+                        this.moduleConfigStatus = '';
+                        this.underachieversStatus = '';
+                        
+                        // 인쇄 실행
+                        this.$nextTick(() => {
+                            window.print();
+                            
+                            // 인쇄 후 원래 상태 복원
+                            setTimeout(() => {
+                                this.adminActionStatus = originalStatuses.adminActionStatus;
+                                this.teacherPlanStatus = originalStatuses.teacherPlanStatus;
+                                this.teacherPlanError = originalStatuses.teacherPlanError;
+                                this.moduleConfigStatus = originalStatuses.moduleConfigStatus;
+                                this.underachieversStatus = originalStatuses.underachieversStatus;
+                            }, 100);
+                        });
                     },
                     closePreviewModal() {
                         this.showPreviewModal = false;
@@ -5554,28 +5508,107 @@
                         if(this.role !== '담임교사') return;
                         this.homeroomMessage = '데이터 조회 중...';
                         this.searchedStudents = [];
+                        this.processedHomeroomStudents = []; // 초기화
                         const classInput = this.homeroomClassInput.trim();
-                        if(!classInput){ this.homeroomMessage = '학급 번호를 입력해주세요.'; return; }
+                        if(!classInput){ 
+                            this.homeroomMessage = '학급 번호를 입력해주세요.'; 
+                            this.processedHomeroomStudents = [];
+                            return; 
+                        }
                         
                         try {
-                            const underachieversSnap = await getDoc(doc(db, `schools/${this.schoolId}/commonData`, "underachievers"));
+                            // currentSchoolCode를 우선 사용, 없으면 schoolId 사용
+                            const activeSchoolId = this.currentSchoolCode || this.schoolId;
+                            if (!activeSchoolId) {
+                                this.homeroomMessage = '학교코드가 설정되지 않았습니다.';
+                                this.processedHomeroomStudents = [];
+                                return;
+                            }
+                            const underachieversSnap = await getDoc(doc(db, `schools/${activeSchoolId}/commonData`, "underachievers"));
                             this.deployedUnderachievers = underachieversSnap.exists() ? underachieversSnap.data().data || [] : [];
                         } catch (e) {
                             this.homeroomMessage = '학생 명단을 불러오는 데 실패했습니다.';
+                            this.processedHomeroomStudents = [];
                             return;
                         }
 
                         const allStudents = this.deployedUnderachievers;
-                        if (!allStudents || allStudents.length === 0) { this.homeroomMessage = '관리자가 배포한 학생 데이터가 없습니다.'; return; }
+                        if (!allStudents || allStudents.length === 0) { 
+                            this.homeroomMessage = '관리자가 배포한 학생 데이터가 없습니다.'; 
+                            this.processedHomeroomStudents = [];
+                            return; 
+                        }
 
                         // 모든 교과교사의 이수 현황 데이터 불러오기
                         await this.loadAllTeacherCompletionData();
 
-                        const filtered = allStudents.filter(s => s && s.id && s.id.startsWith(classInput));
+                        // processedHomeroomStudents 계산 로직
+                        const studentMap = new Map();
+                        this.deployedUnderachievers.forEach(student => {
+                            if (!student || !student.id) return;
+                            const studentClassIdentifier = student.id.substring(0, 3);
+                            if (studentClassIdentifier !== classInput) return;
+
+                            const allSubjects = new Map();
+                            (student.gradeSubjects || []).forEach(subject => {
+                                if (!subject || !subject.name) return;
+                                if (!allSubjects.has(subject.name)) { allSubjects.set(subject.name, { grade: true, attendance: false }); }
+                                else { allSubjects.get(subject.name).grade = true; }
+                            });
+                            (student.attendanceSubjects || []).forEach(sName => {
+                                if (sName) { 
+                                    if (!allSubjects.has(sName)) { 
+                                        allSubjects.set(sName, { grade: false, attendance: true }); 
+                                    } else { 
+                                        allSubjects.get(sName).attendance = true; 
+                                    }
+                                }
+                            });
+
+                            const subjectsArray = Array.from(allSubjects.entries()).map(([name, reasons]) => {
+                                let reason = '';
+                                if (reasons.grade && reasons.attendance) reason = '학업성취율&과목출석률';
+                                else if (reasons.grade) reason = '학업성취율';
+                                else if (reasons.attendance) reason = '과목출석률';
+                                
+                                // 해당 과목의 이수 현황 확인
+                                const studentId = String(student.id);
+                                let completion = { status: '확인필요', color: 'text-gray-500'};
+                                
+                                if (this.allTeacherCompletionData[name]) {
+                                    const completionStatus = this.allTeacherCompletionData[name][studentId];
+                                    if (completionStatus) {
+                                        if (completionStatus === '이수') {
+                                            completion = { status: '이수확인', color: 'text-green-600'};
+                                        } else if (completionStatus === '미이수') {
+                                            completion = { status: '미이수', color: 'text-red-600'};
+                                        }
+                                    }
+                                }
+                                return { subject: name, reason: reason, status: completion.status, statusColor: completion.color };
+                            });
+
+                            studentMap.set(student.id, {
+                                id: student.id, name: student.name, subjects: subjectsArray,
+                                originalStudent: student
+                            });
+                        });
+
+                        const tableRows = [];
+                        studentMap.forEach(studentData => {
+                            studentData.subjects.forEach((subjectInfo, index) => {
+                                tableRows.push({ ...studentData, ...subjectInfo, isFirstRow: index === 0, rowspan: studentData.subjects.length });
+                            });
+                        });
+                        tableRows.sort((a, b) => {
+                            if (!a || !a.id || !b || !b.id) return 0;
+                            if (a.id < b.id) return -1; if (a.id > b.id) return 1; return 0;
+                        });
                         
-                        if(filtered.length > 0){
-                            this.searchedStudents = filtered;
-                            this.homeroomMessage = `${classInput}반 미도달 학생 ${filtered.length}명을 조회했습니다.`;
+                        this.processedHomeroomStudents = tableRows;
+                        
+                        if(tableRows.length > 0){
+                            this.homeroomMessage = `${classInput}반 미도달 학생 ${tableRows.length}명을 조회했습니다.`;
                         } else {
                             this.homeroomMessage = `해당 학급에 미도달 학생이 없습니다.`;
                         }
@@ -5841,6 +5874,7 @@
                         this.teacherGuidanceData = this.getInitialGuidanceData();
                         this.teacherPlanError = ''; this.teacherPlanStatus = ''; this.newGuidanceStudentId = '';
                         this.homeroomClassInput = ''; this.searchedStudents = []; this.homeroomMessage = '';
+                        this.processedHomeroomStudents = [];
                     },
                     resetAllLocalData(resetAuth = true) {
                         if (resetAuth) {
