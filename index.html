@@ -5618,7 +5618,13 @@
                                 // 1. commonData/completionStatus에서 전송된 이수현황 데이터 읽기 (우선)
                                 // 이 데이터가 가장 최신이고 정확함
                                 try {
-                                    const commonCompletionDocRef = doc(db, `schools/${this.schoolId}/commonData`, 'completionStatus');
+                                    // currentSchoolCode를 우선 사용, 없으면 schoolId 사용
+                                    const activeSchoolId = this.currentSchoolCode || this.schoolId;
+                                    if (!activeSchoolId) {
+                                        console.warn('학교코드가 설정되지 않아 이수현황 데이터를 읽을 수 없습니다.');
+                                        return;
+                                    }
+                                    const commonCompletionDocRef = doc(db, `schools/${activeSchoolId}/commonData`, 'completionStatus');
                                     const commonCompletionSnap = await getDoc(commonCompletionDocRef);
                                     if (commonCompletionSnap.exists()) {
                                         const completionData = commonCompletionSnap.data().data || {};
@@ -5648,8 +5654,14 @@
                                 // 2. teacherData 컬렉션을 순회하면서 각 교과교사의 guidance 데이터 읽기 (이수현황 계산용)
                                 // commonData에 없는 데이터만 계산
                                 try {
-                                    console.log('teacherData 컬렉션 읽기 시작...');
-                                    const teacherDataRef = collection(db, `schools/${this.schoolId}/teacherData`);
+                                    // currentSchoolCode를 우선 사용, 없으면 schoolId 사용
+                                    const activeSchoolId = this.currentSchoolCode || this.schoolId;
+                                    if (!activeSchoolId) {
+                                        console.warn('학교코드가 설정되지 않아 이수현황 데이터를 읽을 수 없습니다.');
+                                        return;
+                                    }
+                                    console.log('teacherData 컬렉션 읽기 시작...', { activeSchoolId });
+                                    const teacherDataRef = collection(db, `schools/${activeSchoolId}/teacherData`);
                                     const teacherDataSnap = await getDocs(teacherDataRef);
                                     console.log(`teacherData 문서 개수: ${teacherDataSnap.docs.length}`);
                                     
