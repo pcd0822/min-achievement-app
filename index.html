@@ -806,13 +806,12 @@
                                   @change="switchSubject"
                                   class="px-4 py-2 border border-gray-300 rounded-md text-lg min-w-[300px]"
                               >
-                                  <option :value="-1">과목을 선택하세요</option>
                                   <option v-for="(plan, index) in teacherPlanList" :key="index" :value="index">
                                       {{ plan.subjectName }} ({{ plan.subjectGrade ? plan.subjectGrade + '학년' : '' }} {{ plan.subjectSemester ? plan.subjectSemester + '학기' : '' }} {{ plan.subjectCategory || '' }})
                                   </option>
                               </select>
                               <button @click="addNewSubjectDirectly()" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition">+ 새 과목 추가</button>
-                              <button @click="teacherViewMode = 'cards'" class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition">카드 뷰로 돌아가기</button>
+                              <button @click="returnToCardView()" class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition">카드 뷰로 돌아가기</button>
                           </div>
                       </div>
                       
@@ -2255,15 +2254,20 @@
 
                 methods: {
                     // --- Subject Management ---
-                    selectSubjectFromCard(index) {
+                    async selectSubjectFromCard(index) {
                         this.currentSubjectIndex = index;
                         this.teacherViewMode = 'dropdown';
-                        this.loadSubjectData(index);
+                        await this.loadSubjectData(index);
                     },
-                    switchSubject() {
+                    async switchSubject() {
                         if (this.currentSubjectIndex >= 0 && this.currentSubjectIndex < this.teacherPlanList.length) {
-                            this.loadSubjectData(this.currentSubjectIndex);
+                            await this.loadSubjectData(this.currentSubjectIndex);
                         }
+                    },
+                    returnToCardView() {
+                        this.teacherViewMode = 'cards';
+                        this.currentSubjectIndex = -1;
+                        this.teacherTab = 'plan'; // 탭도 초기화
                     },
                     async loadSubjectData(index) {
                         if (index < 0 || index >= this.teacherPlanList.length) return;
