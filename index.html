@@ -4392,13 +4392,22 @@
                                     const subjectHeaderRow = sheetData[3];
                                     if (!subjectHeaderRow) throw new Error(`'${file.name}' 파일의 4행에서 과목 정보를 찾을 수 없습니다.`);
 
-                                    for (let r = 5; r < sheetData.length; r += 2) {
-                                        const nameRow = sheetData[r - 1];
-                                        const statusRow = sheetData[r];
-                                        if (!nameRow || !statusRow || nameRow[0] == null || nameRow[1] == null) continue;
-
-                                        const num = nameRow[0];
-                                        const name = nameRow[1];
+                                    // 학생 데이터 행 찾기: 번호와 이름이 있는 행을 찾음
+                                    for (let r = 4; r < sheetData.length; r++) {
+                                        const currentRow = sheetData[r];
+                                        if (!currentRow || currentRow[0] == null || currentRow[1] == null) continue;
+                                        
+                                        // 번호와 이름이 있는 행인지 확인
+                                        const num = currentRow[0];
+                                        const name = currentRow[1];
+                                        
+                                        // 번호가 숫자가 아니거나 이름이 비어있으면 건너뛰기
+                                        if (isNaN(Number(num)) || !name || String(name).trim() === '') continue;
+                                        
+                                        // 다음 행이 상태 행인지 확인 (미도달 정보가 있는 행)
+                                        const nextRow = sheetData[r + 1];
+                                        if (!nextRow) continue;
+                                        
                                         // 학번 형식: 학년*10000 + 반*100 + 번호 (5자리 숫자)
                                         const fullId = String(Number(classGrade) * 10000 + Number(classNum) * 100 + Number(num));
                                         
@@ -4410,12 +4419,12 @@
                                         
                                         // studentData에서 찾지 못한 경우, 이름으로도 검색 시도 (동명이인 처리)
                                         let actualStudentId = fullId;
-                                        let actualStudentName = name;
+                                        let actualStudentName = String(name).trim();
                                         if (!foundStudent && this.studentData && this.studentData.length > 0) {
                                             // 이름이 정확히 일치하는 학생 찾기
                                             const nameMatches = this.studentData.filter(s => {
                                                 const studentName = String(s['이름'] || '').trim();
-                                                return studentName === name || studentName === String(name);
+                                                return studentName === actualStudentName || studentName === String(actualStudentName);
                                             });
                                             
                                             if (nameMatches.length === 1) {
@@ -4438,7 +4447,7 @@
                                                     actualStudentId = String(classMatches[0]['학번'] || '').trim();
                                                     actualStudentName = String(classMatches[0]['이름'] || '').trim();
                                                 } else {
-                                                    console.warn(`학생을 찾을 수 없음: ${name} (${fullId}), 동명이인 ${nameMatches.length}명, 학급 일치 ${classMatches.length}명`);
+                                                    console.warn(`학생을 찾을 수 없음: ${actualStudentName} (${fullId}), 동명이인 ${nameMatches.length}명, 학급 일치 ${classMatches.length}명`);
                                                 }
                                             }
                                         } else if (foundStudent) {
@@ -4446,12 +4455,19 @@
                                             actualStudentName = String(foundStudent['이름'] || '').trim();
                                         }
 
-                                        for (let c = 3; c < statusRow.length; c++) {
-                                            const statusValue = String(statusRow[c] || '').trim();
-                                            if (statusValue === "미도달" || statusValue === "미도달 ") {
+                                        // 상태 행에서 미도달 과목 찾기
+                                        for (let c = 3; c < nextRow.length; c++) {
+                                            const statusValue = String(nextRow[c] || '').trim();
+                                            
+                                            // 미도달 인식: 다양한 형식 지원 (공백, 대소문자 등)
+                                            const isUnderachiever = /미도달/i.test(statusValue) && statusValue.length <= 10;
+                                            
+                                            if (isUnderachiever) {
                                                 const subjectWithCredits = subjectHeaderRow[c];
                                                 if (!subjectWithCredits) continue;
                                                 const subject = String(subjectWithCredits).split('(')[0].trim();
+                                                
+                                                console.log(`[processGradeFiles] 미도달 발견: 학생=${actualStudentName}(${actualStudentId}), 과목=${subject}, 상태값="${statusValue}"`);
                                                 
                                                 // 과목명, 학년, 학기, 분류를 모두 포함한 고유 키 생성
                                                 const subjectKey = `${subject}|${classGrade}|${semester}|${category}`;
