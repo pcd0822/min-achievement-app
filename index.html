@@ -1066,7 +1066,12 @@
                                            <tbody>
                                                <tr v-for="student in currentGuidanceData.students" :key="student.id" class="text-center">
                                                    <td class="sticky left-0 bg-white z-20 p-2 border-l border-b border-gray-300" style="width: 80px; min-width: 80px; max-width: 80px;" align="top">{{ student.id }}</td>
-                                                   <td class="sticky bg-white z-20 p-2 border-l border-r border-b border-gray-300 font-semibold whitespace-nowrap" style="width: 96px; min-width: 96px; max-width: 96px; left: 80px;" align="top">{{ student.name }}</td>
+                                                   <td class="sticky bg-white z-20 p-2 border-l border-r border-b border-gray-300 font-semibold whitespace-nowrap" style="width: 96px; min-width: 96px; max-width: 96px; left: 80px;" align="top">
+                                                       <div class="flex items-center justify-between">
+                                                           <span>{{ student.name }}</span>
+                                                           <button v-if="teacherTab === 'preventive'" @click="removeGuidanceStudent(teacherTab, student.id)" class="ml-2 text-red-600 hover:text-red-900 font-bold" title="삭제">×</button>
+                                                       </div>
+                                                   </td>
                                                    <td v-for="(session, index) in currentGuidanceData.sessions" :key="index" class="p-2 border border-gray-300 align-top">
                                                        <select class="w-full p-1 border rounded text-xs" v-model="session.attendance[student.id]" :disabled="session.isSaved" @change="saveGuidanceData">
                                                            <option value="">선택</option>
@@ -5117,6 +5122,28 @@
                             });
                             data.error = `학적 정보에 없는 학생입니다 (학번: ${studentId}). 학번을 확인하거나 관리자에게 문의하세요.`;
                         }
+                    },
+                    removeGuidanceStudent(type, studentId) {
+                        if (this.role !== '교과교사') return;
+                        const data = this.teacherGuidanceData[type];
+                        if (!data) return;
+                        
+                        // 학생 목록에서 제거
+                        const studentIndex = data.students.findIndex(s => s && s.id === studentId);
+                        if (studentIndex !== -1) {
+                            data.students.splice(studentIndex, 1);
+                        }
+                        
+                        // 모든 세션의 출석 정보에서도 제거
+                        if (data.sessions) {
+                            data.sessions.forEach(session => {
+                                if (session && session.attendance && session.attendance.hasOwnProperty(studentId)) {
+                                    delete session.attendance[studentId];
+                                }
+                            });
+                        }
+                        
+                        this.saveGuidanceData();
                     },
                     addGuidanceSession(type) {
                         if (this.role !== '교과교사') return; const data = this.teacherGuidanceData[type]; if (!data) return;
