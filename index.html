@@ -1408,8 +1408,8 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="row in filteredSubjectSummary" :key="row.subjectName">
-                                        <td>{{ row.subjectName }}</td>
+                                    <tr v-for="row in filteredSubjectSummary" :key="`${row.subjectName}-${row.category || ''}`">
+                                        <td>{{ row.subjectName }}{{ row.category ? ' (' + row.category + ')' : '' }}</td>
                                         <td>{{ row.credits }}</td>
                                         <td>{{ row.gradeCount }}</td>
                                         <td>{{ row.attendanceCount }}</td>
@@ -1436,8 +1436,8 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="row in filteredPreventionSummary" :key="row.subjectName">
-                                        <td>{{ row.subjectName }}</td>
+                                    <tr v-for="row in filteredPreventionSummary" :key="`${row.subjectName}-${row.category || ''}`">
+                                        <td>{{ row.subjectName }}{{ row.category ? ' (' + row.category + ')' : '' }}</td>
                                         <td>{{ row.hasPrevention ? '진행' : '미진행' }}</td>
                                         <td>{{ row.participants }}</td>
                                         <td>{{ row.nonParticipants }}</td>
@@ -1465,8 +1465,8 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="row in filteredAdditionalSummary" :key="row.subjectName">
-                                        <td>{{ row.subjectName }}</td>
+                                    <tr v-for="row in filteredAdditionalSummary" :key="`${row.subjectName}-${row.category || ''}`">
+                                        <td>{{ row.subjectName }}{{ row.category ? ' (' + row.category + ')' : '' }}</td>
                                         <td>{{ row.credits }}</td>
                                         <td>{{ row.attendanceTargets }}</td>
                                         <td>{{ row.participants }}</td>
@@ -1498,8 +1498,8 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="row in filteredRemedialSummary" :key="row.subjectName">
-                                        <td>{{ row.subjectName }}</td>
+                                    <tr v-for="row in filteredRemedialSummary" :key="`${row.subjectName}-${row.category || ''}`">
+                                        <td>{{ row.subjectName }}{{ row.category ? ' (' + row.category + ')' : '' }}</td>
                                         <td>{{ row.credits }}</td>
                                         <td>{{ row.gradeTargets }}</td>
                                         <td>{{ row.participants }}</td>
@@ -1527,8 +1527,8 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="row in filteredDeficitSummary" :key="row.subjectName">
-                                        <td>{{ row.subjectName }}</td>
+                                    <tr v-for="row in filteredDeficitSummary" :key="`${row.subjectName}-${row.category || ''}`">
+                                        <td>{{ row.subjectName }}{{ row.category ? ' (' + row.category + ')' : '' }}</td>
                                         <td>{{ row.gradeCount }}</td>
                                         <td>{{ row.attendanceCount }}</td>
                                         <td>{{ row.bothCount }}</td>
@@ -2408,29 +2408,36 @@
                                 recognizedHoursMap.set(name, isNaN(hours) ? 0 : hours);
                             });
                             const ensureSubject = (subjectName, grade = null, semester = null, category = null) => {
-                                // 과목명만으로 키를 생성하되, 학년/학기 정보는 별도로 저장
-                                const key = subjectName ? String(subjectName).trim() : '';
-                                if (!key) return null;
+                                // 과목명과 계열을 함께 키로 사용하여 같은 과목명이지만 계열이 다른 경우 구분
+                                const subjectNameKey = subjectName ? String(subjectName).trim() : '';
+                                if (!subjectNameKey) return null;
                                 
-                                // 교육과정 편제표에서 해당 과목의 학년/학기 정보 찾기
+                                // 교육과정 편제표에서 해당 과목의 학년/학기/분류 정보 찾기
                                 let subjectInfo = null;
                                 if (grade != null && semester != null) {
                                     subjectInfo = this.findSubjectInCurriculum(subjectName, grade, semester, category);
                                 } else {
                                     // 학년/학기 정보가 없으면 첫 번째로 찾은 과목 정보 사용
                                     subjectInfo = this.curriculumData.find(row => 
-                                        row && row['과목명'] && String(row['과목명']).trim() === key
+                                        row && row['과목명'] && String(row['과목명']).trim() === subjectNameKey
                                     );
                                 }
                                 
+                                // 계열 정보 추출 (subjectInfo에서 가져오거나, category 파라미터 사용)
+                                const subjectCategory = subjectInfo 
+                                    ? (subjectInfo['분류'] ? String(subjectInfo['분류']).trim() : '') 
+                                    : (category ? String(category).trim() : '');
+                                
+                                // 과목명과 계열을 함께 키로 사용
+                                const key = `${subjectNameKey}|${subjectCategory}`;
+                                
                                 if (!subjectStats.has(key)) {
-                                    const subjectGrade = subjectInfo ? (subjectInfo['학년'] != null ? Number(subjectInfo['학년']) : null) : null;
-                                    const subjectSemester = subjectInfo ? (subjectInfo['학기'] != null ? Number(subjectInfo['학기']) : null) : null;
-                                    const subjectCategory = subjectInfo ? (subjectInfo['분류'] ? String(subjectInfo['분류']).trim() : '') : '';
-                                    const subjectCredits = subjectInfo ? (Number(subjectInfo['학점']) || 0) : (curriculumMap.has(key) ? curriculumMap.get(key) : 0);
+                                    const subjectGrade = subjectInfo ? (subjectInfo['학년'] != null ? Number(subjectInfo['학년']) : null) : (grade != null ? Number(grade) : null);
+                                    const subjectSemester = subjectInfo ? (subjectInfo['학기'] != null ? Number(subjectInfo['학기']) : null) : (semester != null ? Number(semester) : null);
+                                    const subjectCredits = subjectInfo ? (Number(subjectInfo['학점']) || 0) : (curriculumMap.has(subjectNameKey) ? curriculumMap.get(subjectNameKey) : 0);
                                     
                                     subjectStats.set(key, {
-                                        subjectName: key,
+                                        subjectName: subjectNameKey,
                                         credits: subjectCredits,
                                         grade: subjectGrade,
                                         semester: subjectSemester,
@@ -2544,6 +2551,8 @@
                                 // 모든 teacherData 문서의 completionStatus 하위 컬렉션을 확인
                                 for (const teacherDoc of teacherDataSnap.docs) {
                                     console.log(`[통계] 교사 문서 처리 시작: teacherUid=${teacherDoc.id}`);
+                                    // 교과교사 계획서 정보 저장 (guidance 문서 처리 시 사용)
+                                    let planInfo = null;
                                     try {
                                         const planDocRef = doc(teacherDoc.ref, 'plans', 'teacherPlan');
                                         const planSnap = await getDoc(planDocRef);
@@ -2551,7 +2560,11 @@
                                             const planData = planSnap.data();
                                             if (planData && planData.subjectName) {
                                                 const subjectName = String(planData.subjectName).trim();
-                                                const stats = ensureSubject(subjectName);
+                                                const planGrade = planData.subjectGrade != null ? Number(planData.subjectGrade) : null;
+                                                const planSemester = planData.subjectSemester != null ? Number(planData.subjectSemester) : null;
+                                                const planCategory = planData.subjectCategory ? String(planData.subjectCategory).trim() : null;
+                                                planInfo = { subjectName, grade: planGrade, semester: planSemester, category: planCategory };
+                                                const stats = ensureSubject(subjectName, planGrade, planSemester, planCategory);
                                                 if (stats) {
                                                     stats.planTeachers.add(teacherDoc.id);
                                                     planSubjects.add(subjectName);
@@ -2569,7 +2582,13 @@
                                         for (const guidanceDoc of guidanceSnap.docs) {
                                             const subjectName = this.decodeSubjectName(guidanceDoc.id);
                                             console.log(`[통계] guidance 문서 처리: 과목=${subjectName}, docId=${guidanceDoc.id}`);
-                                            const stats = ensureSubject(subjectName);
+                                            // 계획서 정보가 있으면 사용, 없으면 null로 전달하여 교육과정 편제표에서 찾도록 함
+                                            const stats = ensureSubject(
+                                                subjectName, 
+                                                planInfo ? planInfo.grade : null, 
+                                                planInfo ? planInfo.semester : null, 
+                                                planInfo ? planInfo.category : null
+                                            );
                                             if (!stats) {
                                                 console.warn(`[통계] stats가 null: 과목=${subjectName}`);
                                                 continue;
@@ -5033,7 +5052,7 @@
                     },
 
                     // --- GUIDANCE LOGBOOK METHODS ---
-                    addGuidanceStudent(type) {
+                    async addGuidanceStudent(type) {
                         if (this.role !== '교과교사') return;
                         const data = this.teacherGuidanceData[type];
                         if (!data) return;
@@ -5044,13 +5063,24 @@
                         
                         // studentData 로딩 확인 및 디버깅
                         if (!this.studentData || this.studentData.length === 0) {
-                            console.error("studentData가 로드되지 않았습니다.", {
+                            console.warn("studentData가 로드되지 않았습니다. 다시 로드 시도...", {
                                 studentData: this.studentData,
                                 studentDataLength: this.studentData?.length,
-                                schoolId: this.schoolId
+                                schoolId: this.schoolId,
+                                currentSchoolCode: this.currentSchoolCode
                             });
-                            data.error = '학적 정보가 로드되지 않았습니다. 관리자가 학적 정보를 업로드했는지 확인하거나 잠시 후 다시 시도해주세요.';
-                            return;
+                            // studentData가 없으면 다시 로드 시도
+                            try {
+                                await this.loadCommonData();
+                                if (!this.studentData || this.studentData.length === 0) {
+                                    data.error = '학적 정보가 로드되지 않았습니다. 관리자가 학적 정보를 업로드했는지 확인하거나 잠시 후 다시 시도해주세요.';
+                                    return;
+                                }
+                            } catch (error) {
+                                console.error("학적 정보 재로드 실패:", error);
+                                data.error = '학적 정보를 불러오는 중 오류가 발생했습니다. 관리자에게 문의하세요.';
+                                return;
+                            }
                         }
 
                         // 학번 필드명 확인 (다양한 필드명 지원)
@@ -5352,9 +5382,16 @@
                         
                         this.importModalError = '최신 명단 확인 중...';
                         try {
-                            const underachieversSnap = await getDoc(doc(db, `schools/${this.schoolId}/commonData`, "underachievers"));
+                            // currentSchoolCode를 우선 사용, 없으면 schoolId 사용
+                            const activeSchoolId = this.currentSchoolCode || this.schoolId;
+                            if (!activeSchoolId) {
+                                this.importModalError = '학교코드가 설정되지 않았습니다.';
+                                return;
+                            }
+                            const underachieversSnap = await getDoc(doc(db, `schools/${activeSchoolId}/commonData`, "underachievers"));
                             const deployedData = underachieversSnap.exists() ? underachieversSnap.data().data || [] : [];
                             this.deployedUnderachievers = this.normalizeUnderachieverList(deployedData);
+                            console.log(`[importUnderachievers] 미도달 학생 명단 로드 완료: activeSchoolId=${activeSchoolId}, 학생 수=${this.deployedUnderachievers.length}`);
                         } catch (e) {
                             console.error('미도달 학생 명단 로드 오류:', e);
                             this.importModalError = '최신 명단을 불러오는 데 실패했습니다.';
@@ -5370,9 +5407,35 @@
                         // 학년, 학기, 계열 정보를 사용하여 정확한 과목 매칭
                         const filteredStudents = allUnderachievers.filter(student => {
                             if (!student || !student.id) return false;
-                            const studentClassId = student.id.substring(0, 3);
-                            const classMatch = classes.includes(studentClassId);
-                            if (!classMatch) return false;
+                            
+                            // 학번에서 학년과 반 추출 (5자리: 학년*10000+반*100+번호)
+                            const studentIdNum = Number(student.id);
+                            if (isNaN(studentIdNum)) {
+                                console.warn(`학번이 숫자가 아님: ${student.id}`);
+                                return false;
+                            }
+                            const studentGrade = Math.floor(studentIdNum / 10000);
+                            const studentClass = Math.floor((studentIdNum % 10000) / 100);
+                            
+                            // 입력된 학급과 비교 (예: "101" = 1학년 1반)
+                            const classMatch = classes.some(classInput => {
+                                const classInputNum = Number(classInput);
+                                if (isNaN(classInputNum)) return false;
+                                const inputGrade = Math.floor(classInputNum / 100);
+                                const inputClass = classInputNum % 100;
+                                return studentGrade === inputGrade && studentClass === inputClass;
+                            });
+                            
+                            if (!classMatch) {
+                                console.log(`학급 불일치: 학생=${student.id} (${studentGrade}학년 ${studentClass}반), 입력된 학급=${classes.join(', ')}`);
+                                return false;
+                            }
+                            
+                            // 학년 일치 확인
+                            if (studentGrade !== this.importGrade) {
+                                console.log(`학년 불일치: 학생=${student.id} (${studentGrade}학년), 입력된 학년=${this.importGrade}`);
+                                return false;
+                            }
                             
                             // 학년, 학기, 계열 정보를 사용하여 과목 검색
                             const subjectInfo = this.findSubjectInCurriculum(
@@ -5382,12 +5445,31 @@
                                 this.importCategory
                             );
                             
-                            if (!subjectInfo) return false;
+                            if (!subjectInfo) {
+                                console.log(`과목을 찾을 수 없음: ${subject}, 학년=${this.importGrade}, 학기=${this.importSemester}, 계열=${this.importCategory}`);
+                                return false;
+                            }
                             
-                            // 과목명만으로 매칭 (학년, 학기, 계열은 이미 findSubjectInCurriculum에서 확인됨)
-                            const gradeMatch = (student.gradeSubjects || []).some(s => s && s.name === subject);
+                            // 과목 매칭: gradeSubjects와 attendanceSubjects 모두 확인
+                            // gradeSubjects는 객체 배열이므로 name, grade, semester, category 모두 확인
+                            const gradeMatch = (student.gradeSubjects || []).some(s => {
+                                if (!s || !s.name) return false;
+                                const nameMatch = s.name === subject;
+                                const gradeMatch = s.grade == null || s.grade === this.importGrade;
+                                const semesterMatch = s.semester == null || s.semester === this.importSemester;
+                                const categoryMatch = !s.category || s.category === this.importCategory;
+                                return nameMatch && gradeMatch && semesterMatch && categoryMatch;
+                            });
+                            
+                            // attendanceSubjects는 문자열 배열이므로 과목명만 확인
                             const attendanceMatch = (student.attendanceSubjects || []).includes(subject);
-                            return gradeMatch || attendanceMatch;
+                            
+                            const isMatch = gradeMatch || attendanceMatch;
+                            if (isMatch) {
+                                console.log(`학생 매칭 성공: ${student.id} (${student.name}), 과목=${subject}, 학년=${this.importGrade}, 학기=${this.importSemester}, 계열=${this.importCategory}, 학급=${studentGrade}학년 ${studentClass}반`);
+                            }
+                            
+                            return isMatch;
                         });
 
                         if (filteredStudents.length === 0) { this.importModalError = '해당 조건에 맞는 학생을 찾을 수 없습니다.'; return; }
