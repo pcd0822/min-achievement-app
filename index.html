@@ -3955,11 +3955,8 @@
                             return null;
                         }
                         
-                        // 분류 정규화: 회계경영과, 웹디자인과는 전문계열로 변환
-                        let normalizedCategory = category;
-                        if (category === '회계경영' || category === '웹디자인') {
-                            normalizedCategory = '전문계열';
-                        }
+                        // category는 이미 '전문계열' 또는 '인문계열'로 정규화되어 있음
+                        const normalizedCategory = category || '인문계열';
                         
                         console.log('[findSubjectInCurriculum] 검색:', {
                             subjectName,
@@ -3969,7 +3966,17 @@
                             normalizedCategory
                         });
                         
-                        const result = this.curriculumData.find(row => {
+                        // 1차 필터링: 분류로 먼저 필터링
+                        const filteredByCategory = this.curriculumData.filter(row => {
+                            if (!row || !row['분류']) return false;
+                            const rowCategory = String(row['분류']).trim();
+                            return rowCategory === normalizedCategory;
+                        });
+                        
+                        console.log(`[findSubjectInCurriculum] 분류 "${normalizedCategory}"로 필터링: ${filteredByCategory.length}개 과목`);
+                        
+                        // 2차 필터링: 과목명, 학년, 학기로 검색
+                        const result = filteredByCategory.find(row => {
                             if (!row || !row['과목명']) return false;
                             const nameMatch = String(row['과목명']).trim() === String(subjectName || '').trim();
                             if (!nameMatch) return false;
@@ -3984,15 +3991,6 @@
                             if (semester != null && semester !== '') {
                                 const rowSemester = row['학기'] != null ? Number(row['학기']) : null;
                                 if (rowSemester === null || rowSemester !== Number(semester)) return false;
-                            }
-                            
-                            // 분류 매칭 (있으면 일치해야 함)
-                            if (normalizedCategory && normalizedCategory.trim()) {
-                                const rowCategory = row['분류'] ? String(row['분류']).trim() : '';
-                                // 편제표의 분류와 정규화된 분류 비교
-                                if (!rowCategory || rowCategory !== String(normalizedCategory).trim()) {
-                                    return false;
-                                }
                             }
                             
                             return true;
@@ -4012,8 +4010,9 @@
                                 grade,
                                 semester,
                                 normalizedCategory,
-                                curriculumDataLength: this.curriculumData.length,
-                                sampleRows: this.curriculumData.slice(0, 3).map(r => ({
+                                totalCurriculumDataLength: this.curriculumData.length,
+                                filteredByCategoryLength: filteredByCategory.length,
+                                sampleFilteredRows: filteredByCategory.slice(0, 5).map(r => ({
                                     name: r['과목명'],
                                     grade: r['학년'],
                                     semester: r['학기'],
@@ -4378,14 +4377,12 @@
                                     const classNumMatch = classInfo.match(/(\d{1,2})\s*반/);
                                     const classNum = classNumMatch ? classNumMatch[1] : null;
                                     
-                                    // 분류 추출: '과' 앞의 텍스트, 없으면 '인문계열'로 기본값
+                                    // 분류 추출: '~과'가 있으면 '전문계열', 없으면 '인문계열'
                                     const categoryMatch = classInfo.match(/([^과]+)\s*과/);
-                                    let category = categoryMatch ? categoryMatch[1].trim() : '인문계열';
+                                    // '과'가 있으면 전문계열, 없으면 인문계열
+                                    const category = categoryMatch ? '전문계열' : '인문계열';
                                     
-                                    // 회계경영과, 웹디자인과는 전문계열로 매칭
-                                    if (category === '회계경영' || category === '웹디자인') {
-                                        category = '전문계열';
-                                    }
+                                    console.log(`[processGradeFiles] 분류 추출: "${classInfo}" → ${category}`);
 
                                     if (!classGrade || !classNum) throw new Error(`'${file.name}' 파일의 학급 정보 형식("${classInfo}")이 예상과 다릅니다. (예: '1학년 3반')`);
                                     
