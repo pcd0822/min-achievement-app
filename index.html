@@ -128,24 +128,24 @@
          #print-area h4 { font-size: 1.0rem; }
 
          #print-area table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
-            font-size: 9pt;
+             width: 100%;
+             border-collapse: collapse;
+             margin-top: 10px;
+             font-size: 9pt;
             table-layout: auto; /* 셀 너비 자동 조정 */
-        }
-        #print-area th, #print-area td {
-            border: 1px solid #666; /* 인쇄 시 잘 보이도록 어두운 테두리 */
+         }
+         #print-area th, #print-area td {
+             border: 1px solid #666; /* 인쇄 시 잘 보이도록 어두운 테두리 */
             padding: 10px 12px;
-            text-align: center;
+             text-align: center;
             vertical-align: top;
-            word-wrap: break-word; /* 긴 텍스트 줄바꿈 */
+             word-wrap: break-word; /* 긴 텍스트 줄바꿈 */
             overflow-wrap: break-word;
             min-height: 40px;
             height: auto;
             line-height: 1.5;
             box-sizing: border-box;
-        }
+         }
           #print-area th {
               background-color: #f2f2f2;
               font-weight: bold;
@@ -160,7 +160,7 @@
         #print-area tbody td {
             height: auto;
             min-height: 40px;
-        }
+          }
          /* 테이블 내 텍스트 왼쪽 정렬용 */
          #print-area .text-left {
              text-align: left;
@@ -411,6 +411,15 @@
                  visibility: visible !important;
              }
         }
+        
+        /* 과목 카드 애니메이션 */
+        .subject-card {
+            transition: all 0.3s ease;
+        }
+        .subject-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 40px rgba(147, 51, 234, 0.3) !important;
+        }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -421,11 +430,11 @@
             <div class="container mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex items-center justify-between h-16">
                     <div class="flex flex-col sm:flex-row sm:items-center">
-                        <div class="flex items-center">
-                            <svg class="h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v11.494m-9-5.747h18"/>
-                            </svg>
-                            <h1 class="ml-2 text-2xl font-bold text-gray-800">최소 성취수준 보장지도 관리</h1>
+                    <div class="flex items-center">
+                        <svg class="h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v11.494m-9-5.747h18"/>
+                        </svg>
+                        <h1 class="ml-2 text-2xl font-bold text-gray-800">최소 성취수준 보장지도 관리</h1>
                         </div>
                         <span class="sm:ml-4 sm:mt-0 mt-1 text-xs text-gray-400">Designed by 박찬들 (설악고)</span>
                     </div>
@@ -532,7 +541,7 @@
              <!-- Main Dashboard (Show only if logged in and role is selected) -->
              <div v-if="isLoggedIn && role && !isLoading">
                 <!-- Admin View -->
-                     <div v-if="role === '관리자'">
+                 <div v-if="role === '관리자'">
                       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-3">
                           <h2 class="text-3xl font-bold text-gray-800">관리자 대시보드 (학교코드: {{ currentSchoolCode || '미설정' }})</h2>
                           <button
@@ -643,7 +652,7 @@
                                                    <td v-if="detailIndex === 0" :rowspan="student.details.length" class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200">{{ student.id }}</td>
                                                    <td v-if="detailIndex === 0" :rowspan="student.details.length" class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200">{{ student.name }}</td>
                                                    <td v-if="detailIndex === 0" :rowspan="student.details.length" class="px-3 py-4 whitespace-nowrap align-top border-b border-gray-200 text-xs">{{ student.specialNotes }}</td>
-                                                        <td class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200">{{ detail.reason }}</td>
+                                                   <td class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200">{{ detail.reason }}</td>
                                                         <td class="px-6 py-4 whitespace-normal align-top border-b border-gray-200 table-wide-cell">{{ detail.subjects }}</td>
                                                    <td class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200">{{ detail.lessonDetails }}</td>
                                                        <td v-if="detailIndex === 0" :rowspan="student.details.length" class="px-6 py-4 whitespace-normal align-top border-b border-gray-200 table-exception-cell">
@@ -697,7 +706,7 @@
                                    <input type="text" v-model="newsletterForm.department" placeholder="담당 부서 및 연락처" class="w-full p-2 border rounded">
                                    <div>
                                        <label class="block text-sm font-medium text-gray-700">학교 로고 이미지</label>
-                                   <input type="file" @change="handleImageUpload($event, 'newsletter', 'logoUrl')" accept="image/*" class="w-full">
+                                       <input type="file" @change="handleImageUpload($event, 'newsletter', 'logoUrl')" accept="image/*" class="w-full">
                                    <div v-if="newsletterForm.logoUrl" class="mt-2 relative inline-block">
                                         <img :src="newsletterForm.logoUrl" alt="로고 미리보기" class="h-16 object-contain border rounded">
                                         <button type="button" @click="removeImage('newsletter', 'logoUrl')" class="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-black bg-opacity-60 text-white flex items-center justify-center text-sm hover:bg-opacity-80" aria-label="로고 삭제">×</button>
@@ -748,6 +757,65 @@
                 <!-- Teacher View -->
                  <div v-if="role === '교과교사' && schoolId">
                       <h2 class="text-3xl font-bold text-gray-800 mb-6">교과교사 대시보드 (학교코드: {{ currentSchoolCode || schoolId || '미설정' }})</h2>
+                      
+                      <!-- 과목 카드 뷰 (초기 화면) -->
+                      <div v-if="teacherViewMode === 'cards' || (teacherViewMode !== 'dropdown' && teacherPlanList.length === 0)" class="mb-8">
+                          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                              <!-- 과목 카드들 -->
+                              <div 
+                                  v-for="(plan, index) in teacherPlanList" 
+                                  :key="index"
+                                  @click="selectSubjectFromCard(index)"
+                                  class="subject-card bg-white rounded-lg shadow-lg p-6 cursor-pointer transition-all duration-300 hover:shadow-purple-300 hover:shadow-2xl hover:-translate-y-2 border-2 border-gray-200 hover:border-purple-300"
+                                  style="min-height: 280px; display: flex; flex-direction: column; justify-content: space-between;"
+                              >
+                                  <div>
+                                      <h3 class="text-2xl font-bold text-indigo-700 mb-4 text-center">{{ plan.subjectName || '과목명 미입력' }}</h3>
+                                      <div class="space-y-2 text-sm text-gray-700">
+                                          <p><span class="font-semibold">학년:</span> {{ plan.subjectGrade ? plan.subjectGrade + '학년' : '미입력' }}</p>
+                                          <p><span class="font-semibold">학기:</span> {{ plan.subjectSemester ? plan.subjectSemester + '학기' : '미입력' }}</p>
+                                          <p><span class="font-semibold">계열:</span> {{ plan.subjectCategory || '미입력' }}</p>
+                                          <p><span class="font-semibold">담당교사:</span> {{ plan.teacherNames && plan.teacherNames.length > 0 ? plan.teacherNames.join(', ') : '미입력' }}</p>
+                                      </div>
+                                  </div>
+                                  <div class="mt-4 pt-4 border-t border-gray-200">
+                                      <button @click.stop="deleteSubject(index)" class="w-full px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition text-sm">삭제</button>
+                                  </div>
+                              </div>
+                              
+                              <!-- 새 과목 추가 카드 -->
+                              <div 
+                                  @click="showAddSubjectModal = true"
+                                  class="subject-card bg-gradient-to-br from-purple-50 to-indigo-50 rounded-lg shadow-lg p-6 cursor-pointer transition-all duration-300 hover:shadow-purple-300 hover:shadow-2xl hover:-translate-y-2 border-2 border-dashed border-purple-300 hover:border-purple-500"
+                                  style="min-height: 280px; display: flex; flex-direction: column; justify-content: center; align-items: center;"
+                              >
+                                  <div class="text-center">
+                                      <div class="text-6xl text-purple-400 mb-4">+</div>
+                                      <p class="text-lg font-semibold text-purple-700">새 과목 추가</p>
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
+                      
+                      <!-- 드롭다운 뷰 (카드 클릭 후) -->
+                      <div v-if="teacherViewMode === 'dropdown'" class="mb-6">
+                          <div class="flex items-center space-x-4 mb-6">
+                              <label class="text-lg font-semibold text-gray-700">과목 선택:</label>
+                              <select 
+                                  v-model="currentSubjectIndex" 
+                                  @change="switchSubject"
+                                  class="px-4 py-2 border border-gray-300 rounded-md text-lg min-w-[300px]"
+                              >
+                                  <option :value="-1">과목을 선택하세요</option>
+                                  <option v-for="(plan, index) in teacherPlanList" :key="index" :value="index">
+                                      {{ plan.subjectName }} ({{ plan.subjectGrade ? plan.subjectGrade + '학년' : '' }} {{ plan.subjectSemester ? plan.subjectSemester + '학기' : '' }} {{ plan.subjectCategory || '' }})
+                                  </option>
+                              </select>
+                              <button @click="showAddSubjectModal = true" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition">+ 새 과목 추가</button>
+                              <button @click="teacherViewMode = 'cards'" class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition">카드 뷰로 돌아가기</button>
+                          </div>
+                      </div>
+                      
                        <div class="flex border-b mb-6">
                            <button class="tab-button" :class="{ 'active': teacherTab === 'plan' }" @click="switchTeacherTab('plan')">계획서 작성</button>
                            <button class="tab-button" :class="{ 'active': teacherTab === 'preventive' }" @click="switchTeacherTab('preventive')">예방지도 출석부 & 수업일지</button>
@@ -811,7 +879,7 @@
                                    </div>
                                    <div v-if="achievement.statement || achievement.isEditing" class="mt-2 p-3 bg-gray-100 rounded-md">
                                        <div class="flex items-start justify-between mb-2">
-                                           <p class="text-sm font-semibold">최소 성취수준 진술문:</p>
+                                       <p class="text-sm font-semibold">최소 성취수준 진술문:</p>
                                            <button
                                                v-if="!achievement.isEditing"
                                                type="button"
@@ -1122,16 +1190,16 @@
                                                    <div class="flex items-center gap-2">
                                                        <span class="font-semibold shrink-0">날짜/시간:</span>
                                                        <span class="text-gray-700">{{ session.date }} / {{ session.time }}</span>
-                                                   </div>
+                                           </div>
                                                    <div class="flex items-center gap-2">
                                                        <span class="font-semibold shrink-0">수업방법:</span>
                                                        <span class="text-gray-700">{{ [...new Set(Object.values(session.attendance || {}))].filter(Boolean).join(', ') || '미입력' }}</span>
-                                                   </div>
+                                       </div>
                                                    <div class="flex items-center gap-2">
                                                        <label class="font-semibold shrink-0">장소:</label>
                                                        <input type="text" class="flex-1 p-1 border rounded text-sm" v-model="session.place" @change="saveGuidanceData" placeholder="장소 입력">
-                                                   </div>
-                                               </div>
+                                       </div>
+                                   </div>
                                                <div>
                                                    <label class="font-semibold text-sm block mb-1">지도내용:</label>
                                                    <textarea 
@@ -1164,7 +1232,7 @@
                  </div>
 
                  <!-- Homeroom Teacher View -->
-                 <div v-if="role === '담임교사' && schoolId" class="space-y-6">
+                  <div v-if="role === '담임교사' && schoolId" class="space-y-6">
                      <h2 class="text-3xl font-bold text-gray-800">담임교사 대시보드 (학교코드: {{ currentSchoolCode || schoolId || '미설정' }})</h2>
                       <div class="bg-white p-6 rounded-lg shadow-md">
                           <div class="flex items-end space-x-2">
@@ -1622,7 +1690,7 @@
                     </div>
                 </div>
             </div>
-        </div>
+        </div>    
         
         <!-- 인쇄용 컨테이너 (숨김 - html2canvas 전용) -->
         <div id="print-area-container" class="hidden"></div>
@@ -1780,6 +1848,13 @@
                         importSemester: null,
                         importCategory: '',
                         importModalError: '',
+                        // --- Multi-Subject Management ---
+                        teacherPlanList: [], // 여러 과목의 계획서 배열
+                        teacherGuidanceDataList: [], // 여러 과목의 출석부/수업일지 배열
+                        currentSubjectIndex: -1, // 현재 선택된 과목 인덱스 (-1이면 미선택)
+                        teacherViewMode: 'cards', // 'cards' 또는 'dropdown'
+                        
+                        // 기존 단일 과목 데이터 (하위 호환성 유지)
                         teacherPlan: {
                             subjectName: '', teacherNames: [''],
                             achievements: [createEmptyAchievement()],
@@ -1799,6 +1874,16 @@
                             supplementary: { students: [], sessions: Array.from({ length: 10 }, () => ({ date: '', time: '', isSaved: false, place: '', content: '', attendance: {} })), error: ''}
                         },
                         newGuidanceStudentId: '',
+                        
+                        // --- Subject Management State ---
+                        showAddSubjectModal: false,
+                        newSubjectForm: {
+                            subjectName: '',
+                            subjectGrade: null,
+                            subjectSemester: null,
+                            subjectCategory: '',
+                            teacherNames: ['']
+                        },
 
                         // --- Homeroom Teacher State ---
                         homeroomClassInput: '',
@@ -2039,11 +2124,11 @@
                                     this.teacherPlan.subjectSemester,
                                     this.teacherPlan.subjectCategory
                                 );
-                                if (subjectInfo) {
-                                    requiredSubjectCredits = Number(subjectInfo.학점) || 0;
-                                    supplementaryHours = requiredSubjectCredits * this.moduleConfig.hoursPerCredit;
-                                    requiredHoursForCompletion = Math.ceil((supplementaryHours * 2) / 3 * 10) / 10;
-                                    maxEmotionalSupportHours = supplementaryHours * (this.moduleConfig.emotionalSupportRatio / 100);
+                            if (subjectInfo) {
+                                requiredSubjectCredits = Number(subjectInfo.학점) || 0;
+                                supplementaryHours = requiredSubjectCredits * this.moduleConfig.hoursPerCredit;
+                                requiredHoursForCompletion = Math.ceil((supplementaryHours * 2) / 3 * 10) / 10;
+                                maxEmotionalSupportHours = supplementaryHours * (this.moduleConfig.emotionalSupportRatio / 100);
                                 }
                             } catch (error) {
                                 console.error('guidanceCompletionStatus에서 findSubjectInCurriculum 호출 오류:', error);
@@ -2098,8 +2183,8 @@
                                 const totalPreventiveHoursForStudent = preventiveTotals[student.id] || 0;
                                 // 예방지도 및 정서지원 연계 규칙 적용
                                 // 1) 예방지도 최대 연계 가능 시수(학생별): 학습지원대상자는 별도 비율 적용
-                                const studentInfo = this.studentData.find(s => String(s['학번']) === student.id);
-                                const isSpecialSupport = studentInfo && studentInfo['특기사항'] === '학습지원대상';
+                                    const studentInfo = this.studentData.find(s => String(s['학번']) === student.id);
+                                    const isSpecialSupport = studentInfo && studentInfo['특기사항'] === '학습지원대상';
                                 const maxPreventiveLinkedHours = supplementaryHours * ((isSpecialSupport ? this.moduleConfig.specialPreventiveRatio : this.moduleConfig.preventiveRatio) / 100);
                                 
                                 // 표시용(원자료) 시간은 그대로 보여주되,
@@ -2109,7 +2194,7 @@
                                 status[student.id].preventiveHours = Math.floor(displayPreventiveHours || 0);
                                 // 합산값은 소수점 유지, 상한만 적용
                                 const creditedPreventiveHours = Math.min((displayPreventiveHours || 0), maxPreventiveLinkedHours);
-                                currentStudentTotal += creditedPreventiveHours;
+                                    currentStudentTotal += creditedPreventiveHours;
 
                                 // 3) 정서지원 인정 시간: 자체 비율 캡을 적용하되,
                                 //    (예방지도 인정 + 정서지원 인정) 합이 예방지도 최대 연계 가능 시간을 초과하지 않도록 추가 캡 적용
@@ -2169,6 +2254,194 @@
                 },
 
                 methods: {
+                    // --- Subject Management ---
+                    selectSubjectFromCard(index) {
+                        this.currentSubjectIndex = index;
+                        this.teacherViewMode = 'dropdown';
+                        this.loadSubjectData(index);
+                    },
+                    switchSubject() {
+                        if (this.currentSubjectIndex >= 0 && this.currentSubjectIndex < this.teacherPlanList.length) {
+                            this.loadSubjectData(this.currentSubjectIndex);
+                        }
+                    },
+                    async loadSubjectData(index) {
+                        if (index < 0 || index >= this.teacherPlanList.length) return;
+                        const plan = this.teacherPlanList[index];
+                        let guidance = this.teacherGuidanceDataList[index];
+                        
+                        // guidance 데이터가 없으면 Firestore에서 로드 시도
+                        if (!guidance) {
+                            this.teacherPlan = JSON.parse(JSON.stringify(plan));
+                            await this.loadGuidanceData();
+                            guidance = JSON.parse(JSON.stringify(this.teacherGuidanceData));
+                            // 로드한 데이터를 리스트에 저장
+                            if (this.teacherGuidanceDataList.length <= index) {
+                                this.teacherGuidanceDataList.push(guidance);
+                            } else {
+                                this.teacherGuidanceDataList[index] = guidance;
+                            }
+                        }
+                        
+                        // 현재 teacherPlan과 teacherGuidanceData에 로드
+                        this.teacherPlan = JSON.parse(JSON.stringify(plan));
+                        this.teacherGuidanceData = JSON.parse(JSON.stringify(guidance));
+                        
+                        // 날짜 필드 복원
+                        const parseDates = (period) => (period || []).map(d => d ? new Date(d.seconds ? d.seconds * 1000 : d) : null).filter(d => d && !isNaN(d.getTime()));
+                        this.teacherPlan.preventionPeriod = parseDates(this.teacherPlan.preventionPeriod);
+                        this.teacherPlan.supplementaryPeriod = parseDates(this.teacherPlan.supplementaryPeriod);
+                        this.teacherPlan.additionalPeriod = parseDates(this.teacherPlan.additionalPeriod);
+                        
+                        this.updateMaxHours();
+                        this.$nextTick(() => { this.initFlatpickr(); });
+                    },
+                    async addNewSubject() {
+                        if (!this.newSubjectForm.subjectName.trim()) {
+                            alert('과목명을 입력해주세요.');
+                            return;
+                        }
+                        
+                        const newPlan = {
+                            subjectName: this.newSubjectForm.subjectName,
+                            subjectGrade: this.newSubjectForm.subjectGrade,
+                            subjectSemester: this.newSubjectForm.subjectSemester,
+                            subjectCategory: this.newSubjectForm.subjectCategory,
+                            teacherNames: this.newSubjectForm.teacherNames.filter(n => n.trim()),
+                            achievements: [createEmptyAchievement()],
+                            gradeCalculation: '추정분할점수',
+                            conductPrevention: 'X',
+                            preventionTarget: '',
+                            preventionMethods: [],
+                            preventionPeriod: [],
+                            preventionSessions: [{ plan: '' }, { plan: '' }, { plan: '' }],
+                            supplementaryMethods: [],
+                            supplementaryPeriod: [],
+                            supplementarySessions: [],
+                            maxSupplementaryHours: 0,
+                            additionalMethods: [],
+                            additionalPeriod: [],
+                            additionalSessions: [],
+                            maxAdditionalHours: 0,
+                        };
+                        
+                        const newGuidance = this.getInitialGuidanceData();
+                        
+                        this.teacherPlanList.push(newPlan);
+                        this.teacherGuidanceDataList.push(newGuidance);
+                        this.currentSubjectIndex = this.teacherPlanList.length - 1;
+                        
+                        // 새 과목을 현재 선택된 과목으로 설정
+                        await this.loadSubjectData(this.currentSubjectIndex);
+                        this.teacherViewMode = 'dropdown';
+                        
+                        // 폼 초기화
+                        this.newSubjectForm = {
+                            subjectName: '',
+                            subjectGrade: null,
+                            subjectSemester: null,
+                            subjectCategory: '',
+                            teacherNames: ['']
+                        };
+                        this.showAddSubjectModal = false;
+                        
+                        // 저장
+                        this.saveAllTeacherData();
+                    },
+                    deleteSubject(index) {
+                        if (!confirm('정말 이 과목을 삭제하시겠습니까? 모든 데이터가 삭제됩니다.')) return;
+                        
+                        this.teacherPlanList.splice(index, 1);
+                        this.teacherGuidanceDataList.splice(index, 1);
+                        
+                        if (this.currentSubjectIndex === index) {
+                            this.currentSubjectIndex = -1;
+                            this.teacherPlan = this.getInitialTeacherPlan();
+                            this.teacherGuidanceData = this.getInitialGuidanceData();
+                        } else if (this.currentSubjectIndex > index) {
+                            this.currentSubjectIndex--;
+                        }
+                        
+                        this.saveAllTeacherData();
+                    },
+                    addNewSubjectTeacher() {
+                        this.newSubjectForm.teacherNames.push('');
+                    },
+                    removeNewSubjectTeacher(index) {
+                        this.newSubjectForm.teacherNames.splice(index, 1);
+                    },
+                    async saveAllTeacherData() {
+                        if (this.role !== '교과교사' || !this.user || !db) return;
+                        const activeSchoolId = this.currentSchoolCode || this.schoolId;
+                        if (!activeSchoolId) return;
+                        
+                        try {
+                            // 날짜 필드를 ISO 문자열로 변환하여 저장
+                            const planListToSave = this.teacherPlanList.map(plan => {
+                                const planCopy = JSON.parse(JSON.stringify(plan));
+                                const formatDates = (period) => (period || []).map(d => (d instanceof Date && !isNaN(d.getTime())) ? d.toISOString() : null).filter(Boolean);
+                                planCopy.preventionPeriod = formatDates(plan.preventionPeriod);
+                                planCopy.supplementaryPeriod = formatDates(plan.supplementaryPeriod);
+                                planCopy.additionalPeriod = formatDates(plan.additionalPeriod);
+                                planCopy.achievements = (planCopy.achievements || []).map((achievement) => {
+                                    if (!achievement) return { text: '', statement: '' };
+                                    const { loading, isEditing, editDraft, ...rest } = achievement;
+                                    return rest;
+                                });
+                                return planCopy;
+                            });
+                            
+                            const teacherDataRef = doc(db, `schools/${activeSchoolId}/teacherData`, this.user.uid);
+                            await setDoc(teacherDataRef, {
+                                planList: planListToSave,
+                                guidanceDataList: this.teacherGuidanceDataList,
+                                lastUpdated: new Date().toISOString()
+                            }, { merge: true });
+                            console.log('모든 과목 데이터 저장 완료');
+                        } catch (error) {
+                            console.error('과목 데이터 저장 실패:', error);
+                        }
+                    },
+                    async loadAllTeacherData() {
+                        if (this.role !== '교과교사' || !this.user || !db) return;
+                        const activeSchoolId = this.currentSchoolCode || this.schoolId;
+                        if (!activeSchoolId) return;
+                        
+                        try {
+                            const teacherDataRef = doc(db, `schools/${activeSchoolId}/teacherData`, this.user.uid);
+                            const teacherDataSnap = await getDoc(teacherDataRef);
+                            
+                            if (teacherDataSnap.exists()) {
+                                const data = teacherDataSnap.data();
+                                if (data.planList && Array.isArray(data.planList)) {
+                                    this.teacherPlanList = data.planList;
+                                }
+                                if (data.guidanceDataList && Array.isArray(data.guidanceDataList)) {
+                                    this.teacherGuidanceDataList = data.guidanceDataList;
+                                }
+                                
+                                // 기존 단일 데이터가 있으면 마이그레이션
+                                if (data.plan && (!this.teacherPlanList || this.teacherPlanList.length === 0)) {
+                                    const planCopy = JSON.parse(JSON.stringify(data.plan));
+                                    const parseDates = (period) => (period || []).map(d => d ? new Date(d.seconds ? d.seconds * 1000 : d) : null).filter(d => d && !isNaN(d.getTime()));
+                                    planCopy.preventionPeriod = parseDates(planCopy.preventionPeriod);
+                                    planCopy.supplementaryPeriod = parseDates(planCopy.supplementaryPeriod);
+                                    planCopy.additionalPeriod = parseDates(planCopy.additionalPeriod);
+                                    this.teacherPlanList = [planCopy];
+                                    this.teacherGuidanceDataList = [data.guidance || this.getInitialGuidanceData()];
+                                    await this.saveAllTeacherData();
+                                }
+                                
+                                // 첫 번째 과목을 기본 선택
+                                if (this.teacherPlanList.length > 0 && this.currentSubjectIndex < 0) {
+                                    this.currentSubjectIndex = 0;
+                                    await this.loadSubjectData(0);
+                                }
+                            }
+                        } catch (error) {
+                            console.error('과목 데이터 로드 실패:', error);
+                        }
+                    },
                     // --- Textarea Resize Helper ---
                     handleTextareaResize(event) {
                         const textarea = event.target;
@@ -3104,17 +3377,30 @@
                                         await this.fetchCurrentSchoolCode();
                                         await this.loadCommonData();
                                         if (this.role === '교과교사') {
-                                            await this.loadTeacherPlan();
-                                            if (this.teacherPlan.subjectName) {
-                                                await this.loadGuidanceData();
-                                                this.filterSupplementaryStudents();
+                                            await this.loadAllTeacherData();
+                                            // 기존 단일 과목 데이터가 있으면 마이그레이션
+                                            if (this.teacherPlanList.length === 0) {
+                                                await this.loadTeacherPlan();
+                                                if (this.teacherPlan.subjectName) {
+                                                    this.teacherPlanList.push(JSON.parse(JSON.stringify(this.teacherPlan)));
+                                                    this.teacherGuidanceDataList.push(JSON.parse(JSON.stringify(this.teacherGuidanceData)));
+                                                    this.currentSubjectIndex = 0;
+                                                    await this.saveAllTeacherData();
+                                                }
+                                            }
+                                            if (this.currentSubjectIndex >= 0 && this.currentSubjectIndex < this.teacherPlanList.length) {
+                                                await this.loadSubjectData(this.currentSubjectIndex);
+                                                if (this.teacherPlan.subjectName) {
+                                                    await this.loadGuidanceData();
+                                                    this.filterSupplementaryStudents();
+                                                }
                                             }
                                         } else if (this.role === '관리자') {
                                         this.underachievers = this.normalizeUnderachieverList(this.deployedUnderachievers);
                                         }
                                     } else if (this.isLoggedIn && this.role && !this.schoolId) {
                                         console.log("Role exists, but schoolId is missing. Showing schoolId modal.");
-                                    this.schoolIdMode = this.role === '관리자' ? 'create' : 'join';
+                                        this.schoolIdMode = this.role === '관리자' ? 'create' : 'join';
                                         this.currentSchoolCode = '';
                                     this.newSchoolId = '';
                                     this.schoolIdError = '';
@@ -3274,38 +3560,51 @@
                         this.schoolId = effectiveCanonicalId;
                         this.currentSchoolCode = code || effectiveCanonicalId;
                         this.showSchoolIdModal = false;
-
+                        
                         console.log("학교코드 최종 확정:", this.currentSchoolCode, "실제 ID:", this.schoolId, "역할:", this.role);
-                        await this.saveUserRoleAndSchoolId(this.role);
-                        console.log("사용자 데이터 저장 완료");
-
-                        await this.loadCommonData();
-                        console.log("공용 데이터 로딩 완료");
-
+                            await this.saveUserRoleAndSchoolId(this.role);
+                            console.log("사용자 데이터 저장 완료");
+                            
+                            await this.loadCommonData();
+                            console.log("공용 데이터 로딩 완료");
+                            
                         if (this.role === '관리자') {
                             this.underachievers = this.normalizeUnderachieverList(this.deployedUnderachievers);
                         }
 
                         if (this.role === '교과교사') {
-                            console.log("교과교사 데이터 로딩 시작");
-                            await this.loadTeacherPlan();
-                            console.log("교과교사 계획안 로딩 완료");
-                            if (this.teacherPlan.subjectName) {
-                                console.log("과목명 존재, 지도 자료 로딩 시작:", this.teacherPlan.subjectName);
-                                await this.loadGuidanceData();
-                                this.filterSupplementaryStudents();
-                                console.log("지도 자료 로딩 완료");
-                            } else {
-                                console.log("과목명 없음, 지도 자료 로딩 건너뜀");
+                                console.log("교과교사 데이터 로딩 시작");
+                                await this.loadAllTeacherData();
+                                // 기존 단일 과목 데이터가 있으면 마이그레이션
+                                if (this.teacherPlanList.length === 0) {
+                                    await this.loadTeacherPlan();
+                                    if (this.teacherPlan.subjectName) {
+                                        this.teacherPlanList.push(JSON.parse(JSON.stringify(this.teacherPlan)));
+                                        this.teacherGuidanceDataList.push(JSON.parse(JSON.stringify(this.teacherGuidanceData)));
+                                        this.currentSubjectIndex = 0;
+                                        await this.saveAllTeacherData();
+                                    }
+                                }
+                                if (this.currentSubjectIndex >= 0 && this.currentSubjectIndex < this.teacherPlanList.length) {
+                                    await this.loadSubjectData(this.currentSubjectIndex);
+                                    console.log("교과교사 계획안 로딩 완료");
+                                    if (this.teacherPlan.subjectName) {
+                                        console.log("과목명 존재, 지도 자료 로딩 시작:", this.teacherPlan.subjectName);
+                                        await this.loadGuidanceData();
+                                        this.filterSupplementaryStudents();
+                                        console.log("지도 자료 로딩 완료");
+                                    } else {
+                                        console.log("과목명 없음, 지도 자료 로딩 건너뜀");
+                                    }
+                                }
                             }
-                        }
-
-                        this.newSchoolId = '';
+                            
+                            this.newSchoolId = '';
                         await this.fetchCurrentSchoolCode();
-                        this.$nextTick(() => { 
-                            this.initFlatpickr();
-                            console.log("Vue 상태 갱신 완료");
-                        });
+                            this.$nextTick(() => { 
+                                this.initFlatpickr();
+                                console.log("Vue 상태 갱신 완료");
+                            });
                         console.log("학교코드 설정 절차 완료");
                     },
                     async handleSchoolIdSubmit() {
@@ -3570,7 +3869,7 @@
                                     this.statusMessage = `공용 데이터 로딩 완료. (저장된 미도달 대상자 ${processedData.length}명 불러옴)`;
                                 } else {
                                     this.underachievers = this.normalizeUnderachieverList(this.deployedUnderachievers);
-                                    this.statusMessage = '공용 데이터 로딩 완료.';
+                            this.statusMessage = '공용 데이터 로딩 완료.';
                                 }
                             } else {
                                 this.underachievers = this.normalizeUnderachieverList(this.deployedUnderachievers);
@@ -3767,8 +4066,9 @@
                             return;
                         }
                         this.teacherPlanStatus = "계획안 저장 중...";
-                        const planDocRef = doc(db, `schools/${activeSchoolId}/teacherData/${this.user.uid}/plans/teacherPlan`);
-                        try {
+                        
+                        // 현재 선택된 과목이 있으면 해당 인덱스의 데이터 업데이트
+                        if (this.currentSubjectIndex >= 0 && this.currentSubjectIndex < this.teacherPlanList.length) {
                             const planToSave = { ...JSON.parse(JSON.stringify(this.teacherPlan)) };
                             const formatDates = (period) => (period || []).map(d => (d instanceof Date && !isNaN(d.getTime())) ? d.toISOString() : null).filter(Boolean);
                             planToSave.preventionPeriod = formatDates(this.teacherPlan.preventionPeriod);
@@ -3780,9 +4080,32 @@
                                 const { loading, isEditing, editDraft, ...rest } = achievement;
                                 return rest;
                             });
-                            await setDoc(planDocRef, planToSave);
+                            
+                            // teacherPlanList 업데이트
+                            this.teacherPlanList[this.currentSubjectIndex] = planToSave;
+                            
+                            // 전체 데이터 저장
+                            await this.saveAllTeacherData();
                             this.teacherPlanStatus = "계획안이 저장되었습니다.";
-                        } catch (error) { console.error("Error saving teacher plan:", error); this.teacherPlanStatus = "계획안 저장 실패: " + error.message; }
+                        } else {
+                            // 기존 방식 (하위 호환성)
+                            const planDocRef = doc(db, `schools/${activeSchoolId}/teacherData/${this.user.uid}/plans/teacherPlan`);
+                            try {
+                                const planToSave = { ...JSON.parse(JSON.stringify(this.teacherPlan)) };
+                                const formatDates = (period) => (period || []).map(d => (d instanceof Date && !isNaN(d.getTime())) ? d.toISOString() : null).filter(Boolean);
+                                planToSave.preventionPeriod = formatDates(this.teacherPlan.preventionPeriod);
+                                planToSave.supplementaryPeriod = formatDates(this.teacherPlan.supplementaryPeriod);
+                                planToSave.additionalPeriod = formatDates(this.teacherPlan.additionalPeriod);
+
+                                planToSave.achievements = (planToSave.achievements || []).map((achievement) => {
+                                    if (!achievement) return { text: '', statement: '' };
+                                    const { loading, isEditing, editDraft, ...rest } = achievement;
+                                    return rest;
+                                });
+                                await setDoc(planDocRef, planToSave);
+                                this.teacherPlanStatus = "계획안이 저장되었습니다.";
+                            } catch (error) { console.error("Error saving teacher plan:", error); this.teacherPlanStatus = "계획안 저장 실패: " + error.message; }
+                        }
                         setTimeout(() => this.teacherPlanStatus = '', 3000);
                     },
                     // 과목명을 안전한 문서 ID로 변환
@@ -3839,7 +4162,7 @@
                                 
                                 // preventive 데이터 로드
                                 if (fetchedData.preventive) {
-                                    this.teacherGuidanceData.preventive = {
+                                this.teacherGuidanceData.preventive = {
                                         students: Array.isArray(fetchedData.preventive.students) ? fetchedData.preventive.students : [],
                                         sessions: this.mergeSessions(defaultGuidance.preventive.sessions, fetchedData.preventive.sessions),
                                         error: fetchedData.preventive.error || ''
@@ -3850,12 +4173,12 @@
                                 
                                 // supplementary 데이터 로드
                                 if (fetchedData.supplementary) {
-                                    this.teacherGuidanceData.supplementary = {
+                                this.teacherGuidanceData.supplementary = {
                                         students: Array.isArray(fetchedData.supplementary.students) ? fetchedData.supplementary.students : [],
                                         sessions: this.mergeSessions(defaultGuidance.supplementary.sessions, fetchedData.supplementary.sessions),
                                         error: fetchedData.supplementary.error || ''
-                                    };
-                                } else {
+                                };
+                            } else {
                                     this.teacherGuidanceData.supplementary = defaultGuidance.supplementary;
                                 }
                                 
@@ -3936,6 +4259,13 @@
                             });
                             
                             await setDoc(doc(db, docPath), dataToSave);
+                            
+                            // 현재 선택된 과목이 있으면 teacherGuidanceDataList에도 업데이트
+                            if (this.currentSubjectIndex >= 0 && this.currentSubjectIndex < this.teacherGuidanceDataList.length) {
+                                this.teacherGuidanceDataList[this.currentSubjectIndex] = JSON.parse(JSON.stringify(this.teacherGuidanceData));
+                                await this.saveAllTeacherData();
+                            }
+                            
                             console.log("saveGuidanceData: 저장 완료");
                             return { success: true, message: '출석부 및 수업일지가 저장되었습니다.' };
                         } catch (error) { 
@@ -4349,7 +4679,7 @@
                         
                         // 인쇄 실행
                         this.$nextTick(() => {
-                            window.print();
+                        window.print();
                             
                             // 인쇄 후 원래 상태 복원
                             setTimeout(() => {
@@ -4408,12 +4738,12 @@
                                     // 학급 추출
                                     const classNumMatch = classInfo.match(/(\d{1,2})\s*반/);
                                     const classNum = classNumMatch ? classNumMatch[1] : null;
-                                    
+
                                     // 분류 추출: '~과'가 있으면 '전문계열', 없으면 '인문계열'
                                     const categoryMatch = classInfo.match(/([^과]+)\s*과/);
                                     // '과'가 있으면 전문계열, 없으면 인문계열
                                     const category = categoryMatch ? '전문계열' : '인문계열';
-                                    
+
                                     console.log(`[processGradeFiles] 분류 추출: "${classInfo}" → ${category}`);
 
                                     if (!classGrade || !classNum) throw new Error(`'${file.name}' 파일의 학급 정보 형식("${classInfo}")이 예상과 다릅니다. (예: '1학년 3반')`);
@@ -4837,10 +5167,10 @@
                                 this.teacherPlan.subjectSemester,
                                 this.teacherPlan.subjectCategory
                             );
-                            if (subject) {
-                                const credits = Number(subject.학점);
-                                if (!isNaN(credits) && credits > 0) {
-                                    calculatedHours = credits * this.moduleConfig.hoursPerCredit;
+                        if (subject) {
+                            const credits = Number(subject.학점);
+                            if (!isNaN(credits) && credits > 0) {
+                                calculatedHours = credits * this.moduleConfig.hoursPerCredit;
                                 }
                             }
                         }
@@ -4901,7 +5231,7 @@
                                 } else if (response.status === 500) {
                                     throw new Error(`서버 오류 (500): ${errorMessage}`);
                                 } else {
-                                    throw new Error(`API 요청 실패 (${response.status}): ${errorMessage}`);
+                                throw new Error(`API 요청 실패 (${response.status}): ${errorMessage}`);
                                 }
                             }
                             const result = await response.json();
@@ -5086,8 +5416,8 @@
                             try {
                                 await this.loadCommonData();
                                 if (!this.studentData || this.studentData.length === 0) {
-                                    data.error = '학적 정보가 로드되지 않았습니다. 관리자가 학적 정보를 업로드했는지 확인하거나 잠시 후 다시 시도해주세요.';
-                                    return;
+                            data.error = '학적 정보가 로드되지 않았습니다. 관리자가 학적 정보를 업로드했는지 확인하거나 잠시 후 다시 시도해주세요.';
+                            return;
                                 }
                             } catch (error) {
                                 console.error("학적 정보 재로드 실패:", error);
@@ -6020,7 +6350,7 @@
                             this.adminModifyError = '';
                             this.adminActionStatus = `학교코드가 '${newCode}'(으)로 변경되었습니다. 새 코드를 교사들에게 공유하세요.`;
                             this.showAdminModifyModal = false;
-                            this.newSchoolIdForModify = '';
+                        this.newSchoolIdForModify = '';
                         } catch (error) {
                             console.error("학교코드 변경 중 오류:", error);
                             this.adminModifyError = error?.message || '학교코드 변경 중 오류가 발생했습니다.';
