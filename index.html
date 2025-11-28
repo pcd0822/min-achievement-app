@@ -1152,8 +1152,7 @@
                                                            class="w-full p-1 border rounded text-xs" 
                                                            :class="{ 'attendance-dropdown-changed': isAttendanceChanged(session, student.id) }"
                                                            v-model="session.attendance[student.id]" 
-                                                           :disabled="session.isSaved" 
-                                                           @change="saveGuidanceData">
+                                                           :disabled="session.isSaved">
                                                            <option value="">선택</option>
                                                            <option v-for="rh in moduleConfig.recognizedHours" :key="rh.name" :value="rh.name">{{ rh.name }}</option>
                                                        </select>
@@ -4249,7 +4248,7 @@
                             this.$nextTick(() => { this.initFlatpickr(); });
                         }
                     },
-                    async saveGuidanceData(){
+                    async saveGuidanceData(updateOriginal = false){
                         if (!this.user || !db || !this.schoolId) {
                             console.warn("saveGuidanceData: 저장 조건 불만족", {
                                 hasUser: !!this.user,
@@ -4312,30 +4311,32 @@
                             
                             await setDoc(doc(db, docPath), dataToSave);
                             
-                            // 저장 성공 후 원본 attendance 값을 현재 값으로 업데이트 (변경 추적 리셋)
-                            if (this.teacherGuidanceData.preventive && this.teacherGuidanceData.preventive.sessions) {
-                                this.teacherGuidanceData.preventive.sessions.forEach(session => {
-                                    if (session && session.attendance) {
-                                        if (!session.originalAttendance) {
-                                            session.originalAttendance = {};
+                            // updateOriginal이 true일 때만 원본 attendance 값을 현재 값으로 업데이트 (변경 추적 리셋)
+                            if (updateOriginal) {
+                                if (this.teacherGuidanceData.preventive && this.teacherGuidanceData.preventive.sessions) {
+                                    this.teacherGuidanceData.preventive.sessions.forEach(session => {
+                                        if (session && session.attendance) {
+                                            if (!session.originalAttendance) {
+                                                session.originalAttendance = {};
+                                            }
+                                            Object.keys(session.attendance).forEach(studentId => {
+                                                session.originalAttendance[studentId] = session.attendance[studentId] || '';
+                                            });
                                         }
-                                        Object.keys(session.attendance).forEach(studentId => {
-                                            session.originalAttendance[studentId] = session.attendance[studentId] || '';
-                                        });
-                                    }
-                                });
-                            }
-                            if (this.teacherGuidanceData.supplementary && this.teacherGuidanceData.supplementary.sessions) {
-                                this.teacherGuidanceData.supplementary.sessions.forEach(session => {
-                                    if (session && session.attendance) {
-                                        if (!session.originalAttendance) {
-                                            session.originalAttendance = {};
+                                    });
+                                }
+                                if (this.teacherGuidanceData.supplementary && this.teacherGuidanceData.supplementary.sessions) {
+                                    this.teacherGuidanceData.supplementary.sessions.forEach(session => {
+                                        if (session && session.attendance) {
+                                            if (!session.originalAttendance) {
+                                                session.originalAttendance = {};
+                                            }
+                                            Object.keys(session.attendance).forEach(studentId => {
+                                                session.originalAttendance[studentId] = session.attendance[studentId] || '';
+                                            });
                                         }
-                                        Object.keys(session.attendance).forEach(studentId => {
-                                            session.originalAttendance[studentId] = session.attendance[studentId] || '';
-                                        });
-                                    }
-                                });
+                                    });
+                                }
                             }
                             
                             // 현재 선택된 과목이 있으면 teacherGuidanceDataList에도 업데이트
@@ -4452,7 +4453,7 @@
                             return;
                         }
                         this[statusVar] = '저장 중...';
-                        const result = await this.saveGuidanceData();
+                        const result = await this.saveGuidanceData(true); // 원본 값 업데이트
                         if (result) {
                             if (result.success) {
                                 this[statusVar] = '✓ 저장 완료';
