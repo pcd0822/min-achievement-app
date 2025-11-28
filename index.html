@@ -4453,7 +4453,7 @@
                             return;
                         }
                         this[statusVar] = '저장 중...';
-                        const result = await this.saveGuidanceData(true); // 원본 값 업데이트
+                        const result = await this.saveGuidanceData(); // 차시별 저장에서 원본 값 업데이트하므로 여기서는 false
                         if (result) {
                             if (result.success) {
                                 this[statusVar] = '✓ 저장 완료';
@@ -5617,6 +5617,7 @@
                     },
                     toggleSaveSession(session) {
                         if (this.role !== '교과교사' || !session) return;
+                        const wasSaved = session.isSaved;
                         session.isSaved = !session.isSaved;
                         if (this.currentGuidanceData && this.currentGuidanceData.students) {
                             this.currentGuidanceData.students.forEach(student => {
@@ -5624,6 +5625,15 @@
                                 if (student && !session.attendance.hasOwnProperty(student.id)) {
                                     session.attendance[student.id] = '';
                                 }
+                            });
+                        }
+                        // 저장 버튼을 눌렀을 때 (isSaved가 false -> true로 변경될 때) 원본 값 업데이트
+                        if (!wasSaved && session.isSaved && session.attendance) {
+                            if (!session.originalAttendance) {
+                                session.originalAttendance = {};
+                            }
+                            Object.keys(session.attendance).forEach(studentId => {
+                                session.originalAttendance[studentId] = session.attendance[studentId] || '';
                             });
                         }
                         this.saveGuidanceData();
