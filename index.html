@@ -97,6 +97,10 @@
             white-space: normal;
             word-break: keep-all;
         }
+        .attendance-dropdown-changed {
+            background-color: #fef3c7 !important; /* 노란색 배경 */
+            border-color: #f59e0b !important; /* 주황색 테두리 */
+        }
         .table-exception-cell {
             min-width: 280px;
             max-width: 420px;
@@ -1144,7 +1148,12 @@
                                                        </div>
                                                    </td>
                                                    <td v-for="(session, index) in currentGuidanceData.sessions" :key="index" class="p-2 border border-gray-300 align-top">
-                                                       <select class="w-full p-1 border rounded text-xs" v-model="session.attendance[student.id]" :disabled="session.isSaved" @change="saveGuidanceData">
+                                                       <select 
+                                                           class="w-full p-1 border rounded text-xs" 
+                                                           :class="{ 'attendance-dropdown-changed': isAttendanceChanged(session, student.id) }"
+                                                           v-model="session.attendance[student.id]" 
+                                                           :disabled="session.isSaved" 
+                                                           @change="saveGuidanceData">
                                                            <option value="">선택</option>
                                                            <option v-for="rh in moduleConfig.recognizedHours" :key="rh.name" :value="rh.name">{{ rh.name }}</option>
                                                        </select>
@@ -1869,8 +1878,8 @@
                         },
                         teacherPlanError: '',
                         teacherGuidanceData: {
-                            preventive: { students: [], sessions: Array.from({ length: 10 }, () => ({ date: '', time: '', isSaved: false, place: '', content: '', attendance: {} })), error: ''},
-                            supplementary: { students: [], sessions: Array.from({ length: 10 }, () => ({ date: '', time: '', isSaved: false, place: '', content: '', attendance: {} })), error: ''}
+                            preventive: { students: [], sessions: Array.from({ length: 10 }, () => ({ date: '', time: '', isSaved: false, place: '', content: '', attendance: {}, originalAttendance: {} })), error: ''},
+                            supplementary: { students: [], sessions: Array.from({ length: 10 }, () => ({ date: '', time: '', isSaved: false, place: '', content: '', attendance: {}, originalAttendance: {} })), error: ''}
                         },
                         newGuidanceStudentId: '',
                         
@@ -2511,7 +2520,7 @@
                         };
                     },
                     getInitialGuidanceData() {
-                        const defaultSession = () => ({ date: '', time: '', isSaved: false, place: '', content: '', attendance: {} });
+                        const defaultSession = () => ({ date: '', time: '', isSaved: false, place: '', content: '', attendance: {}, originalAttendance: {} });
                         return {
                             preventive: { students: [], sessions: Array.from({ length: 10 }, defaultSession), error: ''},
                             supplementary: { students: [], sessions: Array.from({ length: 10 }, defaultSession), error: ''}
@@ -4303,6 +4312,32 @@
                             
                             await setDoc(doc(db, docPath), dataToSave);
                             
+                            // 저장 성공 후 원본 attendance 값을 현재 값으로 업데이트 (변경 추적 리셋)
+                            if (this.teacherGuidanceData.preventive && this.teacherGuidanceData.preventive.sessions) {
+                                this.teacherGuidanceData.preventive.sessions.forEach(session => {
+                                    if (session && session.attendance) {
+                                        if (!session.originalAttendance) {
+                                            session.originalAttendance = {};
+                                        }
+                                        Object.keys(session.attendance).forEach(studentId => {
+                                            session.originalAttendance[studentId] = session.attendance[studentId] || '';
+                                        });
+                                    }
+                                });
+                            }
+                            if (this.teacherGuidanceData.supplementary && this.teacherGuidanceData.supplementary.sessions) {
+                                this.teacherGuidanceData.supplementary.sessions.forEach(session => {
+                                    if (session && session.attendance) {
+                                        if (!session.originalAttendance) {
+                                            session.originalAttendance = {};
+                                        }
+                                        Object.keys(session.attendance).forEach(studentId => {
+                                            session.originalAttendance[studentId] = session.attendance[studentId] || '';
+                                        });
+                                    }
+                                });
+                            }
+                            
                             // 현재 선택된 과목이 있으면 teacherGuidanceDataList에도 업데이트
                             if (this.currentSubjectIndex >= 0 && this.currentSubjectIndex < this.teacherGuidanceDataList.length) {
                                 this.teacherGuidanceDataList[this.currentSubjectIndex] = JSON.parse(JSON.stringify(this.teacherGuidanceData));
@@ -4439,25 +4474,42 @@
                         const currentStudents = (this.teacherTab === 'preventive' ? this.teacherGuidanceData.preventive?.students : this.teacherGuidanceData.supplementary?.students) || [];
 
                         for (let i = 0; i < mergedLength; i++) {
-                            const defaultSess = { date: '', time: '', isSaved: false, place: '', content: '', attendance: {} };
+                            const defaultSess = { date: '', time: '', isSaved: false, place: '', content: '', attendance: {}, originalAttendance: {} };
                             const loadedSess = validLoadedSessions[i];
                             let sessionToPush;
 
                             if (loadedSess) {
                                 loadedSess.attendance = loadedSess.attendance || {};
                                 sessionToPush = { ...defaultSess, ...loadedSess };
+                                // 원본 attendance 값 저장 (변경 추적용)
+                                sessionToPush.originalAttendance = JSON.parse(JSON.stringify(loadedSess.attendance || {}));
                             } else {
                                 sessionToPush = defaultSess;
+                                sessionToPush.originalAttendance = {};
                             }
                             
                             currentStudents.forEach(student => {
                                 if (student && !sessionToPush.attendance.hasOwnProperty(student.id)) {
                                     sessionToPush.attendance[student.id] = '';
                                 }
+                                // originalAttendance에도 초기값 설정
+                                if (student && !sessionToPush.originalAttendance.hasOwnProperty(student.id)) {
+                                    sessionToPush.originalAttendance[student.id] = '';
+                                }
                             });
                             merged.push(sessionToPush);
                         }
                         return merged;
+                    },
+                    isAttendanceChanged(session, studentId) {
+                        // 세션이 없거나 원본 값이 없으면 변경되지 않은 것으로 간주
+                        if (!session || !session.originalAttendance) {
+                            return false;
+                        }
+                        // 현재 값과 원본 값 비교
+                        const currentValue = session.attendance && session.attendance[studentId] ? session.attendance[studentId] : '';
+                        const originalValue = session.originalAttendance[studentId] ? session.originalAttendance[studentId] : '';
+                        return currentValue !== originalValue;
                     },
                     findSubjectInCurriculum(subjectName, grade, semester, category) {
                         // 교육과정 편제표에서 과목명, 학년, 학기, 분류가 모두 일치하는 과목 검색
@@ -5492,7 +5544,19 @@
                             }
                             data.students.push(studentToAdd);
                             data.students.sort((a, b) => a.id.localeCompare(b.id));
-                            data.sessions.forEach(session => { if (session && !session.attendance.hasOwnProperty(studentId)) { session.attendance[studentId] = ''; } });
+                            data.sessions.forEach(session => { 
+                                if (session) {
+                                    if (!session.attendance.hasOwnProperty(studentId)) { 
+                                        session.attendance[studentId] = ''; 
+                                    }
+                                    if (!session.originalAttendance) {
+                                        session.originalAttendance = {};
+                                    }
+                                    if (!session.originalAttendance.hasOwnProperty(studentId)) {
+                                        session.originalAttendance[studentId] = '';
+                                    }
+                                }
+                            });
                             this.newGuidanceStudentId = '';
                             this.saveGuidanceData();
                         } else {
@@ -5518,8 +5582,13 @@
                         // 모든 세션의 출석 정보에서도 제거
                         if (data.sessions) {
                             data.sessions.forEach(session => {
-                                if (session && session.attendance && session.attendance.hasOwnProperty(studentId)) {
-                                    delete session.attendance[studentId];
+                                if (session) {
+                                    if (session.attendance && session.attendance.hasOwnProperty(studentId)) {
+                                        delete session.attendance[studentId];
+                                    }
+                                    if (session.originalAttendance && session.originalAttendance.hasOwnProperty(studentId)) {
+                                        delete session.originalAttendance[studentId];
+                                    }
                                 }
                             });
                         }
@@ -5529,8 +5598,14 @@
                     addGuidanceSession(type) {
                         if (this.role !== '교과교사') return; const data = this.teacherGuidanceData[type]; if (!data) return;
                         const initialAttendance = {};
-                        data.students.forEach(s => { if (s) initialAttendance[s.id] = ''; });
-                        data.sessions.push({ date: '', time: '', isSaved: false, place: '', content: '', attendance: initialAttendance });
+                        const initialOriginalAttendance = {};
+                        data.students.forEach(s => { 
+                            if (s) {
+                                initialAttendance[s.id] = '';
+                                initialOriginalAttendance[s.id] = '';
+                            }
+                        });
+                        data.sessions.push({ date: '', time: '', isSaved: false, place: '', content: '', attendance: initialAttendance, originalAttendance: initialOriginalAttendance });
                         this.saveGuidanceData();
                         this.$nextTick(() => { this.initFlatpickr(); });
                     },
@@ -5927,7 +6002,12 @@
                         if (this.role !== '교과교사') return;
                         if (this.teacherGuidanceData.supplementary) {
                             this.teacherGuidanceData.supplementary.students = [];
-                            this.teacherGuidanceData.supplementary.sessions.forEach(session => { if(session) session.attendance = {}; });
+                            this.teacherGuidanceData.supplementary.sessions.forEach(session => { 
+                                if(session) {
+                                    session.attendance = {};
+                                    session.originalAttendance = {};
+                                }
+                            });
                             this.saveGuidanceData();
                         }
                     },
@@ -6447,5 +6527,6 @@
 
 </body>
 </html>
+
 
 
