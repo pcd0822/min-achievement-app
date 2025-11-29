@@ -2738,11 +2738,24 @@
                         };
                         this.completionExcelData = [];
                         this.statisticsState.error = '통계 데이터가 초기화되었습니다. 이수현황 엑셀을 다시 업로드해주세요.';
+                        
+                        // 파일 입력 필드 초기화
+                        this.$nextTick(() => {
+                            const fileInput = document.querySelector('input[type="file"][accept=".xlsx,.xls"]');
+                            if (fileInput) {
+                                fileInput.value = '';
+                            }
+                        });
                     },
                     async handleCompletionExcelUpload(event) {
                         if (this.role !== '관리자') return;
                         const files = event?.target?.files;
                         if (!files || files.length === 0) return;
+
+                        console.log('[통계] 엑셀 파일 업로드 시작:', {
+                            fileCount: files.length,
+                            fileNames: Array.from(files).map(f => f.name)
+                        });
 
                         this.statisticsState.loading = true;
                         this.statisticsState.error = '';
@@ -2797,7 +2810,14 @@
                                 totalFiles: allSubjects.length,
                                 subjects: allSubjects.map(s => ({ name: s.subjectName, rows: s.rows.length }))
                             });
+                            
+                            // 통계 재계산
                             this.recomputeStatisticsFromCompletionExcel();
+                            
+                            // 파일 입력 필드 초기화 (같은 파일을 다시 선택할 수 있도록)
+                            if (event?.target) {
+                                event.target.value = '';
+                            }
                         } catch (error) {
                             console.error('이수현황 엑셀 업로드 오류:', error);
                             this.statisticsState.error = '이수현황 엑셀을 처리하는 중 오류가 발생했습니다.';
@@ -2807,15 +2827,20 @@
                     },
                     recomputeStatisticsFromCompletionExcel() {
                         if (!this.completionExcelData || this.completionExcelData.length === 0) {
-                            console.log('업로드된 이수현황 엑셀 데이터가 없습니다.');
+                            console.warn('[통계] 업로드된 이수현황 엑셀 데이터가 없습니다.');
+                            this.statisticsState.error = '엑셀 데이터가 없습니다. 파일을 업로드해주세요.';
                             return;
                         }
 
                         console.log('[통계] 엑셀 데이터 재계산 시작:', {
                             subjectCount: this.completionExcelData.length,
                             subjects: this.completionExcelData.map(e => e.subjectName),
-                            sampleRows: this.completionExcelData[0]?.rows?.slice(0, 2)
+                            sampleRows: this.completionExcelData[0]?.rows?.slice(0, 2),
+                            totalRows: this.completionExcelData.reduce((sum, e) => sum + (e.rows?.length || 0), 0)
                         });
+
+                        // 에러 초기화
+                        this.statisticsState.error = '';
 
                         const subjectSummaryMap = new Map();
                         const preventionSummaryMap = new Map();
@@ -3094,67 +3119,28 @@
                             preventionSummaryCount: preventionSummary.length,
                             additionalSummaryCount: additionalSummary.length,
                             remedialSummaryCount: remedialSummary.length,
+                            multiSubjectBucketsCount: multiSubjectBuckets.length,
                             samplePrevention: preventionSummary.slice(0, 2),
                             sampleAdditional: additionalSummary.slice(0, 2),
                             sampleRemedial: remedialSummary.slice(0, 2),
                             fullPrevention: preventionSummary,
                             fullAdditional: additionalSummary,
-                            fullRemedial: remedialSummary
+                            fullRemedial: remedialSummary,
+                            multiSubjectBuckets: multiSubjectBuckets
                         });
 
-                        // Vue 반응성 강제 업데이트
-                        this.$forceUpdate();
-                    },
-                    async handleCompletionExcelUpload(event) {
-                        if (this.role !== '관리자') return;
-                        const files = event?.target?.files;
-                        if (!files || files.length === 0) return;
-
-                        this.statisticsState.loading = true;
-                        this.statisticsState.error = '';
-                        this.completionExcelData = [];
-
-                        try {
-                            const readFileAsRows = (file) => new Promise((resolve, reject) => {
-                                const reader = new FileReader();
-                                reader.onload = e => {
-                                    try {
-                                        const data = new Uint8Array(e.target.result);
-                                        const workbook = XLSX.read(data, { type: 'array' });
-                                        const firstSheet = workbook.SheetNames[0];
-                                        const ws = workbook.Sheets[firstSheet];
-                                        const rows = XLSX.utils.sheet_to_json(ws);
-                                        resolve(rows);
-                                    } catch (err) { reject(err); }
-                                };
-                                reader.onerror = err => reject(err);
-                                reader.readAsArrayBuffer(file);
-                            });
-
-                            const allSubjects = [];
-
-                            for (const file of files) {
-                                const rows = await readFileAsRows(file);
-                                if (!rows || rows.length === 0) continue;
-
-                                let subjectName = '';
-                                const name = file.name || '';
-                                const parts = name.replace(/\.xlsx?$/i, '').split('_');
-                                if (parts.length >= 2) {
-                                    subjectName = parts[1]; // 이수현황표_<과목명>_날짜
-                                }
-
-                                allSubjects.push({ subjectName, rows });
-                            }
-
-                            this.completionExcelData = allSubjects;
-                            this.recomputeStatisticsFromCompletionExcel();
-                        } catch (error) {
-                            console.error('이수현황 엑셀 업로드 오류:', error);
-                            this.statisticsState.error = '이수현황 엑셀을 처리하는 중 오류가 발생했습니다.';
-                        } finally {
-                            this.statisticsState.loading = false;
+                        // 데이터가 제대로 계산되었는지 확인
+                        if (subjectSummary.length === 0 && preventionSummary.length === 0) {
+                            console.warn('[통계] 계산된 데이터가 없습니다. 엑셀 파일 형식을 확인해주세요.');
+                            this.statisticsState.error = '엑셀 파일에서 데이터를 읽을 수 없습니다. 파일 형식을 확인해주세요.';
+                        } else {
+                            this.statisticsState.error = '';
                         }
+
+                        // Vue 반응성 강제 업데이트
+                        this.$nextTick(() => {
+                            this.$forceUpdate();
+                        });
                     },
                     recomputeStatisticsFromCompletionExcel() {
                         if (!this.completionExcelData || this.completionExcelData.length === 0) {
