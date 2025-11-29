@@ -1432,15 +1432,38 @@
                              </div>
                          </div>
                          <div>
-                             <label class="block text-sm font-medium text-gray-700">학급 (예: 101, 102)</label>
-                             <input
-                                 type="text"
-                                 v-model="importClassId"
-                                 placeholder="예: 101 (1학년 1반), 202 (2학년 2반)"
-                                 class="w-full p-2 border rounded-md"
-                             >
+                             <label class="block text-sm font-medium text-gray-700">학급 (여러 학급 입력 가능, 예: 101, 102)</label>
+                             <div class="space-y-2">
+                                 <div
+                                     v-for="(cls, index) in importClasses"
+                                     :key="'import-class-' + index"
+                                     class="flex items-center space-x-2"
+                                 >
+                                     <input
+                                         type="text"
+                                         v-model="importClasses[index]"
+                                         placeholder="예: 101 (1학년 1반), 202 (2학년 2반)"
+                                         class="flex-1 p-2 border rounded-md"
+                                     >
+                                     <button
+                                         type="button"
+                                         @click="removeImportClassInput(index)"
+                                         v-if="importClasses.length > 1"
+                                         class="px-2 py-1 bg-red-500 text-white text-xs rounded-md hover:bg-red-600"
+                                     >
+                                         삭제
+                                     </button>
+                                 </div>
+                                 <button
+                                     type="button"
+                                     @click="addImportClassInput"
+                                     class="px-3 py-1 bg-gray-200 text-gray-800 text-xs rounded-md hover:bg-gray-300"
+                                 >
+                                     + 학급 추가
+                                 </button>
+                             </div>
                              <p class="mt-1 text-xs text-gray-500">
-                                 학급 번호는 학생 학번 5자리 중 앞 3자리와 일치해야 합니다. (예: 1학년 1반 = 101)
+                                 각 학급 번호는 학생 학번 5자리 중 앞 3자리와 일치해야 합니다. (예: 1학년 1반 = 101)
                              </p>
                          </div>
                          <div>
@@ -1926,7 +1949,6 @@
                         importSemester: null,
                         importCategory: '',
                         importModalError: '',
-                        importClassId: '',
                         selectedUnderachieverFile: null,
                         // --- Multi-Subject Management ---
                         teacherPlanList: [], // 여러 과목의 계획서 배열
@@ -4280,11 +4302,11 @@
                             if (!student || !Array.isArray(student.details)) return;
                             student.details.forEach(detail => {
                                 if (!detail || !detail.subjects) return;
-                                // '과목명(학점수), 과목명(학점수)...' 형태에서 과목명만 추출
+                                // '과목명(4학점), 과목명(3학점)...' 형태의 토큰을 그대로 사용
+                                // 과목명이 같아도 학점이 다르면 서로 다른 항목으로 구분되도록 함
                                 const parts = String(detail.subjects).split(/[,]/).map(s => s.trim()).filter(Boolean);
                                 parts.forEach(p => {
-                                    const nameOnly = p.split('(')[0].trim();
-                                    if (nameOnly) subjectsSet.add(nameOnly);
+                                    if (p) subjectsSet.add(p);
                                 });
                             });
                         });
@@ -5988,16 +6010,20 @@
                             const grade = this.teacherPlan.subjectGrade != null ? Number(this.teacherPlan.subjectGrade) : null;
                             const semester = this.teacherPlan.subjectSemester != null ? Number(this.teacherPlan.subjectSemester) : null;
                             const category = (this.teacherPlan.subjectCategory || '').trim();
-                            const classId = (this.importClassId || '').trim();
 
                             if (!subjectName || grade == null || semester == null || !category) {
                                 this.importModalError = '계획서 작성 탭에서 과목명, 학년, 학기, 계열을 모두 입력하고 저장한 후 다시 시도해주세요.';
                                 return;
                             }
-                            if (!classId || classId.length !== 3) {
-                                this.importModalError = '학급 번호(예: 101, 102)를 3자리로 정확히 입력해주세요.';
+                            // 유효한 학급 번호(3자리)만 필터링
+                            const validClasses = (this.importClasses || [])
+                                .map(c => String(c || '').trim())
+                                .filter(c => c.length === 3);
+                            if (!validClasses.length) {
+                                this.importModalError = '학급 번호(예: 101, 102)를 3자리로 최소 1개 이상 정확히 입력해주세요.';
                                 return;
                             }
+                            const classSet = new Set(validClasses);
                             if (!this.selectedUnderachieverFile) {
                                 this.importModalError = '관리자로부터 공유받은 미도달 대상자 엑셀 파일을 선택해주세요.';
                                 return;
@@ -6055,9 +6081,9 @@
                                     const name = String(row['이름'] || '').trim();
                                     if (!id || !name) return;
 
-                                    // 학급 필터: 학번 앞 3자리가 입력된 학급 번호와 일치하는 학생만 대상
+                                    // 학급 필터: 학번 앞 3자리가 입력된 여러 학급 번호 중 하나와 일치하는 학생만 대상
                                     const studentClass = id.substring(0, 3);
-                                    if (studentClass !== classId) return;
+                                    if (!classSet.has(studentClass)) return;
 
                                     const subjectsCell = String(row['미도달 과목(학점수)'] || '');
                                     if (!subjectsCell) return;
