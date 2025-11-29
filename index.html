@@ -3195,46 +3195,6 @@
                             this.$forceUpdate();
                         });
                     },
-                    recomputeStatisticsFromCompletionExcel() {
-                        if (!this.completionExcelData || this.completionExcelData.length === 0) {
-                            console.log('업로드된 이수현황 엑셀 데이터가 없습니다.');
-                            return;
-                        }
-
-                        const subjectSummaryMap = new Map();
-
-                        this.completionExcelData.forEach(entry => {
-                            const subjectName = entry.subjectName || '미지정 과목';
-                            if (!subjectSummaryMap.has(subjectName)) {
-                                subjectSummaryMap.set(subjectName, {
-                                    subjectName,
-                                    credits: 0,
-                                    gradeCount: 0,
-                                    attendanceCount: 0,
-                                    exceptionCount: 0,
-                                    incompleteCount: 0,
-                                    completeCount: 0,
-                                    category: ''
-                                });
-                            }
-                            const summary = subjectSummaryMap.get(subjectName);
-
-                            (entry.rows || []).forEach(row => {
-                                const status = String(row['이수여부'] || '').trim();
-                                const reason = String(row['미도달항목'] || row['미도달내역'] || '').trim();
-
-                                if (reason.includes('학업성취율')) summary.gradeCount += 1;
-                                if (reason.includes('과목출석률')) summary.attendanceCount += 1;
-                                if (String(row['특기사항'] || '').includes('예외')) summary.exceptionCount += 1;
-
-                                if (status === '이수') summary.completeCount += 1;
-                                else summary.incompleteCount += 1;
-                            });
-                        });
-
-                        this.statisticsState.subjectSummary = Array.from(subjectSummaryMap.values());
-                        this.statisticsState.lastUpdated = new Date().toLocaleString();
-                    },
                     async computeStatisticsData() {
                         // currentSchoolCode를 우선 사용, 없으면 schoolId 사용
                         const activeSchoolId = this.currentSchoolCode || this.schoolId;
