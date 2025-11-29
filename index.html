@@ -2800,7 +2800,10 @@
 
                             for (const file of files) {
                                 const rows = await readFileAsRows(file);
-                                if (!rows || rows.length === 0) continue;
+                                if (!rows || rows.length === 0) {
+                                    console.warn('[통계] 빈 엑셀 파일:', file.name);
+                                    continue;
+                                }
 
                                 let subjectName = '';
                                 const name = file.name || '';
@@ -2809,10 +2812,22 @@
                                     subjectName = parts[1]; // 이수현황표_<과목명>_날짜
                                 }
 
+                                console.log('[통계] 엑셀 파일 처리:', {
+                                    fileName: file.name,
+                                    subjectName,
+                                    rowCount: rows.length,
+                                    firstRowKeys: rows[0] ? Object.keys(rows[0]) : [],
+                                    firstRowSample: rows[0]
+                                });
+
                                 allSubjects.push({ subjectName, rows });
                             }
 
                             this.completionExcelData = allSubjects;
+                            console.log('[통계] 업로드된 엑셀 데이터:', {
+                                totalFiles: allSubjects.length,
+                                subjects: allSubjects.map(s => ({ name: s.subjectName, rows: s.rows.length }))
+                            });
                             this.recomputeStatisticsFromCompletionExcel();
                         } catch (error) {
                             console.error('이수현황 엑셀 업로드 오류:', error);
@@ -2922,12 +2937,18 @@
                             const additional = additionalSummaryMap.get(subjectKey);
                             const remedial = remedialSummaryMap.get(subjectKey);
 
-                            (entry.rows || []).forEach(row => {
+                            (entry.rows || []).forEach((row, rowIndex) => {
                                 // 각 행에서도 학년, 학기, 계열, 학점 정보 확인 (없으면 첫 번째 행의 값 사용)
                                 const rowGrade = row['학년'] != null ? Number(row['학년']) : subjectGrade;
                                 const rowSemester = row['학기'] != null ? Number(row['학기']) : subjectSemester;
                                 const rowCategory = String(row['계열'] || '').trim() || subjectCategory;
                                 const rowCredits = Number(row['학점'] || 0) || subjectCredits;
+
+                                // 디버깅: 첫 번째 행의 열 이름 확인
+                                if (rowIndex === 0) {
+                                    console.log('[통계] 엑셀 첫 번째 행의 열 이름:', Object.keys(row));
+                                    console.log('[통계] 엑셀 첫 번째 행 데이터:', row);
+                                }
 
                                 const status = String(row['이수여부'] || '').trim();
                                 const reason = String(row['미도달항목'] || row['미도달내역'] || '').trim();
@@ -2936,6 +2957,18 @@
                                 // 엑셀 파일에 저장된 실제 열 이름: '예방지도시간' (엑셀 저장 시 사용)
                                 const preventiveHours = Number(row['예방지도시간'] || row['예방지도'] || 0);
                                 const totalHours = Number(row['총계'] || 0);
+
+                                // 디버깅: 첫 번째 행의 주요 값 확인
+                                if (rowIndex === 0) {
+                                    console.log('[통계] 첫 번째 행 주요 값:', {
+                                        status,
+                                        reason,
+                                        preventiveHours,
+                                        totalHours,
+                                        hasGrade: reason.includes('학업성취율'),
+                                        hasAttendance: reason.includes('과목출석률')
+                                    });
+                                }
 
                                 const hasGrade = reason.includes('학업성취율');
                                 const hasAttendance = reason.includes('과목출석률');
@@ -3055,8 +3088,14 @@
                             remedialSummaryCount: remedialSummary.length,
                             samplePrevention: preventionSummary.slice(0, 2),
                             sampleAdditional: additionalSummary.slice(0, 2),
-                            sampleRemedial: remedialSummary.slice(0, 2)
+                            sampleRemedial: remedialSummary.slice(0, 2),
+                            fullPrevention: preventionSummary,
+                            fullAdditional: additionalSummary,
+                            fullRemedial: remedialSummary
                         });
+
+                        // Vue 반응성 강제 업데이트
+                        this.$forceUpdate();
                     },
                     async handleCompletionExcelUpload(event) {
                         if (this.role !== '관리자') return;
