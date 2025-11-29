@@ -1637,7 +1637,7 @@
                                 <tbody>
                                     <tr v-for="row in filteredPreventionSummary" :key="`${row.subjectName}-${row.category || ''}-${row.credits || 0}`">
                                         <td>{{ row.displayName || row.subjectName }}{{ row.category ? ' (' + row.category + ')' : '' }}</td>
-                                        <td>{{ row.hasPrevention ? '진행' : '미진행' }}</td>
+                                        <td>{{ row.hasPrevention ? '진행함' : '미진행' }}</td>
                                         <td>{{ row.participants }}</td>
                                         <td>{{ row.nonParticipants }}</td>
                                     </tr>
@@ -1740,7 +1740,7 @@
                         </section>
 
                         <section>
-                            <h4 class="stats-section-title">학업성취율 다과목 미도달 학생 수</h4>
+                            <h4 class="stats-section-title">다과목 미도달 학생 수</h4>
                             <table class="stats-table">
                                 <thead>
                                     <tr>
@@ -1760,37 +1760,6 @@
                             </table>
                         </section>
 
-                        <section>
-                            <h4 class="stats-section-title">학년별 예방지도 참가자 비율</h4>
-                            <table class="stats-table">
-                                <thead>
-                                    <tr>
-                                        <th>학년</th>
-                                        <th>미도달 인원</th>
-                                        <th>예방지도 참여 인원</th>
-                                        <th>참여율</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-for="ratio in statisticsState.gradePreventionRatios" :key="ratio.grade">
-                                        <td>{{ ratio.grade }}</td>
-                                        <td>{{ ratio.total }}</td>
-                                        <td>{{ ratio.participants }}</td>
-                                        <td>{{ ratio.percentage }}%</td>
-                                    </tr>
-                                    <tr v-if="statisticsState.gradePreventionRatios.length === 0">
-                                        <td colspan="4">표시할 데이터가 없습니다.</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                            <p class="text-sm text-gray-600 mt-3">
-                                예방지도 진행 중인 과목 비율: 
-                                <span class="font-semibold text-indigo-600">
-                                    {{ statisticsState.preventionCourseRatio.activeSubjects }} / {{ statisticsState.preventionCourseRatio.totalSubjects }}
-                                </span>
-                                ({{ statisticsState.preventionCourseRatio.percentage }}%)
-                            </p>
-                        </section>
 
                     </div>
                 </div>
@@ -2852,6 +2821,8 @@
                         const preventionSummaryMap = new Map();
                         const additionalSummaryMap = new Map();
                         const remedialSummaryMap = new Map();
+                        // 다과목 미도달 학생 수 계산을 위한 학생별 과목 카운터
+                        const studentSubjectCountMap = new Map(); // 학번 -> 과목 수
 
                         this.completionExcelData.forEach(entry => {
                             const subjectName = entry.subjectName || '미지정 과목';
@@ -2970,11 +2941,18 @@
                                     });
                                 }
 
+                                const studentId = String(row['학번'] || '').trim();
                                 const hasGrade = reason.includes('학업성취율');
                                 const hasAttendance = reason.includes('과목출석률');
                                 const isException = specialNotes.includes('예외') || note.includes('예외');
 
-                                // 과목별 이수현황 요약 (기존과 동일)
+                                // 다과목 미도달 학생 수 계산: 각 학생이 몇 개 과목에서 미도달인지 카운트
+                                if (studentId) {
+                                    const currentCount = studentSubjectCountMap.get(studentId) || 0;
+                                    studentSubjectCountMap.set(studentId, currentCount + 1);
+                                }
+
+                                // 과목별 이수현황 요약
                                 if (hasGrade) summary.gradeCount += 1;
                                 if (hasAttendance) summary.attendanceCount += 1;
                                 if (isException) summary.exceptionCount += 1;
@@ -2983,11 +2961,12 @@
                                 else summary.incompleteCount += 1;
 
                                 // 과목별 예방지도 참여 현황
-                                // 대상: 이 과목의 미도달 학생 전체 (엑셀에 존재하는 모든 행)
+                                // 엑셀 파일에 예방지도 이수 시간이 있으면 진행여부에 '진행함' 표시
+                                // 예방지도시간 > 0이면 참여 인원, 0이면 미참여 인원
                                 const hasPreventive = preventiveHours > 0;
                                 if (hasPreventive) {
                                     prevention.participants += 1;
-                                    prevention.hasPrevention = true;
+                                    prevention.hasPrevention = true; // 진행함 표시
                                 } else {
                                     prevention.nonParticipants += 1;
                                 }
@@ -3073,10 +3052,39 @@
                         this.statisticsState.additionalSummary = additionalSummary;
                         this.statisticsState.remedialSummary = remedialSummary;
 
+                        // 다과목 미도달 학생 수 계산
+                        const multiSubjectBuckets = [
+                            { label: '0~1개 과목', count: 0 },
+                            { label: '2~3개 과목', count: 0 },
+                            { label: '4~5개 과목', count: 0 },
+                            { label: '6~7개 과목', count: 0 },
+                            { label: '8~9개 과목', count: 0 }
+                        ];
+                        
+                        studentSubjectCountMap.forEach((count, studentId) => {
+                            if (count === 0 || count === 1) {
+                                multiSubjectBuckets[0].count += 1;
+                            } else if (count >= 2 && count <= 3) {
+                                multiSubjectBuckets[1].count += 1;
+                            } else if (count >= 4 && count <= 5) {
+                                multiSubjectBuckets[2].count += 1;
+                            } else if (count >= 6 && count <= 7) {
+                                multiSubjectBuckets[3].count += 1;
+                            } else if (count >= 8 && count <= 9) {
+                                multiSubjectBuckets[4].count += 1;
+                            }
+                        });
+
+                        console.log('[통계] 다과목 미도달 학생 수:', {
+                            totalStudents: studentSubjectCountMap.size,
+                            buckets: multiSubjectBuckets,
+                            sampleStudents: Array.from(studentSubjectCountMap.entries()).slice(0, 10)
+                        });
+
                         // 엑셀 기반 재계산이므로, deficitSummary/기타는 일단 초기화
                         this.statisticsState.deficitSummary = [];
-                        this.statisticsState.multiSubjectBuckets = [];
-                        this.statisticsState.gradePreventionRatios = [];
+                        this.statisticsState.multiSubjectBuckets = multiSubjectBuckets;
+                        this.statisticsState.gradePreventionRatios = []; // 삭제 요청에 따라 빈 배열로 유지
                         this.statisticsState.preventionCourseRatio = { totalSubjects: 0, activeSubjects: 0, percentage: 0 };
 
                         this.statisticsState.lastUpdated = new Date().toLocaleString();
