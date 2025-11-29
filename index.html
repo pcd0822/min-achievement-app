@@ -2823,9 +2823,13 @@
                         }
 
                         const subjectSummaryMap = new Map();
+                        const preventionSummaryMap = new Map();
+                        const additionalSummaryMap = new Map();
+                        const remedialSummaryMap = new Map();
 
                         this.completionExcelData.forEach(entry => {
                             const subjectName = entry.subjectName || '미지정 과목';
+
                             if (!subjectSummaryMap.has(subjectName)) {
                                 subjectSummaryMap.set(subjectName, {
                                     subjectName,
@@ -2838,22 +2842,141 @@
                                     category: ''
                                 });
                             }
+                            if (!preventionSummaryMap.has(subjectName)) {
+                                preventionSummaryMap.set(subjectName, {
+                                    subjectName,
+                                    grade: null,
+                                    semester: null,
+                                    category: '',
+                                    hasPrevention: false,
+                                    participants: 0,
+                                    nonParticipants: 0
+                                });
+                            }
+                            if (!additionalSummaryMap.has(subjectName)) {
+                                additionalSummaryMap.set(subjectName, {
+                                    subjectName,
+                                    credits: 0,
+                                    grade: null,
+                                    semester: null,
+                                    category: '',
+                                    attendanceTargets: 0,
+                                    participants: 0,
+                                    exceptionCount: 0,
+                                    nonParticipants: 0,
+                                    completeCount: 0,
+                                    incompleteCount: 0
+                                });
+                            }
+                            if (!remedialSummaryMap.has(subjectName)) {
+                                remedialSummaryMap.set(subjectName, {
+                                    subjectName,
+                                    credits: 0,
+                                    grade: null,
+                                    semester: null,
+                                    category: '',
+                                    gradeTargets: 0,
+                                    participants: 0,
+                                    nonParticipants: 0,
+                                    exceptionCount: 0,
+                                    completeCount: 0,
+                                    incompleteCount: 0
+                                });
+                            }
+
                             const summary = subjectSummaryMap.get(subjectName);
+                            const prevention = preventionSummaryMap.get(subjectName);
+                            const additional = additionalSummaryMap.get(subjectName);
+                            const remedial = remedialSummaryMap.get(subjectName);
 
                             (entry.rows || []).forEach(row => {
                                 const status = String(row['이수여부'] || '').trim();
                                 const reason = String(row['미도달항목'] || row['미도달내역'] || '').trim();
+                                const specialNotes = String(row['특기사항'] || '').trim();
+                                const note = String(row['비고'] || '').trim();
+                                const preventiveHours = Number(row['예방지도'] || 0);
+                                const totalHours = Number(row['총계'] || 0);
 
-                                if (reason.includes('학업성취율')) summary.gradeCount += 1;
-                                if (reason.includes('과목출석률')) summary.attendanceCount += 1;
-                                if (String(row['특기사항'] || '').includes('예외')) summary.exceptionCount += 1;
+                                const hasGrade = reason.includes('학업성취율');
+                                const hasAttendance = reason.includes('과목출석률');
+                                const isException = specialNotes.includes('예외') || note.includes('예외');
+
+                                // 과목별 이수현황 요약 (기존과 동일)
+                                if (hasGrade) summary.gradeCount += 1;
+                                if (hasAttendance) summary.attendanceCount += 1;
+                                if (isException) summary.exceptionCount += 1;
 
                                 if (status === '이수') summary.completeCount += 1;
                                 else summary.incompleteCount += 1;
+
+                                // 과목별 예방지도 참여 현황
+                                // 대상: 이 과목의 미도달 학생 전체 (엑셀에 존재하는 모든 행)
+                                const hasPreventive = preventiveHours > 0;
+                                if (hasPreventive) {
+                                    prevention.participants += 1;
+                                    prevention.hasPrevention = true;
+                                } else {
+                                    prevention.nonParticipants += 1;
+                                }
+
+                                // 과목별 추가학습 참여 현황 (과목출석률 미도달만 있는 학생 대상)
+                                if (hasAttendance && !hasGrade) {
+                                    additional.attendanceTargets += 1;
+                                    if (isException) additional.exceptionCount += 1;
+
+                                    if (totalHours > 0) {
+                                        additional.participants += 1;
+                                    } else {
+                                        additional.nonParticipants += 1;
+                                    }
+
+                                    if (status === '이수') additional.completeCount += 1;
+                                    else if (status === '미이수') additional.incompleteCount += 1;
+                                }
+
+                                // 과목별 보충지도(학업성취율) 참여 현황
+                                // 대상: 학업성취율 미도달 학생 (과목출석률 동시 미도달 포함)
+                                if (hasGrade) {
+                                    remedial.gradeTargets += 1;
+                                    if (isException) remedial.exceptionCount += 1;
+
+                                    if (totalHours > 0) {
+                                        remedial.participants += 1;
+                                    } else {
+                                        remedial.nonParticipants += 1;
+                                    }
+
+                                    if (status === '이수') remedial.completeCount += 1;
+                                    else if (status === '미이수') remedial.incompleteCount += 1;
+                                }
                             });
                         });
 
-                        this.statisticsState.subjectSummary = Array.from(subjectSummaryMap.values());
+                        // 정렬 및 상태 반영
+                        const subjectSummary = Array.from(subjectSummaryMap.values()).sort((a, b) =>
+                            a.subjectName.localeCompare(b.subjectName, 'ko')
+                        );
+                        const preventionSummary = Array.from(preventionSummaryMap.values()).sort((a, b) =>
+                            a.subjectName.localeCompare(b.subjectName, 'ko')
+                        );
+                        const additionalSummary = Array.from(additionalSummaryMap.values()).sort((a, b) =>
+                            a.subjectName.localeCompare(b.subjectName, 'ko')
+                        );
+                        const remedialSummary = Array.from(remedialSummaryMap.values()).sort((a, b) =>
+                            a.subjectName.localeCompare(b.subjectName, 'ko')
+                        );
+
+                        this.statisticsState.subjectSummary = subjectSummary;
+                        this.statisticsState.preventionSummary = preventionSummary;
+                        this.statisticsState.additionalSummary = additionalSummary;
+                        this.statisticsState.remedialSummary = remedialSummary;
+
+                        // 엑셀 기반 재계산이므로, deficitSummary/기타는 일단 초기화
+                        this.statisticsState.deficitSummary = [];
+                        this.statisticsState.multiSubjectBuckets = [];
+                        this.statisticsState.gradePreventionRatios = [];
+                        this.statisticsState.preventionCourseRatio = { totalSubjects: 0, activeSubjects: 0, percentage: 0 };
+
                         this.statisticsState.lastUpdated = new Date().toLocaleString();
                     },
                     async handleCompletionExcelUpload(event) {
