@@ -1607,8 +1607,8 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="row in filteredSubjectSummary" :key="`${row.subjectName}-${row.category || ''}`">
-                                        <td>{{ row.subjectName }}{{ row.category ? ' (' + row.category + ')' : '' }}</td>
+                                    <tr v-for="row in filteredSubjectSummary" :key="`${row.subjectName}-${row.category || ''}-${row.credits || 0}`">
+                                        <td>{{ row.displayName || row.subjectName }}{{ row.category ? ' (' + row.category + ')' : '' }}</td>
                                         <td>{{ row.credits }}</td>
                                         <td>{{ row.gradeCount }}</td>
                                         <td>{{ row.attendanceCount }}</td>
@@ -1635,8 +1635,8 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="row in filteredPreventionSummary" :key="`${row.subjectName}-${row.category || ''}`">
-                                        <td>{{ row.subjectName }}{{ row.category ? ' (' + row.category + ')' : '' }}</td>
+                                    <tr v-for="row in filteredPreventionSummary" :key="`${row.subjectName}-${row.category || ''}-${row.credits || 0}`">
+                                        <td>{{ row.displayName || row.subjectName }}{{ row.category ? ' (' + row.category + ')' : '' }}</td>
                                         <td>{{ row.hasPrevention ? '진행' : '미진행' }}</td>
                                         <td>{{ row.participants }}</td>
                                         <td>{{ row.nonParticipants }}</td>
@@ -1664,8 +1664,8 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="row in filteredAdditionalSummary" :key="`${row.subjectName}-${row.category || ''}`">
-                                        <td>{{ row.subjectName }}{{ row.category ? ' (' + row.category + ')' : '' }}</td>
+                                    <tr v-for="row in filteredAdditionalSummary" :key="`${row.subjectName}-${row.category || ''}-${row.credits || 0}`">
+                                        <td>{{ row.displayName || row.subjectName }}{{ row.category ? ' (' + row.category + ')' : '' }}</td>
                                         <td>{{ row.credits }}</td>
                                         <td>{{ row.attendanceTargets }}</td>
                                         <td>{{ row.participants }}</td>
@@ -1697,8 +1697,8 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="row in filteredRemedialSummary" :key="`${row.subjectName}-${row.category || ''}`">
-                                        <td>{{ row.subjectName }}{{ row.category ? ' (' + row.category + ')' : '' }}</td>
+                                    <tr v-for="row in filteredRemedialSummary" :key="`${row.subjectName}-${row.category || ''}-${row.credits || 0}`">
+                                        <td>{{ row.displayName || row.subjectName }}{{ row.category ? ' (' + row.category + ')' : '' }}</td>
                                         <td>{{ row.credits }}</td>
                                         <td>{{ row.gradeTargets }}</td>
                                         <td>{{ row.participants }}</td>
@@ -2736,7 +2736,12 @@
                         if (this.role !== '관리자') return;
                         this.showStatisticsModal = true;
                         this.$nextTick(() => {
-                            this.computeStatisticsData();
+                            // 엑셀 데이터가 있으면 엑셀 기준으로만 재계산, 없으면 Firestore 기준으로 계산
+                            if (this.completionExcelData && this.completionExcelData.length > 0) {
+                                this.recomputeStatisticsFromCompletionExcel();
+                            } else {
+                                this.computeStatisticsData();
+                            }
                         });
                     },
                     closeStatisticsModal() {
@@ -2822,6 +2827,12 @@
                             return;
                         }
 
+                        console.log('[통계] 엑셀 데이터 재계산 시작:', {
+                            subjectCount: this.completionExcelData.length,
+                            subjects: this.completionExcelData.map(e => e.subjectName),
+                            sampleRows: this.completionExcelData[0]?.rows?.slice(0, 2)
+                        });
+
                         const subjectSummaryMap = new Map();
                         const preventionSummaryMap = new Map();
                         const additionalSummaryMap = new Map();
@@ -2830,36 +2841,58 @@
                         this.completionExcelData.forEach(entry => {
                             const subjectName = entry.subjectName || '미지정 과목';
 
-                            if (!subjectSummaryMap.has(subjectName)) {
-                                subjectSummaryMap.set(subjectName, {
+                            // 엑셀 파일의 첫 번째 행에서 학년, 학기, 계열, 학점 정보 추출
+                            let subjectGrade = null;
+                            let subjectSemester = null;
+                            let subjectCategory = '';
+                            let subjectCredits = 0;
+
+                            if (entry.rows && entry.rows.length > 0) {
+                                const firstRow = entry.rows[0];
+                                subjectGrade = firstRow['학년'] != null ? Number(firstRow['학년']) : null;
+                                subjectSemester = firstRow['학기'] != null ? Number(firstRow['학기']) : null;
+                                subjectCategory = String(firstRow['계열'] || '').trim();
+                                subjectCredits = Number(firstRow['학점'] || 0);
+                            }
+
+                            // 과목명이 같아도 학점이 다르면 다른 과목으로 구분 (계열이 다름을 의미)
+                            // 키: 과목명|계열|학점 (학점이 있으면), 또는 과목명|계열 (학점이 없으면)
+                            const subjectKey = subjectCredits > 0 
+                                ? `${subjectName}|${subjectCategory}|${subjectCredits}학점`
+                                : `${subjectName}|${subjectCategory}`;
+
+                            if (!subjectSummaryMap.has(subjectKey)) {
+                                subjectSummaryMap.set(subjectKey, {
                                     subjectName,
-                                    credits: 0,
+                                    credits: subjectCredits,
+                                    grade: subjectGrade,
+                                    semester: subjectSemester,
+                                    category: subjectCategory,
                                     gradeCount: 0,
                                     attendanceCount: 0,
                                     exceptionCount: 0,
                                     incompleteCount: 0,
-                                    completeCount: 0,
-                                    category: ''
+                                    completeCount: 0
                                 });
                             }
-                            if (!preventionSummaryMap.has(subjectName)) {
-                                preventionSummaryMap.set(subjectName, {
+                            if (!preventionSummaryMap.has(subjectKey)) {
+                                preventionSummaryMap.set(subjectKey, {
                                     subjectName,
-                                    grade: null,
-                                    semester: null,
-                                    category: '',
+                                    grade: subjectGrade,
+                                    semester: subjectSemester,
+                                    category: subjectCategory,
                                     hasPrevention: false,
                                     participants: 0,
                                     nonParticipants: 0
                                 });
                             }
-                            if (!additionalSummaryMap.has(subjectName)) {
-                                additionalSummaryMap.set(subjectName, {
+                            if (!additionalSummaryMap.has(subjectKey)) {
+                                additionalSummaryMap.set(subjectKey, {
                                     subjectName,
-                                    credits: 0,
-                                    grade: null,
-                                    semester: null,
-                                    category: '',
+                                    credits: subjectCredits,
+                                    grade: subjectGrade,
+                                    semester: subjectSemester,
+                                    category: subjectCategory,
                                     attendanceTargets: 0,
                                     participants: 0,
                                     exceptionCount: 0,
@@ -2868,13 +2901,13 @@
                                     incompleteCount: 0
                                 });
                             }
-                            if (!remedialSummaryMap.has(subjectName)) {
-                                remedialSummaryMap.set(subjectName, {
+                            if (!remedialSummaryMap.has(subjectKey)) {
+                                remedialSummaryMap.set(subjectKey, {
                                     subjectName,
-                                    credits: 0,
-                                    grade: null,
-                                    semester: null,
-                                    category: '',
+                                    credits: subjectCredits,
+                                    grade: subjectGrade,
+                                    semester: subjectSemester,
+                                    category: subjectCategory,
                                     gradeTargets: 0,
                                     participants: 0,
                                     nonParticipants: 0,
@@ -2884,17 +2917,24 @@
                                 });
                             }
 
-                            const summary = subjectSummaryMap.get(subjectName);
-                            const prevention = preventionSummaryMap.get(subjectName);
-                            const additional = additionalSummaryMap.get(subjectName);
-                            const remedial = remedialSummaryMap.get(subjectName);
+                            const summary = subjectSummaryMap.get(subjectKey);
+                            const prevention = preventionSummaryMap.get(subjectKey);
+                            const additional = additionalSummaryMap.get(subjectKey);
+                            const remedial = remedialSummaryMap.get(subjectKey);
 
                             (entry.rows || []).forEach(row => {
+                                // 각 행에서도 학년, 학기, 계열, 학점 정보 확인 (없으면 첫 번째 행의 값 사용)
+                                const rowGrade = row['학년'] != null ? Number(row['학년']) : subjectGrade;
+                                const rowSemester = row['학기'] != null ? Number(row['학기']) : subjectSemester;
+                                const rowCategory = String(row['계열'] || '').trim() || subjectCategory;
+                                const rowCredits = Number(row['학점'] || 0) || subjectCredits;
+
                                 const status = String(row['이수여부'] || '').trim();
                                 const reason = String(row['미도달항목'] || row['미도달내역'] || '').trim();
                                 const specialNotes = String(row['특기사항'] || '').trim();
                                 const note = String(row['비고'] || '').trim();
-                                const preventiveHours = Number(row['예방지도'] || 0);
+                                // 엑셀 파일에 저장된 실제 열 이름: '예방지도시간' (엑셀 저장 시 사용)
+                                const preventiveHours = Number(row['예방지도시간'] || row['예방지도'] || 0);
                                 const totalHours = Number(row['총계'] || 0);
 
                                 const hasGrade = reason.includes('학업성취율');
@@ -2953,18 +2993,47 @@
                         });
 
                         // 정렬 및 상태 반영
-                        const subjectSummary = Array.from(subjectSummaryMap.values()).sort((a, b) =>
-                            a.subjectName.localeCompare(b.subjectName, 'ko')
-                        );
-                        const preventionSummary = Array.from(preventionSummaryMap.values()).sort((a, b) =>
-                            a.subjectName.localeCompare(b.subjectName, 'ko')
-                        );
-                        const additionalSummary = Array.from(additionalSummaryMap.values()).sort((a, b) =>
-                            a.subjectName.localeCompare(b.subjectName, 'ko')
-                        );
-                        const remedialSummary = Array.from(remedialSummaryMap.values()).sort((a, b) =>
-                            a.subjectName.localeCompare(b.subjectName, 'ko')
-                        );
+                        // 과목명에 학점 정보 추가 (학점이 있고, 같은 과목명에 다른 학점이 있는 경우 구분)
+                        const subjectSummary = Array.from(subjectSummaryMap.values()).map(item => {
+                            const displayName = item.credits > 0 
+                                ? `${item.subjectName}(${item.credits}학점)`
+                                : item.subjectName;
+                            return { ...item, displayName };
+                        }).sort((a, b) => {
+                            // 학년, 학기, 과목명 순으로 정렬
+                            if (a.grade !== b.grade) return (a.grade || 0) - (b.grade || 0);
+                            if (a.semester !== b.semester) return (a.semester || 0) - (b.semester || 0);
+                            return a.subjectName.localeCompare(b.subjectName, 'ko');
+                        });
+                        const preventionSummary = Array.from(preventionSummaryMap.values()).map(item => {
+                            // 예방지도는 학점 정보가 없을 수 있으므로 과목명만 사용
+                            const displayName = item.subjectName;
+                            return { ...item, displayName };
+                        }).sort((a, b) => {
+                            if (a.grade !== b.grade) return (a.grade || 0) - (b.grade || 0);
+                            if (a.semester !== b.semester) return (a.semester || 0) - (b.semester || 0);
+                            return a.subjectName.localeCompare(b.subjectName, 'ko');
+                        });
+                        const additionalSummary = Array.from(additionalSummaryMap.values()).map(item => {
+                            const displayName = item.credits > 0 
+                                ? `${item.subjectName}(${item.credits}학점)`
+                                : item.subjectName;
+                            return { ...item, displayName };
+                        }).sort((a, b) => {
+                            if (a.grade !== b.grade) return (a.grade || 0) - (b.grade || 0);
+                            if (a.semester !== b.semester) return (a.semester || 0) - (b.semester || 0);
+                            return a.subjectName.localeCompare(b.subjectName, 'ko');
+                        });
+                        const remedialSummary = Array.from(remedialSummaryMap.values()).map(item => {
+                            const displayName = item.credits > 0 
+                                ? `${item.subjectName}(${item.credits}학점)`
+                                : item.subjectName;
+                            return { ...item, displayName };
+                        }).sort((a, b) => {
+                            if (a.grade !== b.grade) return (a.grade || 0) - (b.grade || 0);
+                            if (a.semester !== b.semester) return (a.semester || 0) - (b.semester || 0);
+                            return a.subjectName.localeCompare(b.subjectName, 'ko');
+                        });
 
                         this.statisticsState.subjectSummary = subjectSummary;
                         this.statisticsState.preventionSummary = preventionSummary;
@@ -2978,6 +3047,16 @@
                         this.statisticsState.preventionCourseRatio = { totalSubjects: 0, activeSubjects: 0, percentage: 0 };
 
                         this.statisticsState.lastUpdated = new Date().toLocaleString();
+
+                        console.log('[통계] 엑셀 데이터 재계산 완료:', {
+                            subjectSummaryCount: subjectSummary.length,
+                            preventionSummaryCount: preventionSummary.length,
+                            additionalSummaryCount: additionalSummary.length,
+                            remedialSummaryCount: remedialSummary.length,
+                            samplePrevention: preventionSummary.slice(0, 2),
+                            sampleAdditional: additionalSummary.slice(0, 2),
+                            sampleRemedial: remedialSummary.slice(0, 2)
+                        });
                     },
                     async handleCompletionExcelUpload(event) {
                         if (this.role !== '관리자') return;
@@ -6026,6 +6105,28 @@
                             return;
                         }
 
+                        // 교육과정 편제표에서 학년, 학기, 계열, 학점 정보 가져오기
+                        let subjectGrade = this.teacherPlan.subjectGrade;
+                        let subjectSemester = this.teacherPlan.subjectSemester;
+                        let subjectCategory = this.teacherPlan.subjectCategory || '';
+                        let subjectCredits = 0;
+
+                        if (subjectGrade != null && subjectSemester != null && subjectCategory) {
+                            try {
+                                const subjectInfo = this.findSubjectInCurriculum(
+                                    this.teacherPlan.subjectName,
+                                    subjectGrade,
+                                    subjectSemester,
+                                    subjectCategory
+                                );
+                                if (subjectInfo) {
+                                    subjectCredits = Number(subjectInfo.학점) || 0;
+                                }
+                            } catch (error) {
+                                console.warn('교육과정 편제표에서 학점 정보를 찾을 수 없습니다:', error);
+                            }
+                        }
+
                         const rows = [];
                         (data.students || []).forEach(student => {
                             if (!student || !student.id) return;
@@ -6037,7 +6138,12 @@
                                 특기사항: status.specialNotes || '일반학생',
                                 미도달항목: student.reason || '',
                                 예방지도시간: status.preventiveHours || 0,
-                                정서지원시간: status.emotionalSupportHours || 0
+                                정서지원시간: status.emotionalSupportHours || 0,
+                                // 과목 정보 추가 (통계 대시보드에서 사용)
+                                학년: subjectGrade != null ? subjectGrade : '',
+                                학기: subjectSemester != null ? subjectSemester : '',
+                                계열: subjectCategory || '',
+                                학점: subjectCredits || 0
                             };
 
                             const methodCols = {};
