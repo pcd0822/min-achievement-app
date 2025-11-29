@@ -1417,6 +1417,32 @@
                              <label class="block text-sm font-medium text-gray-700">과목명</label>
                              <input :value="teacherPlan.subjectName" placeholder="먼저 '계획서 작성' 탭에서 과목명을 입력하세요" required class="w-full p-2 border rounded-md bg-gray-100" disabled>
                          </div>
+                         <div class="grid grid-cols-3 gap-4">
+                             <div>
+                                 <label class="block text-sm font-medium text-gray-700">학년</label>
+                                 <input :value="teacherPlan.subjectGrade ? teacherPlan.subjectGrade + '학년' : '미입력'" class="w-full p-2 border rounded-md bg-gray-100" disabled>
+                             </div>
+                             <div>
+                                 <label class="block text-sm font-medium text-gray-700">학기</label>
+                                 <input :value="teacherPlan.subjectSemester ? teacherPlan.subjectSemester + '학기' : '미입력'" class="w-full p-2 border rounded-md bg-gray-100" disabled>
+                             </div>
+                             <div>
+                                 <label class="block text-sm font-medium text-gray-700">계열(분류)</label>
+                                 <input :value="teacherPlan.subjectCategory || '미입력'" class="w-full p-2 border rounded-md bg-gray-100" disabled>
+                             </div>
+                         </div>
+                         <div>
+                             <label class="block text-sm font-medium text-gray-700">학급 (예: 101, 102)</label>
+                             <input
+                                 type="text"
+                                 v-model="importClassId"
+                                 placeholder="예: 101 (1학년 1반), 202 (2학년 2반)"
+                                 class="w-full p-2 border rounded-md"
+                             >
+                             <p class="mt-1 text-xs text-gray-500">
+                                 학급 번호는 학생 학번 5자리 중 앞 3자리와 일치해야 합니다. (예: 1학년 1반 = 101)
+                             </p>
+                         </div>
                          <div>
                              <label class="block text-sm font-medium text-gray-700">미도달 대상자 엑셀 파일</label>
                              <input type="file"
@@ -1900,6 +1926,7 @@
                         importSemester: null,
                         importCategory: '',
                         importModalError: '',
+                        importClassId: '',
                         selectedUnderachieverFile: null,
                         // --- Multi-Subject Management ---
                         teacherPlanList: [], // 여러 과목의 계획서 배열
@@ -4247,9 +4274,9 @@
                     },
                     openUnderachieverExportModal() {
                         if (this.role !== '관리자') return;
-                        // 현재 미도달 명단에서 과목 목록 추출 (중복 제거)
+                        // 화면에 사용 중인 groupedUnderachievers( details 포함 ) 기준으로 과목 목록 추출
                         const subjectsSet = new Set();
-                        (this.normalizeUnderachieverList(this.underachievers) || []).forEach(student => {
+                        (this.groupedUnderachievers || []).forEach(student => {
                             if (!student || !Array.isArray(student.details)) return;
                             student.details.forEach(detail => {
                                 if (!detail || !detail.subjects) return;
@@ -5961,9 +5988,14 @@
                             const grade = this.teacherPlan.subjectGrade != null ? Number(this.teacherPlan.subjectGrade) : null;
                             const semester = this.teacherPlan.subjectSemester != null ? Number(this.teacherPlan.subjectSemester) : null;
                             const category = (this.teacherPlan.subjectCategory || '').trim();
+                            const classId = (this.importClassId || '').trim();
 
                             if (!subjectName || grade == null || semester == null || !category) {
                                 this.importModalError = '계획서 작성 탭에서 과목명, 학년, 학기, 계열을 모두 입력하고 저장한 후 다시 시도해주세요.';
+                                return;
+                            }
+                            if (!classId || classId.length !== 3) {
+                                this.importModalError = '학급 번호(예: 101, 102)를 3자리로 정확히 입력해주세요.';
                                 return;
                             }
                             if (!this.selectedUnderachieverFile) {
@@ -6023,6 +6055,10 @@
                                     const name = String(row['이름'] || '').trim();
                                     if (!id || !name) return;
 
+                                    // 학급 필터: 학번 앞 3자리가 입력된 학급 번호와 일치하는 학생만 대상
+                                    const studentClass = id.substring(0, 3);
+                                    if (studentClass !== classId) return;
+
                                     const subjectsCell = String(row['미도달 과목(학점수)'] || '');
                                     if (!subjectsCell) return;
 
@@ -6073,7 +6109,7 @@
 
                                 const newStudents = Array.from(newStudentsMap.values());
                                 if (!newStudents.length) {
-                                    this.importModalError = '새로 추가할 학생이 없습니다. (이미 목록에 있거나 학년/학기/계열이 현재 과목과 일치하지 않습니다.)';
+                                    this.importModalError = '새로 추가할 학생이 없습니다. (이미 목록에 있거나 학년/학기/계열/학급이 현재 과목과 일치하지 않습니다.)';
                                     return;
                                 }
 
