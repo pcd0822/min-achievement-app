@@ -3017,26 +3017,48 @@
                                 }
                             });
 
-                            try {
-                                const completionDocRef = doc(db, `schools/${activeSchoolId}/commonData`, 'completionStatus');
-                                const completionSnap = await getDoc(completionDocRef);
-                                const completionData = completionSnap.exists() ? completionSnap.data().data || {} : {};
-                                Object.keys(completionData || {}).forEach(subjectName => {
+                            // 엑셀 데이터를 우선 사용, 없으면 Firestore 백업 사용
+                            if (this.completionExcelData && this.completionExcelData.length > 0) {
+                                // 엑셀 데이터에서 이수현황 추출
+                                this.completionExcelData.forEach(entry => {
+                                    const subjectName = entry.subjectName || '미지정 과목';
                                     const stats = ensureSubject(subjectName);
                                     if (!stats) return;
-                                    const subjectEntries = completionData[subjectName] || {};
-                                    Object.keys(subjectEntries).forEach(studentId => {
-                                        const statusValue = subjectEntries[studentId];
-                                        const id = String(studentId);
-                                        if (statusValue === '이수') {
-                                            stats.completion.complete.add(id);
-                                        } else if (statusValue === '미이수') {
-                                            stats.completion.incomplete.add(id);
+                                    
+                                    (entry.rows || []).forEach(row => {
+                                        const studentId = String(row['학번'] || '').trim();
+                                        if (!studentId) return;
+                                        const status = String(row['이수여부'] || '').trim();
+                                        if (status === '이수') {
+                                            stats.completion.complete.add(studentId);
+                                        } else if (status === '미이수') {
+                                            stats.completion.incomplete.add(studentId);
                                         }
                                     });
                                 });
-                            } catch (error) {
-                                console.warn('completionStatus 로드 실패:', error);
+                            } else {
+                                // 엑셀 데이터가 없으면 Firestore 백업 사용 (하위 호환성)
+                                try {
+                                    const completionDocRef = doc(db, `schools/${activeSchoolId}/commonData`, 'completionStatus');
+                                    const completionSnap = await getDoc(completionDocRef);
+                                    const completionData = completionSnap.exists() ? completionSnap.data().data || {} : {};
+                                    Object.keys(completionData || {}).forEach(subjectName => {
+                                        const stats = ensureSubject(subjectName);
+                                        if (!stats) return;
+                                        const subjectEntries = completionData[subjectName] || {};
+                                        Object.keys(subjectEntries).forEach(studentId => {
+                                            const statusValue = subjectEntries[studentId];
+                                            const id = String(studentId);
+                                            if (statusValue === '이수') {
+                                                stats.completion.complete.add(id);
+                                            } else if (statusValue === '미이수') {
+                                                stats.completion.incomplete.add(id);
+                                            }
+                                        });
+                                    });
+                                } catch (error) {
+                                    console.warn('completionStatus 로드 실패:', error);
+                                }
                             }
 
                             const planSubjects = new Set();
@@ -3646,16 +3668,7 @@
                                         await this.loadCommonData();
                                         if (this.role === '교과교사') {
                                             await this.loadAllTeacherData();
-                                            // 기존 단일 과목 데이터가 있으면 마이그레이션
-                                            if (this.teacherPlanList.length === 0) {
-                                                await this.loadTeacherPlan();
-                                                if (this.teacherPlan.subjectName) {
-                                                    this.teacherPlanList.push(JSON.parse(JSON.stringify(this.teacherPlan)));
-                                                    this.teacherGuidanceDataList.push(JSON.parse(JSON.stringify(this.teacherGuidanceData)));
-                                                    this.currentSubjectIndex = 0;
-                                                    await this.saveAllTeacherData();
-                                                }
-                                            }
+                                            // localStorage에서 로드한 후 현재 선택된 과목의 계획서 설정
                                             if (this.currentSubjectIndex >= 0 && this.currentSubjectIndex < this.teacherPlanList.length) {
                                                 await this.loadSubjectData(this.currentSubjectIndex);
                                                 if (this.teacherPlan.subjectName) {
@@ -3843,16 +3856,6 @@
                         if (this.role === '교과교사') {
                                 console.log("교과교사 데이터 로딩 시작");
                                 await this.loadAllTeacherData();
-                                // 기존 단일 과목 데이터가 있으면 마이그레이션
-                                if (this.teacherPlanList.length === 0) {
-                                    await this.loadTeacherPlan();
-                                    if (this.teacherPlan.subjectName) {
-                                        this.teacherPlanList.push(JSON.parse(JSON.stringify(this.teacherPlan)));
-                                        this.teacherGuidanceDataList.push(JSON.parse(JSON.stringify(this.teacherGuidanceData)));
-                                        this.currentSubjectIndex = 0;
-                                        await this.saveAllTeacherData();
-                                    }
-                                }
                                 if (this.currentSubjectIndex >= 0 && this.currentSubjectIndex < this.teacherPlanList.length) {
                                     await this.loadSubjectData(this.currentSubjectIndex);
                                     console.log("교과교사 계획안 로딩 완료");
@@ -4143,11 +4146,6 @@
                                 this.underachievers = this.normalizeUnderachieverList(this.deployedUnderachievers);
                                 this.statusMessage = '공용 데이터 로딩 완료.';
                             }
-                            
-                            // 담임교사인 경우 이수 현황 데이터도 미리 로드
-                            if (this.role === '담임교사') {
-                                await this.loadAllTeacherCompletionData();
-                            }
                         } catch (error) {
                             console.error("Error loading common data:", error);
                             this.statusMessage = '공용 데이터 로딩 중 오류 발생.';
@@ -4352,54 +4350,45 @@
 
                     // --- Data Loading/Saving (Teacher) ---
                     async loadTeacherPlan() {
-                        // currentSchoolCode를 우선 사용, 없으면 schoolId 사용 (관리자가 통계 대시보드에서 읽을 수 있도록)
-                        const activeSchoolId = this.currentSchoolCode || this.schoolId;
-                        if (!this.user || !db || !activeSchoolId || this.role !== '교과교사') return;
-                        // 경로 오류 방지를 위해 하위 컬렉션 구조 사용
-                        const planDocRef = doc(db, `schools/${activeSchoolId}/teacherData/${this.user.uid}/plans/teacherPlan`);
-                        try {
-                            const docSnap = await getDoc(planDocRef);
+                        // localStorage 기반으로 변경: loadAllTeacherData가 이미 호출되었으므로
+                        // 현재 선택된 과목의 계획서를 teacherPlan에 설정
+                        if (!this.user || this.role !== '교과교사') return;
+                        
+                        if (this.currentSubjectIndex >= 0 && this.currentSubjectIndex < this.teacherPlanList.length) {
+                            const loadedPlan = this.teacherPlanList[this.currentSubjectIndex];
                             const defaultPlan = this.getInitialTeacherPlan();
-                            if (docSnap.exists()) {
-                                const loadedPlan = docSnap.data();
-                                this.teacherPlan = { ...defaultPlan, ...loadedPlan };
+                            this.teacherPlan = { ...defaultPlan, ...loadedPlan };
 
-                                this.teacherPlan.teacherNames = this.teacherPlan.teacherNames && this.teacherPlan.teacherNames.length > 0 ? this.teacherPlan.teacherNames : [''];
-                                const normalizeAchievements = (achievements) => {
-                                    if (!Array.isArray(achievements) || achievements.length === 0) return [createEmptyAchievement()];
-                                    return achievements.map(item => ({
-                                        text: item?.text || '',
-                                        statement: item?.statement || '',
-                                        loading: false,
-                                        isEditing: false,
-                                        editDraft: ''
-                                    }));
-                                };
-                                this.teacherPlan.achievements = normalizeAchievements(this.teacherPlan.achievements);
-                                this.teacherPlan.preventionMethods = this.teacherPlan.preventionMethods || [];
-                                this.teacherPlan.preventionSessions = this.teacherPlan.preventionSessions && this.teacherPlan.preventionSessions.length > 0 ? this.teacherPlan.preventionSessions : [{plan:''}];
-                                this.teacherPlan.supplementaryMethods = this.teacherPlan.supplementaryMethods || [];
-                                this.teacherPlan.supplementarySessions = this.teacherPlan.supplementarySessions || [];
-                                this.teacherPlan.additionalMethods = this.teacherPlan.additionalMethods || [];
-                                this.teacherPlan.additionalSessions = this.teacherPlan.additionalSessions || [];
+                            this.teacherPlan.teacherNames = this.teacherPlan.teacherNames && this.teacherPlan.teacherNames.length > 0 ? this.teacherPlan.teacherNames : [''];
+                            const normalizeAchievements = (achievements) => {
+                                if (!Array.isArray(achievements) || achievements.length === 0) return [createEmptyAchievement()];
+                                return achievements.map(item => ({
+                                    text: item?.text || '',
+                                    statement: item?.statement || '',
+                                    loading: false,
+                                    isEditing: false,
+                                    editDraft: ''
+                                }));
+                            };
+                            this.teacherPlan.achievements = normalizeAchievements(this.teacherPlan.achievements);
+                            this.teacherPlan.preventionMethods = this.teacherPlan.preventionMethods || [];
+                            this.teacherPlan.preventionSessions = this.teacherPlan.preventionSessions && this.teacherPlan.preventionSessions.length > 0 ? this.teacherPlan.preventionSessions : [{plan:''}];
+                            this.teacherPlan.supplementaryMethods = this.teacherPlan.supplementaryMethods || [];
+                            this.teacherPlan.supplementarySessions = this.teacherPlan.supplementarySessions || [];
+                            this.teacherPlan.additionalMethods = this.teacherPlan.additionalMethods || [];
+                            this.teacherPlan.additionalSessions = this.teacherPlan.additionalSessions || [];
 
-                                this.teacherPlan.achievements.forEach(a => {
-                                    a.loading = false;
-                                    a.isEditing = false;
-                                    a.editDraft = '';
-                                });
-                                
-                                const parseDates = (period) => (period || []).map(d => d ? new Date(d.seconds ? d.seconds * 1000 : d) : null).filter(d => d && !isNaN(d.getTime()));
-                                this.teacherPlan.preventionPeriod = parseDates(this.teacherPlan.preventionPeriod);
-                                this.teacherPlan.supplementaryPeriod = parseDates(this.teacherPlan.supplementaryPeriod);
-                                this.teacherPlan.additionalPeriod = parseDates(this.teacherPlan.additionalPeriod);
-                                
-                            } else {
-                                this.teacherPlan = defaultPlan;
-                            }
-                        } catch (error) { 
-                            // 경로 오류는 조용히 처리 (초기값 사용)
-                            console.log("Teacher plan not found, using default plan");
+                            this.teacherPlan.achievements.forEach(a => {
+                                a.loading = false;
+                                a.isEditing = false;
+                                a.editDraft = '';
+                            });
+                            
+                            const parseDates = (period) => (period || []).map(d => d ? new Date(d.seconds ? d.seconds * 1000 : d) : null).filter(d => d && !isNaN(d.getTime()));
+                            this.teacherPlan.preventionPeriod = parseDates(this.teacherPlan.preventionPeriod);
+                            this.teacherPlan.supplementaryPeriod = parseDates(this.teacherPlan.supplementaryPeriod);
+                            this.teacherPlan.additionalPeriod = parseDates(this.teacherPlan.additionalPeriod);
+                        } else {
                             this.teacherPlan = this.getInitialTeacherPlan();
                         }
                         this.updateMaxHours();
