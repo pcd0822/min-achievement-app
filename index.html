@@ -3410,7 +3410,7 @@
 
         import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-        import { getFirestore, doc, setDoc, getDoc, collection, query, where, getDocs, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, query, where, getDocs, writeBatch, runTransaction, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 
 
@@ -7765,34 +7765,52 @@
 
                         
                         // 학교코드가 변경된 경우 이전 학교코드의 로컬 데이터 초기화
-                        if (this.user && previousSchoolCode && previousSchoolCode !== this.currentSchoolCode) {
-                            // 교과교사 데이터 초기화
-                            if (this.role === '교과교사') {
-                                const previousStorageKey = `minAchieve_teacher_${this.user.uid}_${previousSchoolCode}`;
-                                try {
-                                    localStorage.removeItem(previousStorageKey);
-                                    console.log("이전 학교코드의 교과교사 데이터 초기화:", previousStorageKey);
-                                } catch (error) {
-                                    console.warn("이전 학교코드 데이터 초기화 실패:", error);
+                        // previousSchoolCode가 없거나 변경된 경우 모두 처리 (새 학교코드 생성 포함)
+                        const isSchoolCodeChanged = !previousSchoolCode || previousSchoolCode !== this.currentSchoolCode;
+                        
+                        if (this.user && isSchoolCodeChanged) {
+                            // 이전 학교코드가 있는 경우에만 localStorage에서 삭제
+                            if (previousSchoolCode) {
+                                // 교과교사 데이터 초기화
+                                if (this.role === '교과교사') {
+                                    const previousStorageKey = `minAchieve_teacher_${this.user.uid}_${previousSchoolCode}`;
+                                    try {
+                                        localStorage.removeItem(previousStorageKey);
+                                        console.log("이전 학교코드의 교과교사 데이터 초기화:", previousStorageKey);
+                                    } catch (error) {
+                                        console.warn("이전 학교코드 데이터 초기화 실패:", error);
+                                    }
                                 }
-                                // 메모리상의 데이터도 초기화
+                                // 관리자 데이터 초기화
+                                if (this.role === '관리자') {
+                                    const previousAdminStorageKey = `minAchieve_admin_${this.user.uid}_${previousSchoolCode}`;
+                                    try {
+                                        localStorage.removeItem(previousAdminStorageKey);
+                                        console.log("이전 학교코드의 관리자 미도달 대상자 명단 초기화:", previousAdminStorageKey);
+                                    } catch (error) {
+                                        console.warn("이전 학교코드 관리자 데이터 초기화 실패:", error);
+                                    }
+                                }
+                            }
+                            
+                            // 메모리상의 데이터도 초기화 (새 학교코드 생성 또는 변경 시)
+                            if (this.role === '교과교사') {
                                 this.teacherPlanList = [];
                                 this.teacherGuidanceDataList = [];
                                 this.currentSubjectIndex = -1;
                                 this.teacherPlan = this.getInitialTeacherPlan();
                                 this.teacherGuidanceData = this.getInitialGuidanceData();
                             }
-                            // 관리자 데이터 초기화
                             if (this.role === '관리자') {
-                                const previousAdminStorageKey = `minAchieve_admin_${this.user.uid}_${previousSchoolCode}`;
-                                try {
-                                    localStorage.removeItem(previousAdminStorageKey);
-                                    console.log("이전 학교코드의 관리자 미도달 대상자 명단 초기화:", previousAdminStorageKey);
-                                    // 메모리상의 데이터도 초기화
-                                    this.underachievers = [];
-                                } catch (error) {
-                                    console.warn("이전 학교코드 관리자 데이터 초기화 실패:", error);
-                                }
+                                this.underachievers = [];
+                                this.curriculumData = [];
+                                this.studentData = [];
+                                this.emotionalSupportData = [];
+                                this.uploadStatus = {
+                                    curriculum: '',
+                                    student: '',
+                                    emotionalSupport: ''
+                                };
                             }
                         }
                         
@@ -7941,6 +7959,20 @@
                                 canonicalId = canonicalForCreate;
 
                                 console.log("새 학교코드 트랜잭션 생성 완료:", codeInput, "canonical:", canonicalId);
+                                
+                                // 새 학교코드 생성 시 Firestore 공용 데이터 초기화
+                                try {
+                                    const commonDataBasePath = `schools/${canonicalId}/commonData`;
+                                    const commonDataDocs = ['curriculum', 'students', 'emotionalSupport', 'underachievers', 'underachieversProcessed'];
+                                    
+                                    for (const docName of commonDataDocs) {
+                                        const docRef = doc(db, commonDataBasePath, docName);
+                                        await setDoc(docRef, { data: [] }, { merge: false });
+                                    }
+                                    console.log("새 학교코드의 Firestore 공용 데이터 초기화 완료:", canonicalId);
+                                } catch (clearError) {
+                                    console.warn("Firestore 공용 데이터 초기화 실패 (계속 진행):", clearError);
+                                }
 
                             } else if (this.role === '관리자' && this.schoolIdMode === 'input') {
 
