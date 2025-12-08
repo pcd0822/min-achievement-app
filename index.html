@@ -860,7 +860,8 @@
                        <div v-if="teacherViewMode === 'dropdown' && currentSubjectIndex >= 0" class="flex border-b mb-6">
                            <button class="tab-button" :class="{ 'active': teacherTab === 'plan' }" @click="switchTeacherTab('plan')">계획서 작성</button>
                            <button class="tab-button" :class="{ 'active': teacherTab === 'preventive' }" @click="switchTeacherTab('preventive')">예방지도 출석부 & 수업일지</button>
-                           <button class="tab-button" :class="{ 'active': teacherTab === 'supplementary' }" @click="switchTeacherTab('supplementary')">보충지도(추가학습) 출석부&수업일지</button>
+                           <button class="tab-button" :class="{ 'active': teacherTab === 'supplementary' }" @click="switchTeacherTab('supplementary')">보충지도 출석부&수업일지</button>
+                           <button class="tab-button" :class="{ 'active': teacherTab === 'additional' }" @click="switchTeacherTab('additional')">추가학습 출석부&수업일지</button>
                        </div>
 
                        <!-- 계획서 작성 탭 -->
@@ -1063,7 +1064,7 @@
                        <!-- 지도 출석부 & 수업일지 -->
                         <div v-if="currentGuidanceData && teacherTab !== 'plan'" class="space-y-8">
                            <div class="bg-white p-6 rounded-lg shadow-md flex justify-between items-start">
-                               <h3 class="text-xl font-semibold">{{ teacherTab === 'preventive' ? '예방지도' : '보충지도(추가학습)' }} 출석부 & 수업일지</h3>
+                               <h3 class="text-xl font-semibold">{{ teacherTab === 'preventive' ? '예방지도' : teacherTab === 'supplementary' ? '보충지도' : '추가학습' }} 출석부 & 수업일지</h3>
                                <div class="text-right">
                                    <p><strong>과목명:</strong> {{ teacherPlan.subjectName || '미입력' }}</p>
                                    <p><strong>교과교사:</strong> {{ formattedTeacherNames }}</p>
@@ -1078,8 +1079,8 @@
                            <!-- 이수현황표 -->
                            <div class="bg-white p-6 rounded-lg shadow-md">
                                <div class="flex justify-between items-center mb-4">
-                                   <h4 class="text-lg font-semibold">{{ teacherTab === 'preventive' ? '예방지도' : '보충지도(추가학습)' }} 이수현황표</h4>
-                                   <button v-if="teacherTab === 'supplementary'" @click="exportCompletionStatusExcel" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition text-sm font-semibold">
+                                   <h4 class="text-lg font-semibold">{{ teacherTab === 'preventive' ? '예방지도' : teacherTab === 'supplementary' ? '보충지도' : '추가학습' }} 이수현황표</h4>
+                                   <button v-if="teacherTab === 'supplementary' || teacherTab === 'additional'" @click="exportCompletionStatusExcel" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition text-sm font-semibold">
                                        이수현황표 엑셀 다운로드
                                    </button>
                                </div>
@@ -1147,12 +1148,22 @@
                                    </div>
                                    <p v-if="currentGuidanceData.error" class="text-red-500 text-sm mb-4 -mt-2">{{ currentGuidanceData.error }}</p>
                                </div>
-                               <div v-else class="mb-4">
+                               <div v-else-if="teacherTab === 'supplementary'" class="mb-4">
                                    <div class="flex space-x-2">
                                        <button @click="showImportModal = true" class="px-4 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 transition">대상자 업로드</button>
                                        <button @click="resetSupplementaryStudents" class="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition">대상자 초기화</button>
                                    </div>
                                    <p class="mt-2 text-sm text-gray-600">관리자가 내려받아 공유한 미도달 대상자 엑셀 파일을 업로드하여 보충지도 대상자를 생성합니다.</p>
+                               </div>
+                               <div v-else-if="teacherTab === 'additional'" class="mb-4">
+                                   <div class="flex space-x-2">
+                                       <input type="text" v-model="newGuidanceStudentId" @keyup.enter="addGuidanceStudent(teacherTab)" placeholder="학번 입력 후 Enter" class="p-2 border rounded-md w-48">
+                                       <button @click="addGuidanceStudent(teacherTab)" class="px-4 py-2 bg-blue-500 text-white rounded-md">학생 추가</button>
+                                       <button @click="showImportModal = true" class="px-4 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 transition">대상자 업로드</button>
+                                       <button @click="resetAdditionalStudents" class="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition">대상자 초기화</button>
+                                   </div>
+                                   <p v-if="currentGuidanceData && currentGuidanceData.error" class="text-red-500 text-sm mb-4 -mt-2">{{ currentGuidanceData.error }}</p>
+                                   <p class="mt-2 text-sm text-gray-600">과목 출석률 미도달 대상자를 수동으로 추가하거나, 관리자가 내려받아 공유한 미도달 대상자 엑셀 파일을 업로드할 수 있습니다.</p>
                                </div>
 
                                <div class="relative">
@@ -4484,15 +4495,40 @@
                             this.deployedUnderachievers = this.normalizeUnderachieverList(deployedDataRaw);
                             
                             // 관리자인 경우, 처리된 미도달 대상자 목록 불러오기
-                            if (this.role === '관리자' && underachieversProcessedSnap.exists()) {
-                                const processedDataRaw = underachieversProcessedSnap.data().data || [];
-                                const processedData = this.normalizeUnderachieverList(processedDataRaw);
-                                if (processedData.length > 0) {
-                                    this.underachievers = processedData;
-                                    this.statusMessage = `공용 데이터 로딩 완료. (저장된 미도달 대상자 ${processedData.length}명 불러옴)`;
-                                } else {
+                            if (this.role === '관리자') {
+                                // localStorage에서 먼저 확인
+                                const adminStorageKey = `minAchieve_admin_${activeSchoolId}`;
+                                let loadedFromLocalStorage = false;
+                                try {
+                                    const localData = localStorage.getItem(adminStorageKey);
+                                    if (localData) {
+                                        const parsed = JSON.parse(localData);
+                                        if (parsed && parsed.underachievers && Array.isArray(parsed.underachievers) && parsed.underachievers.length > 0) {
+                                            const processedData = this.normalizeUnderachieverList(parsed.underachievers);
+                                            this.underachievers = processedData;
+                                            this.statusMessage = `공용 데이터 로딩 완료. (로컬 저장된 미도달 대상자 ${processedData.length}명 불러옴)`;
+                                            loadedFromLocalStorage = true;
+                                            console.log('관리자 미도달 대상자 명단이 localStorage에서 로드되었습니다.', { adminStorageKey });
+                                        }
+                                    }
+                                } catch (localStorageError) {
+                                    console.warn('localStorage 로드 실패:', localStorageError);
+                                }
+                                
+                                // localStorage에 없으면 Firestore에서 불러오기
+                                if (!loadedFromLocalStorage && underachieversProcessedSnap.exists()) {
+                                    const processedDataRaw = underachieversProcessedSnap.data().data || [];
+                                    const processedData = this.normalizeUnderachieverList(processedDataRaw);
+                                    if (processedData.length > 0) {
+                                        this.underachievers = processedData;
+                                        this.statusMessage = `공용 데이터 로딩 완료. (저장된 미도달 대상자 ${processedData.length}명 불러옴)`;
+                                    } else {
+                                        this.underachievers = this.normalizeUnderachieverList(this.deployedUnderachievers);
+                                        this.statusMessage = '공용 데이터 로딩 완료.';
+                                    }
+                                } else if (!loadedFromLocalStorage) {
                                     this.underachievers = this.normalizeUnderachieverList(this.deployedUnderachievers);
-                            this.statusMessage = '공용 데이터 로딩 완료.';
+                                    this.statusMessage = '공용 데이터 로딩 완료.';
                                 }
                             } else {
                                 this.underachievers = this.normalizeUnderachieverList(this.deployedUnderachievers);
@@ -5560,6 +5596,19 @@
                                                 try {
                                                     const docRef = doc(db, `schools/${activeSchoolId}/commonData`, "underachieversProcessed");
                                                     await setDoc(docRef, { data: JSON.parse(JSON.stringify(processedUnderachievers)) });
+                                                    
+                                                    // localStorage에도 저장 (페이지 새로고침 후에도 유지)
+                                                    const adminStorageKey = `minAchieve_admin_${activeSchoolId}`;
+                                                    try {
+                                                        localStorage.setItem(adminStorageKey, JSON.stringify({
+                                                            underachievers: processedUnderachievers,
+                                                            lastUpdated: new Date().toISOString()
+                                                        }));
+                                                        console.log('관리자 미도달 대상자 명단이 localStorage에 저장되었습니다.', { adminStorageKey });
+                                                    } catch (localStorageError) {
+                                                        console.warn('localStorage 저장 실패:', localStorageError);
+                                                    }
+                                                    
                                                     this.fileProcessingError = '';
                                                     alert(`성적 파일 처리 완료: ${totalFiles}개 파일에서 ${processedUnderachievers.length}명의 미도달 학생이 확인되었습니다. 데이터가 저장되었습니다.`);
                                                 } catch (saveError) {
@@ -6332,7 +6381,7 @@
                     async generateCompletionStatusPdf(type) {
                         const data = this.teacherGuidanceData[type];
                         if (!data || !this.role) return;
-                        const title = type === 'preventive' ? '예방지도' : '보충지도(추가학습)';
+                        const title = type === 'preventive' ? '예방지도' : type === 'supplementary' ? '보충지도' : '추가학습';
                         
                         let tableHtml = `<table><thead><tr>
                             <th>학생</th>
@@ -6374,7 +6423,7 @@
                     async generateAttendancePdf(type) {
                         const data = this.teacherGuidanceData[type];
                         if (!data || !this.role) return;
-                        const title = type === 'preventive' ? '예방지도' : '보충지도(추가학습)';
+                        const title = type === 'preventive' ? '예방지도' : type === 'supplementary' ? '보충지도' : '추가학습';
                         const savedSessions = data.sessions.filter(s => s && s.date);
                         
                         let tableHtml = `<table><thead><tr><th>학번</th><th>이름</th>${savedSessions.map((s, i) => `<th>${i + 1}차시<br/>(${s.date})</th>`).join('')}</tr></thead><tbody>`;
@@ -6395,7 +6444,7 @@
                     },
                     async generateLessonLogPdf(type) {
                         if (!this.currentGuidanceData || !this.role) return;
-                        const title = type === 'preventive' ? '예방지도' : '보충지도(추가학습)';
+                        const title = type === 'preventive' ? '예방지도' : type === 'supplementary' ? '보충지도' : '추가학습';
                         
                         let lessonLogHtml = this.savedGuidanceSessions.map((session, index) => {
                             if (!session) return '';
@@ -6597,11 +6646,12 @@
                                         .map(s => String(s.id))
                                 );
 
+                                // 미도달내역에 관계없이 명단에 있는 모든 학생을 추가학습 대상자로 추가
+                                // (보충지도 대상자로 추가되지 않은 학생들)
+                                const supplementaryIds = new Set(supplementaryStudents.map(s => s.id));
                                 const additionalStudents = newStudents.filter(s => {
-                                    const hasGrade = s.reason && s.reason.includes('학업성취율');
-                                    const hasAttendance = s.reason && s.reason.includes('과목출석률');
-                                    // 과목출석률만 있고 학업성취율은 없는 경우
-                                    return hasAttendance && !hasGrade && !existingAdditionalIds.has(s.id);
+                                    // 보충지도 대상자로 추가되지 않은 학생만 추가학습 대상자로 추가
+                                    return !supplementaryIds.has(s.id) && !existingAdditionalIds.has(s.id);
                                 });
 
                                 if (additionalStudents.length > 0) {
@@ -6654,6 +6704,19 @@
                         if (this.teacherGuidanceData.supplementary) {
                             this.teacherGuidanceData.supplementary.students = [];
                             this.teacherGuidanceData.supplementary.sessions.forEach(session => { 
+                                if(session) {
+                                    session.attendance = {};
+                                    session.originalAttendance = {};
+                                }
+                            });
+                            this.saveGuidanceData();
+                        }
+                    },
+                    resetAdditionalStudents() {
+                        if (this.role !== '교과교사') return;
+                        if (this.teacherGuidanceData.additional) {
+                            this.teacherGuidanceData.additional.students = [];
+                            this.teacherGuidanceData.additional.sessions.forEach(session => { 
                                 if(session) {
                                     session.attendance = {};
                                     session.originalAttendance = {};
