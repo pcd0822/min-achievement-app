@@ -8432,29 +8432,12 @@
                                     console.warn('localStorage 로드 실패:', localStorageError);
                                 }
                                 
-                                // localStorage에 없으면 Firestore에서 불러오기
-                                if (!loadedFromLocalStorage && underachieversProcessedSnap.exists()) {
-                                const processedDataRaw = underachieversProcessedSnap.data().data || [];
-
-                                const processedData = this.normalizeUnderachieverList(processedDataRaw);
-
-                                if (processedData.length > 0) {
-
-                                    this.underachievers = processedData;
-
-                                    this.statusMessage = `공용 데이터 로딩 완료. (저장된 미도달 대상자 ${processedData.length}명 불러옴)`;
-
-                                } else {
-
-                                    this.underachievers = this.normalizeUnderachieverList(this.deployedUnderachievers);
-                            this.statusMessage = '공용 데이터 로딩 완료.';
-                                }
-                                } else if (!loadedFromLocalStorage) {
-                                    // localStorage도 없고 Firestore도 없으면 deployedUnderachievers 사용
-                                this.underachievers = this.normalizeUnderachieverList(this.deployedUnderachievers);
-
-                                this.statusMessage = '공용 데이터 로딩 완료.';
-
+                                // localStorage에 없으면 빈 배열로 시작 (로컬 환경별로 완전히 분리)
+                                // Firestore에서 로드하지 않음 (다른 로컬 환경과 공유되지 않도록)
+                                if (!loadedFromLocalStorage) {
+                                    this.underachievers = [];
+                                    this.statusMessage = '공용 데이터 로딩 완료. (로컬 저장된 미도달 대상자 명단 없음)';
+                                    console.log('로컬 저장소에 미도달 대상자 명단이 없습니다. 빈 배열로 시작합니다.', { adminStorageKey });
                                 }
 
                             } else {
