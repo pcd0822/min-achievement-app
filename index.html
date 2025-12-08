@@ -2393,43 +2393,62 @@
                         this.$nextTick(() => { this.initFlatpickr(); });
                     },
                     async addNewSubjectDirectly() {
-                        // 빈 과목 생성
-                        const newPlan = {
-                            subjectName: '',
-                            subjectGrade: null,
-                            subjectSemester: null,
-                            subjectCategory: '',
-                            teacherNames: [''],
-                            achievements: [createEmptyAchievement()],
-                            gradeCalculation: '추정분할점수',
-                            conductPrevention: 'X',
-                            preventionTarget: '',
-                            preventionMethods: [],
-                            preventionPeriod: [],
-                            preventionSessions: [{ plan: '' }, { plan: '' }, { plan: '' }],
-                            supplementaryMethods: [],
-                            supplementaryPeriod: [],
-                            supplementarySessions: [],
-                            maxSupplementaryHours: 0,
-                            additionalMethods: [],
-                            additionalPeriod: [],
-                            additionalSessions: [],
-                            maxAdditionalHours: 0,
-                        };
+                        // 중복 방지: 이미 진행 중인 추가 작업이 있으면 무시
+                        if (this._isAddingSubject) {
+                            console.log('이미 과목 추가 작업이 진행 중입니다.');
+                            return;
+                        }
+                        this._isAddingSubject = true;
                         
-                        const newGuidance = this.getInitialGuidanceData();
-                        
-                        this.teacherPlanList.push(newPlan);
-                        this.teacherGuidanceDataList.push(newGuidance);
-                        this.currentSubjectIndex = this.teacherPlanList.length - 1;
-                        
-                        // 새 과목을 현재 선택된 과목으로 설정하고 드롭다운 뷰로 전환
-                        await this.loadSubjectData(this.currentSubjectIndex);
-                        this.teacherViewMode = 'dropdown';
-                        this.teacherTab = 'plan'; // 계획서 탭으로 이동
-                        
-                        // 저장
-                        await this.saveAllTeacherData();
+                        try {
+                            // 빈 과목 생성
+                            const newPlan = {
+                                subjectName: '',
+                                subjectGrade: null,
+                                subjectSemester: null,
+                                subjectCategory: '',
+                                teacherNames: [''],
+                                achievements: [createEmptyAchievement()],
+                                gradeCalculation: '추정분할점수',
+                                conductPrevention: 'X',
+                                preventionTarget: '',
+                                preventionMethods: [],
+                                preventionPeriod: [],
+                                preventionSessions: [{ plan: '' }, { plan: '' }, { plan: '' }],
+                                supplementaryMethods: [],
+                                supplementaryPeriod: [],
+                                supplementarySessions: [],
+                                maxSupplementaryHours: 0,
+                                additionalMethods: [],
+                                additionalPeriod: [],
+                                additionalSessions: [],
+                                maxAdditionalHours: 0,
+                            };
+                            
+                            const newGuidance = this.getInitialGuidanceData();
+                            
+                            // 배열이 초기화되지 않았으면 초기화
+                            if (!Array.isArray(this.teacherPlanList)) {
+                                this.teacherPlanList = [];
+                            }
+                            if (!Array.isArray(this.teacherGuidanceDataList)) {
+                                this.teacherGuidanceDataList = [];
+                            }
+                            
+                            this.teacherPlanList.push(newPlan);
+                            this.teacherGuidanceDataList.push(newGuidance);
+                            this.currentSubjectIndex = this.teacherPlanList.length - 1;
+                            
+                            // 새 과목을 현재 선택된 과목으로 설정하고 드롭다운 뷰로 전환
+                            await this.loadSubjectData(this.currentSubjectIndex);
+                            this.teacherViewMode = 'dropdown';
+                            this.teacherTab = 'plan'; // 계획서 탭으로 이동
+                            
+                            // 저장
+                            await this.saveAllTeacherData();
+                        } finally {
+                            this._isAddingSubject = false;
+                        }
                     },
                     async addNewSubject() {
                         if (!this.newSubjectForm.subjectName.trim()) {
@@ -2437,51 +2456,84 @@
                             return;
                         }
                         
-                        const newPlan = {
-                            subjectName: this.newSubjectForm.subjectName,
-                            subjectGrade: this.newSubjectForm.subjectGrade,
-                            subjectSemester: this.newSubjectForm.subjectSemester,
-                            subjectCategory: this.newSubjectForm.subjectCategory,
-                            teacherNames: this.newSubjectForm.teacherNames.filter(n => n.trim()),
-                            achievements: [createEmptyAchievement()],
-                            gradeCalculation: '추정분할점수',
-                            conductPrevention: 'X',
-                            preventionTarget: '',
-                            preventionMethods: [],
-                            preventionPeriod: [],
-                            preventionSessions: [{ plan: '' }, { plan: '' }, { plan: '' }],
-                            supplementaryMethods: [],
-                            supplementaryPeriod: [],
-                            supplementarySessions: [],
-                            maxSupplementaryHours: 0,
-                            additionalMethods: [],
-                            additionalPeriod: [],
-                            additionalSessions: [],
-                            maxAdditionalHours: 0,
-                        };
+                        // 중복 방지: 이미 진행 중인 추가 작업이 있으면 무시
+                        if (this._isAddingSubject) {
+                            console.log('이미 과목 추가 작업이 진행 중입니다.');
+                            return;
+                        }
+                        this._isAddingSubject = true;
                         
-                        const newGuidance = this.getInitialGuidanceData();
-                        
-                        this.teacherPlanList.push(newPlan);
-                        this.teacherGuidanceDataList.push(newGuidance);
-                        this.currentSubjectIndex = this.teacherPlanList.length - 1;
-                        
-                        // 새 과목을 현재 선택된 과목으로 설정
-                        await this.loadSubjectData(this.currentSubjectIndex);
-                        this.teacherViewMode = 'dropdown';
-                        
-                        // 폼 초기화
-                        this.newSubjectForm = {
-                            subjectName: '',
-                            subjectGrade: null,
-                            subjectSemester: null,
-                            subjectCategory: '',
-                            teacherNames: ['']
-                        };
-                        this.showAddSubjectModal = false;
-                        
-                        // 저장
-                        this.saveAllTeacherData();
+                        try {
+                            // 중복 과목 확인: 같은 과목명, 학년, 학기, 계열이 이미 있는지 확인
+                            const existingSubject = this.teacherPlanList.find(plan => 
+                                plan.subjectName === this.newSubjectForm.subjectName.trim() &&
+                                plan.subjectGrade === this.newSubjectForm.subjectGrade &&
+                                plan.subjectSemester === this.newSubjectForm.subjectSemester &&
+                                plan.subjectCategory === this.newSubjectForm.subjectCategory
+                            );
+                            
+                            if (existingSubject) {
+                                alert('이미 동일한 과목(과목명, 학년, 학기, 계열)이 존재합니다.');
+                                this._isAddingSubject = false;
+                                return;
+                            }
+                            
+                            const newPlan = {
+                                subjectName: this.newSubjectForm.subjectName,
+                                subjectGrade: this.newSubjectForm.subjectGrade,
+                                subjectSemester: this.newSubjectForm.subjectSemester,
+                                subjectCategory: this.newSubjectForm.subjectCategory,
+                                teacherNames: this.newSubjectForm.teacherNames.filter(n => n.trim()),
+                                achievements: [createEmptyAchievement()],
+                                gradeCalculation: '추정분할점수',
+                                conductPrevention: 'X',
+                                preventionTarget: '',
+                                preventionMethods: [],
+                                preventionPeriod: [],
+                                preventionSessions: [{ plan: '' }, { plan: '' }, { plan: '' }],
+                                supplementaryMethods: [],
+                                supplementaryPeriod: [],
+                                supplementarySessions: [],
+                                maxSupplementaryHours: 0,
+                                additionalMethods: [],
+                                additionalPeriod: [],
+                                additionalSessions: [],
+                                maxAdditionalHours: 0,
+                            };
+                            
+                            const newGuidance = this.getInitialGuidanceData();
+                            
+                            // 배열이 초기화되지 않았으면 초기화
+                            if (!Array.isArray(this.teacherPlanList)) {
+                                this.teacherPlanList = [];
+                            }
+                            if (!Array.isArray(this.teacherGuidanceDataList)) {
+                                this.teacherGuidanceDataList = [];
+                            }
+                            
+                            this.teacherPlanList.push(newPlan);
+                            this.teacherGuidanceDataList.push(newGuidance);
+                            this.currentSubjectIndex = this.teacherPlanList.length - 1;
+                            
+                            // 새 과목을 현재 선택된 과목으로 설정
+                            await this.loadSubjectData(this.currentSubjectIndex);
+                            this.teacherViewMode = 'dropdown';
+                            
+                            // 폼 초기화
+                            this.newSubjectForm = {
+                                subjectName: '',
+                                subjectGrade: null,
+                                subjectSemester: null,
+                                subjectCategory: '',
+                                teacherNames: ['']
+                            };
+                            this.showAddSubjectModal = false;
+                            
+                            // 저장
+                            await this.saveAllTeacherData();
+                        } finally {
+                            this._isAddingSubject = false;
+                        }
                     },
                     deleteSubject(index) {
                         if (!confirm('정말 삭제하시겠습니까? 모든 데이터가 지워집니다.')) return;
@@ -2551,18 +2603,70 @@
                         const storageKey = this.getTeacherLocalStorageKey();
                         if (!storageKey) return;
 
+                        // 이미 데이터가 로드되어 있고, localStorage의 데이터와 동일한지 확인
+                        // 중복 로드를 방지하기 위해 한 번만 로드하도록 함
+                        if (this.teacherPlanList && this.teacherPlanList.length > 0) {
+                            console.log('이미 교과 데이터가 로드되어 있습니다. 중복 로드를 방지합니다.', { 
+                                currentCount: this.teacherPlanList.length,
+                                storageKey 
+                            });
+                            return;
+                        }
+
                         try {
                             const raw = localStorage.getItem(storageKey);
                             if (!raw) {
                                 console.log('로컬에 저장된 교과 데이터가 없습니다.', { storageKey });
+                                // 데이터가 없으면 빈 배열로 초기화
+                                this.teacherPlanList = [];
+                                this.teacherGuidanceDataList = [];
                                 return;
                             }
                             const data = JSON.parse(raw);
+                            
+                            // 데이터 중복 방지: 기존 데이터가 있으면 덮어쓰지 않음
                             if (data.planList && Array.isArray(data.planList)) {
-                                this.teacherPlanList = data.planList;
+                                // 기존 데이터가 없을 때만 할당
+                                if (!this.teacherPlanList || this.teacherPlanList.length === 0) {
+                                    this.teacherPlanList = data.planList;
+                                } else {
+                                    console.log('기존 교과 데이터가 있어 localStorage 데이터를 무시합니다.', {
+                                        existingCount: this.teacherPlanList.length,
+                                        localStorageCount: data.planList.length
+                                    });
+                                }
+                            } else {
+                                this.teacherPlanList = [];
                             }
+                            
                             if (data.guidanceDataList && Array.isArray(data.guidanceDataList)) {
-                                this.teacherGuidanceDataList = data.guidanceDataList;
+                                // 기존 데이터가 없을 때만 할당
+                                if (!this.teacherGuidanceDataList || this.teacherGuidanceDataList.length === 0) {
+                                    this.teacherGuidanceDataList = data.guidanceDataList;
+                                } else {
+                                    console.log('기존 지도 데이터가 있어 localStorage 데이터를 무시합니다.', {
+                                        existingCount: this.teacherGuidanceDataList.length,
+                                        localStorageCount: data.guidanceDataList.length
+                                    });
+                                }
+                            } else {
+                                this.teacherGuidanceDataList = [];
+                            }
+
+                            // 배열 길이 동기화 (planList와 guidanceDataList의 길이가 다를 수 있음)
+                            if (this.teacherPlanList.length !== this.teacherGuidanceDataList.length) {
+                                console.warn('planList와 guidanceDataList의 길이가 다릅니다. 동기화합니다.', {
+                                    planListLength: this.teacherPlanList.length,
+                                    guidanceDataListLength: this.teacherGuidanceDataList.length
+                                });
+                                // 더 긴 배열의 길이에 맞춰 짧은 배열을 채움
+                                const maxLength = Math.max(this.teacherPlanList.length, this.teacherGuidanceDataList.length);
+                                while (this.teacherPlanList.length < maxLength) {
+                                    this.teacherPlanList.push(this.getInitialTeacherPlan());
+                                }
+                                while (this.teacherGuidanceDataList.length < maxLength) {
+                                    this.teacherGuidanceDataList.push(this.getInitialGuidanceData());
+                                }
                             }
 
                             // 첫 번째 과목을 기본 선택
@@ -2572,6 +2676,9 @@
                             }
                         } catch (error) {
                             console.error('로컬 교과 데이터 로드 실패:', error);
+                            // 오류 발생 시 빈 배열로 초기화
+                            this.teacherPlanList = [];
+                            this.teacherGuidanceDataList = [];
                         }
                     },
                     // --- Textarea Resize Helper ---
