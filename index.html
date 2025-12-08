@@ -4126,7 +4126,9 @@
                                                 }
                                             }
                                         } else if (this.role === '관리자') {
-                                        this.underachievers = this.normalizeUnderachieverList(this.deployedUnderachievers);
+                                        // loadCommonData() 내부에서 이미 localStorage나 Firestore에서 데이터를 로드하므로
+                                        // 여기서 deployedUnderachievers로 덮어쓰지 않음
+                                        // this.underachievers는 loadCommonData()에서 이미 설정됨
                                         }
                                     } else if (this.isLoggedIn && this.role && !this.schoolId) {
                                         console.log("Role exists, but schoolId is missing. Showing schoolId modal.");
@@ -4270,7 +4272,9 @@
                             await this.saveUserRoleAndSchoolId('관리자');
                             if (this.schoolId) {
                                 await this.loadCommonData();
-                                this.underachievers = this.normalizeUnderachieverList(this.deployedUnderachievers);
+                                // loadCommonData() 내부에서 이미 localStorage나 Firestore에서 데이터를 로드하므로
+                                // 여기서 deployedUnderachievers로 덮어쓰지 않음
+                                // this.underachievers는 loadCommonData()에서 이미 설정됨
                                 this.isLoading = false;
                             } else {
                                 this.schoolIdMode = 'create';
@@ -4319,9 +4323,9 @@
                             await this.loadCommonData();
                             console.log("공용 데이터 로딩 완료");
                             
-                        if (this.role === '관리자') {
-                            this.underachievers = this.normalizeUnderachieverList(this.deployedUnderachievers);
-                        }
+                        // loadCommonData() 내부에서 이미 localStorage나 Firestore에서 데이터를 로드하므로
+                        // 여기서 deployedUnderachievers로 덮어쓰지 않음
+                        // this.underachievers는 loadCommonData()에서 이미 설정됨
 
                         if (this.role === '교과교사') {
                                 console.log("교과교사 데이터 로딩 시작");
@@ -4604,7 +4608,7 @@
                             
                             // 관리자인 경우, 처리된 미도달 대상자 목록 불러오기
                             if (this.role === '관리자') {
-                                // localStorage에서 먼저 확인
+                                // localStorage에서 먼저 확인 (저장된 데이터가 최우선)
                                 const adminStorageKey = `minAchieve_admin_${activeSchoolId}`;
                                 let loadedFromLocalStorage = false;
                                 try {
@@ -4613,10 +4617,15 @@
                                         const parsed = JSON.parse(localData);
                                         if (parsed && parsed.underachievers && Array.isArray(parsed.underachievers) && parsed.underachievers.length > 0) {
                                             const processedData = this.normalizeUnderachieverList(parsed.underachievers);
+                                            // localStorage에 저장된 데이터가 있으면 항상 사용 (저장된 데이터가 최신)
                                             this.underachievers = processedData;
                                             this.statusMessage = `공용 데이터 로딩 완료. (로컬 저장된 미도달 대상자 ${processedData.length}명 불러옴)`;
                                             loadedFromLocalStorage = true;
-                                            console.log('관리자 미도달 대상자 명단이 localStorage에서 로드되었습니다.', { adminStorageKey });
+                                            console.log('관리자 미도달 대상자 명단이 localStorage에서 로드되었습니다.', { 
+                                                adminStorageKey,
+                                                count: processedData.length,
+                                                lastUpdated: parsed.lastUpdated
+                                            });
                                         }
                                     }
                                 } catch (localStorageError) {
@@ -4635,6 +4644,7 @@
                                         this.statusMessage = '공용 데이터 로딩 완료.';
                                     }
                                 } else if (!loadedFromLocalStorage) {
+                                    // localStorage도 없고 Firestore도 없으면 deployedUnderachievers 사용
                                     this.underachievers = this.normalizeUnderachieverList(this.deployedUnderachievers);
                                     this.statusMessage = '공용 데이터 로딩 완료.';
                                 }
@@ -4908,26 +4918,39 @@
                         
                         const adminStorageKey = `minAchieve_admin_${activeSchoolId}`;
                         try {
+                            // 현재 underachievers 데이터를 깊은 복사하여 저장
                             const dataToSave = {
                                 underachievers: JSON.parse(JSON.stringify(this.underachievers)),
                                 lastUpdated: new Date().toISOString(),
                                 count: this.underachievers.length
                             };
                             localStorage.setItem(adminStorageKey, JSON.stringify(dataToSave));
-                            const savedTime = new Date().toLocaleString('ko-KR', { 
-                                year: 'numeric', 
-                                month: '2-digit', 
-                                day: '2-digit', 
-                                hour: '2-digit', 
-                                minute: '2-digit',
-                                second: '2-digit'
-                            });
-                            this.underachieversStatus = `✓ 미도달 대상자 ${this.underachievers.length}명이 로컬 환경에 저장되었습니다. (저장 시간: ${savedTime})`;
-                            console.log('관리자 미도달 대상자 명단이 localStorage에 저장되었습니다.', { 
-                                adminStorageKey, 
-                                count: this.underachievers.length,
-                                lastUpdated: dataToSave.lastUpdated
-                            });
+                            
+                            // 저장 후 즉시 다시 로드하여 확인
+                            const savedData = JSON.parse(localStorage.getItem(adminStorageKey));
+                            if (savedData && savedData.underachievers && savedData.underachievers.length === this.underachievers.length) {
+                                const savedTime = new Date().toLocaleString('ko-KR', { 
+                                    year: 'numeric', 
+                                    month: '2-digit', 
+                                    day: '2-digit', 
+                                    hour: '2-digit', 
+                                    minute: '2-digit',
+                                    second: '2-digit'
+                                });
+                                this.underachieversStatus = `✓ 미도달 대상자 ${this.underachievers.length}명이 로컬 환경에 저장되었습니다. (저장 시간: ${savedTime})`;
+                                console.log('관리자 미도달 대상자 명단이 localStorage에 저장되었습니다.', { 
+                                    adminStorageKey, 
+                                    count: this.underachievers.length,
+                                    lastUpdated: dataToSave.lastUpdated,
+                                    verified: true
+                                });
+                            } else {
+                                this.underachieversStatus = '저장은 완료되었으나 검증 중 오류가 발생했습니다.';
+                                console.warn('저장 검증 실패:', { 
+                                    savedCount: savedData?.underachievers?.length,
+                                    originalCount: this.underachievers.length
+                                });
+                            }
                             setTimeout(() => (this.underachieversStatus = ''), 5000);
                         } catch (localStorageError) {
                             console.error('localStorage 저장 실패:', localStorageError);
