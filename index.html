@@ -2156,7 +2156,7 @@
                     },
                     currentGuidanceData() {
                         if (this.role !== '교과교사') return null;
-                        if (this.teacherTab === 'preventive' || this.teacherTab === 'supplementary') {
+                        if (this.teacherTab === 'preventive' || this.teacherTab === 'supplementary' || this.teacherTab === 'additional') {
                             if (!this.teacherGuidanceData[this.teacherTab]) {
                                 this.teacherGuidanceData[this.teacherTab] = this.getInitialGuidanceData()[this.teacherTab];
                             }
@@ -2591,7 +2591,8 @@
                         const defaultSession = () => ({ date: '', time: '', isSaved: false, place: '', content: '', attendance: {}, originalAttendance: {} });
                         return {
                             preventive: { students: [], sessions: Array.from({ length: 10 }, defaultSession), error: ''},
-                            supplementary: { students: [], sessions: Array.from({ length: 10 }, defaultSession), error: ''}
+                            supplementary: { students: [], sessions: Array.from({ length: 10 }, defaultSession), error: ''},
+                            additional: { students: [], sessions: Array.from({ length: 10 }, defaultSession), error: ''}
                         };
                     },
                     normalizeUnderachieverEntry(entry) {
@@ -4002,6 +4003,7 @@
                                                 if (this.teacherPlan.subjectName) {
                                                     await this.loadGuidanceData();
                                                     this.filterSupplementaryStudents();
+                                                    this.filterAdditionalStudents();
                                                 }
                                             }
                                         } else if (this.role === '관리자') {
@@ -4166,11 +4168,32 @@
                     },
                     async finalizeSchoolCodeSelection(code, canonicalId) {
                         const effectiveCanonicalId = canonicalId || code;
+                        const previousSchoolCode = this.currentSchoolCode;
+                        const previousSchoolId = this.schoolId;
+                        
                         this.schoolId = effectiveCanonicalId;
                         this.currentSchoolCode = code || effectiveCanonicalId;
                         this.showSchoolIdModal = false;
                         
                         console.log("학교코드 최종 확정:", this.currentSchoolCode, "실제 ID:", this.schoolId, "역할:", this.role);
+                        
+                        // 학교코드가 변경된 경우 이전 학교코드의 로컬 데이터 초기화
+                        if (this.role === '교과교사' && this.user && previousSchoolCode && previousSchoolCode !== this.currentSchoolCode) {
+                            const previousStorageKey = `minAchieve_teacher_${this.user.uid}_${previousSchoolCode}`;
+                            try {
+                                localStorage.removeItem(previousStorageKey);
+                                console.log("이전 학교코드의 교과교사 데이터 초기화:", previousStorageKey);
+                            } catch (error) {
+                                console.warn("이전 학교코드 데이터 초기화 실패:", error);
+                            }
+                            // 메모리상의 데이터도 초기화
+                            this.teacherPlanList = [];
+                            this.teacherGuidanceDataList = [];
+                            this.currentSubjectIndex = -1;
+                            this.teacherPlan = this.getInitialTeacherPlan();
+                            this.teacherGuidanceData = this.getInitialGuidanceData();
+                        }
+                        
                             await this.saveUserRoleAndSchoolId(this.role);
                             console.log("사용자 데이터 저장 완료");
                             
@@ -4191,6 +4214,7 @@
                                         console.log("과목명 존재, 지도 자료 로딩 시작:", this.teacherPlan.subjectName);
                                         await this.loadGuidanceData();
                                         this.filterSupplementaryStudents();
+                                        this.filterAdditionalStudents();
                                         console.log("지도 자료 로딩 완료");
                                     } else {
                                         console.log("과목명 없음, 지도 자료 로딩 건너뜀");
@@ -4841,6 +4865,18 @@
                                     }
                                 });
                             }
+                            if (this.teacherGuidanceData.additional && this.teacherGuidanceData.additional.sessions) {
+                                this.teacherGuidanceData.additional.sessions.forEach(session => {
+                                    if (session && session.attendance) {
+                                        if (!session.originalAttendance) {
+                                            session.originalAttendance = {};
+                                        }
+                                        Object.keys(session.attendance).forEach(studentId => {
+                                            session.originalAttendance[studentId] = session.attendance[studentId] || '';
+                                        });
+                                    }
+                                });
+                            }
                         }
 
                         // 현재 선택된 과목이 있으면 teacherGuidanceDataList에도 업데이트하고 로컬에 저장
@@ -5052,6 +5088,7 @@
                         this.updateMaxHours();
                         await this.loadGuidanceData();
                         this.filterSupplementaryStudents();
+                        this.filterAdditionalStudents();
                     },
 
                     // --- Helper and UI Methods ---
@@ -5689,11 +5726,18 @@
                         }
                     },
                     filterSupplementaryStudents() {
-                        if (this.role !== '교과교사' || !this.teacherPlan.subjectName || !this.deployedUnderachievers) {
+                        if (this.role !== '교과교사' || !this.teacherPlan.subjectName) {
                             if (this.teacherGuidanceData.supplementary) this.teacherGuidanceData.supplementary.students = [];
                             return;
                         }
                         const subject = this.teacherPlan.subjectName;
+                        
+                        // deployedUnderachievers가 없으면 기존 학생 목록 유지 (importUnderachievers로 추가한 학생 보존)
+                        if (!this.deployedUnderachievers || this.deployedUnderachievers.length === 0) {
+                            console.log("filterSupplementaryStudents: deployedUnderachievers가 없어 기존 학생 목록 유지");
+                            return;
+                        }
+                        
                         const subjectSpecificUnderachievers = this.deployedUnderachievers.filter(student => {
                             if (!student) return false;
                             const gradeMatch = (student.gradeSubjects || []).some(s => s && s.name === subject);
@@ -5704,7 +5748,12 @@
                         const currentSuppStudents = this.teacherGuidanceData.supplementary?.students || [];
                         
                         const deployedIds = new Set(subjectSpecificUnderachievers.map(s => s.id));
-                        const existingStudentsToKeep = currentSuppStudents.filter(s => deployedIds.has(s.id));
+                        // deployedUnderachievers에 있는 학생과 기존에 추가된 학생 모두 유지
+                        const existingStudentsToKeep = currentSuppStudents.filter(s => {
+                            // deployedUnderachievers에 있거나, importUnderachievers로 추가한 학생은 유지
+                            return deployedIds.has(s.id) || !deployedIds.has(s.id);
+                        });
+                        
                         existingStudentsToKeep.forEach(s => {
                             const match = subjectSpecificUnderachievers.find(ds => ds.id === s.id);
                             if (match) {
@@ -5730,6 +5779,62 @@
                         this.teacherGuidanceData.supplementary.students = existingStudentsToKeep;
                         
                         this.teacherGuidanceData.supplementary.sessions.forEach(session => {
+                            if (!session) return;
+                            const newAttendance = {};
+                            existingStudentsToKeep.forEach(student => {
+                                if (student) {
+                                    newAttendance[student.id] = (session.attendance && session.attendance[student.id]) ? session.attendance[student.id] : '';
+                                }
+                            });
+                            session.attendance = newAttendance;
+                        });
+                    },
+                    filterAdditionalStudents() {
+                        if (this.role !== '교과교사' || !this.teacherPlan.subjectName) {
+                            if (this.teacherGuidanceData.additional) this.teacherGuidanceData.additional.students = [];
+                            return;
+                        }
+                        const subject = this.teacherPlan.subjectName;
+                        
+                        // deployedUnderachievers가 없으면 기존 학생 목록 유지
+                        if (!this.deployedUnderachievers || this.deployedUnderachievers.length === 0) {
+                            console.log("filterAdditionalStudents: deployedUnderachievers가 없어 기존 학생 목록 유지");
+                            return;
+                        }
+                        
+                        // 과목출석률 미도달만 있는 학생 필터링
+                        const subjectSpecificUnderachievers = this.deployedUnderachievers.filter(student => {
+                            if (!student) return false;
+                            const attendanceMatch = (student.attendanceSubjects || []).includes(subject);
+                            const gradeMatch = (student.gradeSubjects || []).some(s => s && s.name === subject);
+                            // 과목출석률 미도달만 있고 학업성취율 미도달은 없는 경우
+                            return attendanceMatch && !gradeMatch;
+                        });
+
+                        const currentAdditionalStudents = this.teacherGuidanceData.additional?.students || [];
+                        
+                        const deployedIds = new Set(subjectSpecificUnderachievers.map(s => s.id));
+                        // deployedUnderachievers에 있는 학생과 기존에 추가된 학생 모두 유지
+                        const existingStudentsToKeep = currentAdditionalStudents.filter(s => {
+                            return deployedIds.has(s.id) || !deployedIds.has(s.id);
+                        });
+                        
+                        existingStudentsToKeep.forEach(s => {
+                            const match = subjectSpecificUnderachievers.find(ds => ds.id === s.id);
+                            if (match) {
+                                s.reason = '과목출석률';
+                                const exceptionReason = match.exceptionReason ? String(match.exceptionReason).trim() : '';
+                                const isException = !!exceptionReason;
+                                s.isException = isException;
+                                s.exceptionReason = exceptionReason || '';
+                                s.note = isException ? `추가학습 예외처리 대상자 (${exceptionReason})` : '';
+                            }
+                        });
+
+                        existingStudentsToKeep.sort((a, b) => a.id.localeCompare(b.id));
+                        this.teacherGuidanceData.additional.students = existingStudentsToKeep;
+                        
+                        this.teacherGuidanceData.additional.sessions.forEach(session => {
                             if (!session) return;
                             const newAttendance = {};
                             existingStudentsToKeep.forEach(student => {
@@ -6453,28 +6558,92 @@
                                     return;
                                 }
 
-                                supplementary.students.push(...newStudents);
-                                supplementary.students.sort((a, b) => String(a.id).localeCompare(String(b.id)));
+                                // 보충지도 대상자 추가 (학업성취율 미도달자)
+                                const supplementaryStudents = newStudents.filter(s => s.reason && s.reason.includes('학업성취율'));
+                                if (supplementaryStudents.length > 0) {
+                                    supplementary.students.push(...supplementaryStudents);
+                                    supplementary.students.sort((a, b) => String(a.id).localeCompare(String(b.id)));
 
-                                supplementary.sessions.forEach(session => {
-                                    if (!session) return;
-                                    if (!session.attendance) session.attendance = {};
-                                    if (!session.originalAttendance) session.originalAttendance = {};
-                                    newStudents.forEach(student => {
-                                        if (!session.attendance.hasOwnProperty(student.id)) {
-                                            session.attendance[student.id] = '';
-                                        }
-                                        if (!session.originalAttendance.hasOwnProperty(student.id)) {
-                                            session.originalAttendance[student.id] = '';
-                                        }
+                                    supplementary.sessions.forEach(session => {
+                                        if (!session) return;
+                                        if (!session.attendance) session.attendance = {};
+                                        if (!session.originalAttendance) session.originalAttendance = {};
+                                        supplementaryStudents.forEach(student => {
+                                            if (!session.attendance.hasOwnProperty(student.id)) {
+                                                session.attendance[student.id] = '';
+                                            }
+                                            if (!session.originalAttendance.hasOwnProperty(student.id)) {
+                                                session.originalAttendance[student.id] = '';
+                                            }
+                                        });
                                     });
+                                }
+
+                                // 추가학습 대상자 추가 (과목출석률 미도달만 있는 학생)
+                                const additional = this.teacherGuidanceData.additional;
+                                if (!additional) {
+                                    this.teacherGuidanceData.additional = { students: [], sessions: Array.from({ length: 10 }, () => ({ date: '', time: '', isSaved: false, place: '', content: '', attendance: {}, originalAttendance: {} })), error: '' };
+                                }
+                                if (!Array.isArray(additional.students)) {
+                                    additional.students = [];
+                                }
+                                if (!Array.isArray(additional.sessions)) {
+                                    additional.sessions = Array.from({ length: 10 }, () => ({ date: '', time: '', isSaved: false, place: '', content: '', attendance: {}, originalAttendance: {} }));
+                                }
+
+                                const existingAdditionalIds = new Set(
+                                    additional.students
+                                        .filter(s => s && s.id)
+                                        .map(s => String(s.id))
+                                );
+
+                                const additionalStudents = newStudents.filter(s => {
+                                    const hasGrade = s.reason && s.reason.includes('학업성취율');
+                                    const hasAttendance = s.reason && s.reason.includes('과목출석률');
+                                    // 과목출석률만 있고 학업성취율은 없는 경우
+                                    return hasAttendance && !hasGrade && !existingAdditionalIds.has(s.id);
                                 });
+
+                                if (additionalStudents.length > 0) {
+                                    additionalStudents.forEach(student => {
+                                        student.reason = '과목출석률';
+                                        student.note = student.isException ? `추가학습 예외처리 대상자 (${student.exceptionReason})` : '';
+                                    });
+                                    additional.students.push(...additionalStudents);
+                                    additional.students.sort((a, b) => String(a.id).localeCompare(String(b.id)));
+
+                                    additional.sessions.forEach(session => {
+                                        if (!session) return;
+                                        if (!session.attendance) session.attendance = {};
+                                        if (!session.originalAttendance) session.originalAttendance = {};
+                                        additionalStudents.forEach(student => {
+                                            if (!session.attendance.hasOwnProperty(student.id)) {
+                                                session.attendance[student.id] = '';
+                                            }
+                                            if (!session.originalAttendance.hasOwnProperty(student.id)) {
+                                                session.originalAttendance[student.id] = '';
+                                            }
+                                        });
+                                    });
+                                }
 
                                 this.importModalError = '';
                                 this.selectedUnderachieverFile = null;
                                 this.showImportModal = false;
-                                this.saveGuidanceData();
-                                alert(`${newStudents.length}명의 학생을 보충지도 대상자로 추가했습니다.`);
+                                await this.saveGuidanceData();
+                                
+                                const totalAdded = supplementaryStudents.length + additionalStudents.length;
+                                let message = '';
+                                if (supplementaryStudents.length > 0 && additionalStudents.length > 0) {
+                                    message = `보충지도 대상자 ${supplementaryStudents.length}명, 추가학습 대상자 ${additionalStudents.length}명을 추가했습니다.`;
+                                } else if (supplementaryStudents.length > 0) {
+                                    message = `${supplementaryStudents.length}명의 학생을 보충지도 대상자로 추가했습니다.`;
+                                } else if (additionalStudents.length > 0) {
+                                    message = `${additionalStudents.length}명의 학생을 추가학습 대상자로 추가했습니다.`;
+                                } else {
+                                    message = '추가된 학생이 없습니다.';
+                                }
+                                alert(message);
                             } catch (error) {
                                 console.error('미도달 대상자 엑셀 업로드 오류:', error);
                                 this.importModalError = '엑셀 파일을 처리하는 중 오류가 발생했습니다.';
