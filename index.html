@@ -9154,27 +9154,35 @@
 
                         
                         
-                        // 1차 필터링: 분류로 먼저 필터링
+                        // 1차 필터링: 분류로 먼저 필터링 (분류가 있는 경우만)
 
-                        const filteredByCategory = this.curriculumData.filter(row => {
+                        let searchData = this.curriculumData;
 
-                            if (!row || !row['분류']) return false;
+                        if (normalizedCategory && normalizedCategory !== '') {
 
-                            const rowCategory = String(row['분류']).trim();
+                            searchData = this.curriculumData.filter(row => {
 
-                            return rowCategory === normalizedCategory;
+                                if (!row || !row['분류']) return false;
 
-                        });
+                                const rowCategory = String(row['분류']).trim();
 
-                        
-                        
-                        console.log(`[findSubjectInCurriculum] 분류 "${normalizedCategory}"로 필터링: ${filteredByCategory.length}개 과목`);
+                                return rowCategory === normalizedCategory;
+
+                            });
+
+                            console.log(`[findSubjectInCurriculum] 분류 "${normalizedCategory}"로 필터링: ${searchData.length}개 과목`);
+
+                        } else {
+
+                            console.log(`[findSubjectInCurriculum] 분류 없음. 전체 데이터에서 검색: ${searchData.length}개 과목`);
+
+                        }
 
                         
                         
                         // 2차 필터링: 과목명, 학년, 학기로 검색
 
-                        const result = filteredByCategory.find(row => {
+                        let result = searchData.find(row => {
 
                             if (!row || !row['과목명']) return false;
 
@@ -9214,6 +9222,78 @@
 
                         
                         
+                        // 분류로 찾지 못했고, 분류가 지정된 경우 다른 분류에서도 시도
+
+                        if (!result && normalizedCategory && normalizedCategory !== '') {
+
+                            const alternativeCategory = normalizedCategory === '전문계열' ? '인문계열' : '전문계열';
+
+                            console.log(`[findSubjectInCurriculum] "${normalizedCategory}"에서 찾지 못함. "${alternativeCategory}"로 재시도`);
+
+                            
+
+                            const alternativeData = this.curriculumData.filter(row => {
+
+                                if (!row || !row['분류']) return false;
+
+                                const rowCategory = String(row['분류']).trim();
+
+                                return rowCategory === alternativeCategory;
+
+                            });
+
+                            
+
+                            result = alternativeData.find(row => {
+
+                                if (!row || !row['과목명']) return false;
+
+                                const nameMatch = String(row['과목명']).trim() === String(subjectName || '').trim();
+
+                                if (!nameMatch) return false;
+
+                                
+                                
+                                // 학년 매칭 (있으면 일치해야 함)
+
+                                if (grade != null && grade !== '') {
+
+                                    const rowGrade = row['학년'] != null ? Number(row['학년']) : null;
+
+                                    if (rowGrade === null || rowGrade !== Number(grade)) return false;
+
+                                }
+
+                                
+                                
+                                // 학기 매칭 (있으면 일치해야 함)
+
+                                if (semester != null && semester !== '') {
+
+                                    const rowSemester = row['학기'] != null ? Number(row['학기']) : null;
+
+                                    if (rowSemester === null || rowSemester !== Number(semester)) return false;
+
+                                }
+
+                                
+                                
+                                return true;
+
+                            });
+
+                            
+
+                            if (result) {
+
+                                console.log(`[findSubjectInCurriculum] "${alternativeCategory}"에서 찾음: ${result['과목명']}, 학점=${result['학점']}`);
+
+                            }
+
+                        }
+
+                        
+                        
                         if (result) {
 
                             console.log('[findSubjectInCurriculum] 찾음:', {
@@ -9244,9 +9324,9 @@
 
                                 totalCurriculumDataLength: this.curriculumData.length,
 
-                                filteredByCategoryLength: filteredByCategory.length,
+                                filteredByCategoryLength: searchData.length,
 
-                                sampleFilteredRows: filteredByCategory.slice(0, 5).map(r => ({
+                                sampleFilteredRows: searchData.slice(0, 5).map(r => ({
 
                                     name: r['과목명'],
 
@@ -9397,63 +9477,7 @@
                         const originalValue = session.originalAttendance[studentId] ? session.originalAttendance[studentId] : '';
                         return currentValue !== originalValue;
                     },
-                    findSubjectInCurriculum(subjectName, grade, semester, category) {
-
-                        // 교육과정 편제표에서 과목명, 학년, 학기, 분류가 모두 일치하는 과목 검색
-
-                        if (!this.curriculumData || this.curriculumData.length === 0) return null;
-
-                        return this.curriculumData.find(row => {
-
-                            if (!row || !row['과목명']) return false;
-
-                            const nameMatch = String(row['과목명']).trim() === String(subjectName || '').trim();
-
-                            if (!nameMatch) return false;
-
-                            
-                            
-                            // 학년 매칭 (있으면 일치해야 함)
-
-                            if (grade != null && grade !== '') {
-
-                                const rowGrade = row['학년'] != null ? Number(row['학년']) : null;
-
-                                if (rowGrade === null || rowGrade !== Number(grade)) return false;
-
-                            }
-
-                            
-                            
-                            // 학기 매칭 (있으면 일치해야 함)
-
-                            if (semester != null && semester !== '') {
-
-                                const rowSemester = row['학기'] != null ? Number(row['학기']) : null;
-
-                                if (rowSemester === null || rowSemester !== Number(semester)) return false;
-
-                            }
-
-                            
-                            
-                            // 분류 매칭 (있으면 일치해야 함)
-
-                            if (category && category.trim()) {
-
-                                const rowCategory = row['분류'] ? String(row['분류']).trim() : '';
-
-                                if (!rowCategory || rowCategory !== String(category).trim()) return false;
-
-                            }
-
-                            
-                            
-                            return true;
-
-                        });
-
-                    },
+                    // findSubjectInCurriculum은 9121줄에 이미 정의되어 있음 (중복 제거)
 
                     async handleSubjectChange() {
 
@@ -10044,15 +10068,45 @@
 
 
 
-                                    // 분류 추출: '~과'가 있으면 '전문계열', 없으면 '인문계열'
-
-                                    const categoryMatch = classInfo.match(/([^과]+)\s*과/);
-
-                                    // '과'가 있으면 전문계열, 없으면 인문계열
-
-                                    const category = categoryMatch ? '전문계열' : '인문계열';
-
-
+                                    // 분류 추출: 학년 앞에 있는 '계' 정보로 판단
+                                    // 일반계면 인문계열, 상업계면 전문계열
+                                    let category = '인문계열'; // 기본값
+                                    
+                                    // 학년 앞의 텍스트에서 '일반계' 또는 '상업계' 찾기
+                                    // 예: "2025학년도   1학기   주간   상업계   1학년   웹디자인과  8반"
+                                    const beforeGradeMatch = classInfo.match(/(.+?)(\d+\s*학년)/);
+                                    
+                                    if (beforeGradeMatch && beforeGradeMatch[1]) {
+                                        const beforeGrade = beforeGradeMatch[1];
+                                        
+                                        if (beforeGrade.includes('상업계')) {
+                                            category = '전문계열';
+                                        } else if (beforeGrade.includes('일반계')) {
+                                            category = '인문계열';
+                                        } else {
+                                            // 학년 앞에 '계' 정보가 없으면 전체 문자열에서 확인
+                                            if (classInfo.includes('상업계')) {
+                                                category = '전문계열';
+                                            } else if (classInfo.includes('일반계')) {
+                                                category = '인문계열';
+                                            } else {
+                                                // '계'가 없거나 다른 경우, 기존 로직으로 fallback ('과' 유무로 판단)
+                                                const categoryMatch = classInfo.match(/([^과]+)\s*과/);
+                                                category = categoryMatch ? '전문계열' : '인문계열';
+                                            }
+                                        }
+                                    } else {
+                                        // 학년 패턴을 찾지 못한 경우, 전체 문자열에서 확인
+                                        if (classInfo.includes('상업계')) {
+                                            category = '전문계열';
+                                        } else if (classInfo.includes('일반계')) {
+                                            category = '인문계열';
+                                        } else {
+                                            // '계'가 없거나 다른 경우, 기존 로직으로 fallback ('과' 유무로 판단)
+                                            const categoryMatch = classInfo.match(/([^과]+)\s*과/);
+                                            category = categoryMatch ? '전문계열' : '인문계열';
+                                        }
+                                    }
 
                                     console.log(`[processGradeFiles] 분류 추출: "${classInfo}" → ${category}`);
 
@@ -10316,7 +10370,8 @@
 
                                                     }
 
-                                                    const curriculumInfo = this.findSubjectInCurriculum(
+                                                    // 먼저 추출된 분류로 검색 시도
+                                                    let curriculumInfo = this.findSubjectInCurriculum(
 
                                                         subjectInfo.name,
 
@@ -10327,6 +10382,36 @@
                                                         subjectInfo.category
 
                                                     );
+
+                                                    // 찾지 못했고 분류가 있는 경우, 다른 분류로도 시도 (fallback)
+                                                    if (!curriculumInfo && subjectInfo.category) {
+
+                                                        const alternativeCategory = subjectInfo.category === '전문계열' ? '인문계열' : '전문계열';
+
+                                                        console.log(`[processGradeFiles] 분류 "${subjectInfo.category}"로 찾지 못함. "${alternativeCategory}"로 재시도: ${subjectInfo.name}`);
+
+                                                        curriculumInfo = this.findSubjectInCurriculum(
+
+                                                            subjectInfo.name,
+
+                                                            subjectInfo.grade,
+
+                                                            subjectInfo.semester,
+
+                                                            alternativeCategory
+
+                                                        );
+
+                                                        // 다른 분류에서 찾았으면 해당 분류로 업데이트
+                                                        if (curriculumInfo) {
+
+                                                            console.log(`[processGradeFiles] "${alternativeCategory}"에서 찾음: ${subjectInfo.name}, 학점=${curriculumInfo.학점}`);
+
+                                                            subjectInfo.category = alternativeCategory;
+
+                                                        }
+
+                                                    }
 
                                                     if (!curriculumInfo) {
 
@@ -10344,7 +10429,7 @@
 
                                                         semester: subjectInfo.semester,
 
-                                                        category: subjectInfo.category
+                                                        category: curriculumInfo ? (curriculumInfo['분류'] || subjectInfo.category) : subjectInfo.category
 
                                                     };
 
