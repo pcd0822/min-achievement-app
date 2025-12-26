@@ -9379,8 +9379,9 @@
 
                         
                         
-                        // 2차 필터링: 과목명, 학년, 학기로 검색 (정확한 일치 필요)
+                        // 2차 필터링: 과목명, 학년, 학기, 분류로 검색 (정확한 일치 필요)
                         // 과목명은 앞뒤 공백만 제거하고 정확히 일치해야 함
+                        // 분류도 정확히 일치해야 함
 
                         let result = searchData.find(row => {
 
@@ -9414,6 +9415,14 @@
 
                                 if (rowSemester === null || rowSemester !== Number(semester)) return false;
 
+                            }
+
+                            
+                            
+                            // 분류 매칭 (있으면 일치해야 함)
+                            if (normalizedCategory && normalizedCategory !== '') {
+                                const rowCategory = row['분류'] ? String(row['분류']).trim() : '';
+                                if (rowCategory !== normalizedCategory) return false;
                             }
 
                             
@@ -9695,7 +9704,23 @@
 
                         }
 
-                        // 과목을 찾은 경우
+                        // 과목을 찾은 경우, 분류도 정확히 일치하는지 확인
+                        const foundCategory = subjectInfo['분류'] ? String(subjectInfo['분류']).trim() : '';
+                        const inputCategory = this.teacherPlan.subjectCategory.trim();
+
+                        if (foundCategory !== inputCategory) {
+
+                            this.teacherPlanError = `해당 과목을 편제표에서 찾을 수 없습니다. 입력한 분류("${inputCategory}")와 편제표의 분류("${foundCategory}")가 일치하지 않습니다.`;
+
+                            this.teacherPlan.subjectNotFound = true;
+
+                            this.updateMaxHours();
+
+                            return;
+
+                        }
+
+                        // 모든 조건이 정확히 일치하는 경우
 
                         this.teacherPlanError = '';
 
