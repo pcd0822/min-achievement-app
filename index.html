@@ -2076,7 +2076,11 @@
 
                                <div>
 
-                                   <label class="block text-sm font-medium text-gray-700">차시별 지도 계획 (최대 {{ teacherPlan.maxAdditionalHours }}차시)</label>
+                                   <label class="block text-sm font-medium text-gray-700">
+                                       차시별 지도 계획 
+                                       <span v-if="teacherPlan.subjectNotFound" class="text-red-600 text-sm font-normal">(해당 과목을 편제표에서 찾을 수 없습니다.)</span>
+                                       <span v-else-if="teacherPlan.maxAdditionalHours > 0">(최대 {{ teacherPlan.maxAdditionalHours }}차시)</span>
+                                   </label>
 
                                    <div v-for="(session, index) in teacherPlan.additionalSessions" :key="index" class="flex items-center space-x-2 mt-2">
 
@@ -3763,6 +3767,8 @@
 
                             subjectCategory: '',  // 분류 (보통교과/전문교과)
 
+                            subjectNotFound: false,  // 편제표에서 과목을 찾지 못한 경우 true
+
                             teacherNames: [''],
 
                             achievements: [createEmptyAchievement()],
@@ -5201,6 +5207,8 @@
                             subjectName: '', teacherNames: [''],
 
                             subjectGrade: null, subjectSemester: null, subjectSeries: '', subjectCategory: '',
+
+                            subjectNotFound: false,  // 편제표에서 과목을 찾지 못한 경우 true
 
                             achievements: [createEmptyAchievement()],
 
@@ -9666,13 +9674,15 @@
 
                     async handleSubjectChange() {
 
-                        // 과목명, 학년, 학기, 분류가 모두 입력되었을 때만 학점 계산
+                        // 과목명, 학년, 학기, 계열, 분류가 모두 입력되었을 때만 학점 계산
 
                         if (this.teacherPlan.subjectName && 
 
                             this.teacherPlan.subjectGrade != null && 
 
                             this.teacherPlan.subjectSemester != null && 
+
+                            this.teacherPlan.subjectSeries &&
 
                             this.teacherPlan.subjectCategory) {
 
@@ -9684,7 +9694,7 @@
 
                                 this.teacherPlan.subjectSemester,
 
-                                null,  // 계열 정보 없음
+                                this.teacherPlan.subjectSeries,  // 계열
 
                                 this.teacherPlan.subjectCategory  // 분류는 시수 적용에만 사용
 
@@ -9692,13 +9702,17 @@
 
                             if (!subjectInfo) {
 
-                                this.teacherPlanError = '입력한 조건에 맞는 과목을 교육과정 편제표에서 찾을 수 없습니다. 과목명, 학년, 학기, 분류를 확인해주세요.';
+                                this.teacherPlanError = '입력한 조건에 맞는 과목을 교육과정 편제표에서 찾을 수 없습니다. 과목명, 학년, 학기, 계열, 분류를 확인해주세요.';
 
                             } else {
 
                                 this.teacherPlanError = '';
 
                             }
+
+                        } else {
+
+                            this.teacherPlanError = '';
 
                         }
 
@@ -11306,6 +11320,7 @@
                     updateMaxHours() {
 
                         let calculatedHours = 0;
+                        let subjectNotFound = false;
 
                         if (this.teacherPlan.subjectName && 
 
@@ -11343,13 +11358,30 @@
 
                                 }
 
+                            } else {
+
+                                // 과목을 찾지 못한 경우
+                                subjectNotFound = true;
+
                             }
+
+                        } else if (this.teacherPlan.subjectName || 
+                                   this.teacherPlan.subjectGrade != null || 
+                                   this.teacherPlan.subjectSemester != null || 
+                                   this.teacherPlan.subjectSeries ||
+                                   this.teacherPlan.subjectCategory) {
+
+                            // 일부만 입력된 경우도 오류로 처리
+                            subjectNotFound = true;
 
                         }
 
                         this.teacherPlan.maxSupplementaryHours = calculatedHours;
 
                         this.teacherPlan.maxAdditionalHours = calculatedHours; // Both are the same
+                        
+                        // 과목을 찾지 못한 경우 오류 상태 저장
+                        this.teacherPlan.subjectNotFound = subjectNotFound;
 
 
 
