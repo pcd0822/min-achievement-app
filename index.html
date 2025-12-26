@@ -1782,6 +1782,30 @@
 
                                </div>
 
+                               <!-- 과목 정보 저장 버튼 -->
+                               <div class="pt-4 border-t">
+                                   <button 
+                                       type="button"
+                                       @click="validateAndSaveSubject" 
+                                       class="w-full px-6 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition font-medium">
+                                       과목 정보 저장
+                                   </button>
+                                   <p v-if="teacherPlanError" class="mt-2 text-sm text-red-600">{{ teacherPlanError }}</p>
+                                   <p v-else-if="teacherPlan.subjectName && !teacherPlan.subjectNotFound" class="mt-2 text-sm text-green-600">✓ 과목 정보가 편제표와 일치합니다.</p>
+                               </div>
+
+                               <!-- 과목 정보 저장 버튼 -->
+                               <div class="pt-4 border-t">
+                                   <button 
+                                       type="button"
+                                       @click="validateAndSaveSubject" 
+                                       class="w-full px-6 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition font-medium">
+                                       과목 정보 저장
+                                   </button>
+                                   <p v-if="teacherPlanError" class="mt-2 text-sm text-red-600">{{ teacherPlanError }}</p>
+                                   <p v-else-if="teacherPlan.subjectName && !teacherPlan.subjectNotFound" class="mt-2 text-sm text-green-600">✓ 과목 정보가 편제표와 일치합니다.</p>
+                               </div>
+
                                <div>
 
                                    <label class="block text-sm font-medium text-gray-700">교과교사명</label>
@@ -9674,57 +9698,106 @@
 
                     async handleSubjectChange() {
 
-                        // 과목명, 학년, 학기, 계열, 분류가 모두 입력되었을 때만 학점 계산
+                        // 입력값 변경 시에는 오류 메시지만 초기화 (실제 검증은 저장 버튼에서 수행)
 
-                        if (this.teacherPlan.subjectName && 
+                        this.teacherPlanError = '';
 
-                            this.teacherPlan.subjectGrade != null && 
+                        this.updateMaxHours();
 
-                            this.teacherPlan.subjectSemester != null && 
+                    },
 
-                            this.teacherPlan.subjectSeries &&
+                    async validateAndSaveSubject() {
 
-                            this.teacherPlan.subjectCategory) {
+                        // 과목명, 학년, 학기, 계열, 분류가 모두 입력되었는지 확인
 
-                            const subjectInfo = this.findSubjectInCurriculum(
+                        if (!this.teacherPlan.subjectName || !this.teacherPlan.subjectName.trim()) {
 
-                                this.teacherPlan.subjectName,
+                            this.teacherPlanError = '과목명을 입력해주세요.';
 
-                                this.teacherPlan.subjectGrade,
-
-                                this.teacherPlan.subjectSemester,
-
-                                this.teacherPlan.subjectSeries,  // 계열
-
-                                this.teacherPlan.subjectCategory  // 분류는 시수 적용에만 사용
-
-                            );
-
-                            if (!subjectInfo) {
-
-                                this.teacherPlanError = '입력한 조건에 맞는 과목을 교육과정 편제표에서 찾을 수 없습니다. 과목명, 학년, 학기, 계열, 분류를 확인해주세요.';
-
-                            } else {
-
-                                this.teacherPlanError = '';
-
-                            }
-
-                        } else {
-
-                            this.teacherPlanError = '';
+                            return;
 
                         }
 
-                        await this.saveTeacherPlan();
+                        if (this.teacherPlan.subjectGrade == null || this.teacherPlan.subjectGrade === '') {
+
+                            this.teacherPlanError = '학년을 선택해주세요.';
+
+                            return;
+
+                        }
+
+                        if (this.teacherPlan.subjectSemester == null || this.teacherPlan.subjectSemester === '') {
+
+                            this.teacherPlanError = '학기를 선택해주세요.';
+
+                            return;
+
+                        }
+
+                        if (!this.teacherPlan.subjectSeries || !this.teacherPlan.subjectSeries.trim()) {
+
+                            this.teacherPlanError = '계열을 선택해주세요.';
+
+                            return;
+
+                        }
+
+                        if (!this.teacherPlan.subjectCategory || !this.teacherPlan.subjectCategory.trim()) {
+
+                            this.teacherPlanError = '분류를 선택해주세요.';
+
+                            return;
+
+                        }
+
+                        // 교육과정 편제표에서 과목 검색 (띄어쓰기 무시)
+
+                        const subjectInfo = this.findSubjectInCurriculum(
+
+                            this.teacherPlan.subjectName.trim(),
+
+                            this.teacherPlan.subjectGrade,
+
+                            this.teacherPlan.subjectSemester,
+
+                            this.teacherPlan.subjectSeries.trim(),  // 계열
+
+                            this.teacherPlan.subjectCategory.trim()  // 분류
+
+                        );
+
+                        if (!subjectInfo) {
+
+                            this.teacherPlanError = '해당 과목을 편제표에서 찾을 수 없습니다. 과목명, 학년, 학기, 계열, 분류가 편제표와 정확히 일치하는지 확인해주세요.';
+
+                            this.teacherPlan.subjectNotFound = true;
+
+                            this.updateMaxHours();
+
+                            return;
+
+                        }
+
+                        // 과목을 찾은 경우
+
+                        this.teacherPlanError = '';
+
+                        this.teacherPlan.subjectNotFound = false;
+
+                        // 학점 정보 업데이트
 
                         this.updateMaxHours();
+
+                        // 저장
+
+                        await this.saveTeacherPlan();
 
                         await this.loadGuidanceData();
 
                         this.filterSupplementaryStudents();
 
                         this.filterAdditionalStudents();
+
                     },
 
 
