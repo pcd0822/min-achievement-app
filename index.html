@@ -1194,7 +1194,7 @@
 
                                    <div>
 
-                                       <label class="block text-sm font-medium text-gray-700">학점당 시수 (기본값, 계열별 미설정 시 사용)</label>
+                                       <label class="block text-sm font-medium text-gray-700">학점당 시수</label>
 
                                        <input type="number" v-model.number="moduleConfig.hoursPerCredit" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
 
@@ -1221,26 +1221,6 @@
                                        <label class="block text-sm font-medium text-gray-700">학습지원대상자 예방지도 인정비율 (%)</label>
 
                                        <input type="number" v-model.number="moduleConfig.specialPreventiveRatio" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
-
-                                   </div>
-
-                               </div>
-
-                               <h4 class="text-lg font-semibold mt-6 mb-2">계열별 학점당 적용 시수</h4>
-
-                               <div class="mb-4 p-4 bg-gray-50 rounded-md">
-
-                                   <p class="text-sm text-gray-600 mb-3">교육과정 편제표의 과목 분류(계열)별로 학점당 적용 시수를 설정할 수 있습니다.</p>
-
-                                   <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-                                       <div v-for="category in availableCategories" :key="category">
-
-                                           <label class="block text-sm font-medium text-gray-700">{{ category }} 학점당 시수</label>
-
-                                           <input type="number" v-model.number="moduleConfig.hoursPerCreditByCategory[category]" :placeholder="moduleConfig.hoursPerCredit || 1" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
-
-                                       </div>
 
                                    </div>
 
@@ -3574,8 +3554,6 @@
 
                             hoursPerCredit: 1,
 
-                            hoursPerCreditByCategory: {},
-
                             preventiveRatio: 50,
 
                             emotionalSupportRatio: 20,
@@ -4036,20 +4014,6 @@
 
                     },
 
-                    getHoursPerCredit(category) {
-
-                        // 계열별 시수가 설정되어 있으면 사용, 없으면 기본값 사용
-
-                        if (category && this.moduleConfig.hoursPerCreditByCategory && this.moduleConfig.hoursPerCreditByCategory[category] != null) {
-
-                            return this.moduleConfig.hoursPerCreditByCategory[category];
-
-                        }
-
-                        return this.moduleConfig.hoursPerCredit || 1;
-
-                    },
-
                     statusClass() {
 
                         const text = this.statusText;
@@ -4160,69 +4124,19 @@
 
                             subjectsByReason.forEach((subjectsArray, reason) => {
 
-                                // 계열별로 그룹화하여 표시
-
-                                const subjectsByCategory = new Map();
-
-                                subjectsArray.forEach(s => {
-
-                                    // 교육과정 편제표에서 과목의 계열 정보 찾기
-
-                                    let subjectCategory = '';
-
-                                    const subjectInfo = this.findSubjectInCurriculum(s.name, null, null, null);
-
-                                    if (subjectInfo && subjectInfo['분류']) {
-
-                                        subjectCategory = String(subjectInfo['분류']).trim();
-
-                                    }
-
-                                    if (!subjectsByCategory.has(subjectCategory)) {
-
-                                        subjectsByCategory.set(subjectCategory, []);
-
-                                    }
-
-                                    subjectsByCategory.get(subjectCategory).push(s);
-
-                                });
-
-                                // 계열별로 과목 목록과 시수 정보 생성
-
-                                const categoryDetails = [];
-
-                                const subjectsByCategoryForDisplay = [];
-
-                                subjectsByCategory.forEach((categorySubjects, category) => {
-
-                                    const consolidatedSubjects = categorySubjects.map(s => `${s.name}(${s.credits}학점)`).join(', ');
-
-                                    const hoursPerCredit = this.getHoursPerCredit(category);
-
-                                    const hoursText = hoursPerCredit ? `*${hoursPerCredit}시수` : '';
-
-                                    const categoryLabel = category ? `[${category}] ` : '';
-
-                                    categoryDetails.push(`${categoryLabel}${consolidatedSubjects}${hoursText ? ` ${hoursText}` : ''}`);
-
-                                    subjectsByCategoryForDisplay.push(`${categoryLabel}${consolidatedSubjects}`);
-
-                                });
+                                const consolidatedSubjects = subjectsArray.map(s => `${s.name}(${s.credits}학점)`).join(', ');
 
                                 const lessonType = subjectsArray.some(s => s.grade) ? '보충지도' : '추가학습';
 
-                                const lessonDetails = `${lessonType}(${categoryDetails.join(', ')})`;
+                                const hoursText = this.moduleConfig.hoursPerCredit ? `*${this.moduleConfig.hoursPerCredit}시수` : '';
 
-                                // subjects 필드에도 계열 정보 포함
-
-                                const consolidatedSubjectsWithCategory = subjectsByCategoryForDisplay.join(', ');
+                                const lessonDetails = `${lessonType}(과목 학점수${hoursText})`;
 
 
 
                                 studentEntry.details.push({
 
-                                    reason: reason, subjects: consolidatedSubjectsWithCategory, lessonDetails: lessonDetails,
+                                    reason: reason, subjects: consolidatedSubjects, lessonDetails: lessonDetails,
 
                                     originalSubjects: subjectsArray, id: student.id, name: student.name
 
@@ -4345,11 +4259,7 @@
 
                                 requiredSubjectCredits = Number(subjectInfo.학점) || 0;
 
-                                const subjectCategory = subjectInfo['분류'] ? String(subjectInfo['분류']).trim() : this.teacherPlan.subjectCategory;
-
-                                const hoursPerCredit = this.getHoursPerCredit(subjectCategory);
-
-                                supplementaryHours = requiredSubjectCredits * hoursPerCredit;
+                                supplementaryHours = requiredSubjectCredits * this.moduleConfig.hoursPerCredit;
 
                                 requiredHoursForCompletion = Math.ceil((supplementaryHours * 2) / 3 * 10) / 10;
 
@@ -9870,137 +9780,57 @@
 
 
 
-                            // 계열별로 과목 그룹화
-
-                            const subjectsByCategory = new Map();
+                            const subjectsMap = new Map();
 
                             (fullStudent.gradeSubjects || []).forEach(s => {
 
-                                if (s && s.name) {
-
-                                    // 교육과정 편제표에서 과목의 계열 정보 찾기
-
-                                    let subjectCategory = '';
-
-                                    const subjectInfo = this.findSubjectInCurriculum(s.name, null, null, null);
-
-                                    if (subjectInfo && subjectInfo['분류']) {
-
-                                        subjectCategory = String(subjectInfo['분류']).trim();
-
-                                    }
-
-                                    if (!subjectsByCategory.has(subjectCategory)) {
-
-                                        subjectsByCategory.set(subjectCategory, new Map());
-
-                                    }
-
-                                    if (!subjectsByCategory.get(subjectCategory).has(s.name)) {
-
-                                        subjectsByCategory.get(subjectCategory).set(s.name, { reasons: new Set(), credits: s.credits || 'N/A' });
-
-                                    }
-
-                                    subjectsByCategory.get(subjectCategory).get(s.name).reasons.add('학업성취율');
-
-                                }
+                                if (s && s.name) { if (!subjectsMap.has(s.name)) subjectsMap.set(s.name, new Set()); subjectsMap.get(s.name).add('학업성취율'); }
 
                             });
 
                             (fullStudent.attendanceSubjects || []).forEach(sName => {
 
-                                if (sName) {
+                                if (sName) { if (!subjectsMap.has(sName)) subjectsMap.set(sName, new Set()); subjectsMap.get(sName).add('과목출석률'); }
 
-                                    // 교육과정 편제표에서 과목의 계열 정보 찾기
+                            });
 
-                                    let subjectCategory = '';
 
-                                    const subjectInfo = this.findSubjectInCurriculum(sName, null, null, null);
 
-                                    if (subjectInfo && subjectInfo['분류']) {
+                        if (subjectsMap.size > 0) {
 
-                                        subjectCategory = String(subjectInfo['분류']).trim();
+                            let subjectIndex = 0;
 
-                                    }
+                            const subjectCount = subjectsMap.size;
 
-                                    if (!subjectsByCategory.has(subjectCategory)) {
+                            subjectsMap.forEach((reasons, subjectName) => {
 
-                                        subjectsByCategory.set(subjectCategory, new Map());
+                                if (subjectIndex === 0) {
 
-                                    }
+                                    studentTableHtml += `<tr>
 
-                                    if (!subjectsByCategory.get(subjectCategory).has(sName)) {
+                                        <td rowspan="${subjectCount}" style="vertical-align: top;">${fullStudent.id}</td>
 
-                                        const curriculumInfo = this.curriculumData.find(c => c.과목명 === sName);
+                                        <td rowspan="${subjectCount}" style="vertical-align: top;">${fullStudent.name}</td>
 
-                                        const credits = curriculumInfo ? curriculumInfo.학점 : 'N/A';
+                                        <td class="text-left">${subjectName}</td>
 
-                                        subjectsByCategory.get(subjectCategory).set(sName, { reasons: new Set(), credits: credits });
+                                        <td>${Array.from(reasons).join(' & ')}</td>
 
-                                    }
+                                    </tr>`;
 
-                                    subjectsByCategory.get(subjectCategory).get(sName).reasons.add('과목출석률');
+                                } else {
+
+                                    studentTableHtml += `<tr>
+
+                                        <td class="text-left">${subjectName}</td>
+
+                                        <td>${Array.from(reasons).join(' & ')}</td>
+
+                                    </tr>`;
 
                                 }
 
-                            });
-
-
-
-                        if (subjectsByCategory.size > 0) {
-
-                            let totalRowCount = 0;
-
-                            subjectsByCategory.forEach((categorySubjects, category) => {
-
-                                totalRowCount += categorySubjects.size;
-
-                            });
-
-                            let currentRowIndex = 0;
-
-                            subjectsByCategory.forEach((categorySubjects, category) => {
-
-                                const categoryLabel = category ? `[${category}] ` : '';
-
-                                const hoursPerCredit = this.getHoursPerCredit(category);
-
-                                const hoursText = hoursPerCredit ? ` (학점당 ${hoursPerCredit}시수)` : '';
-
-                                categorySubjects.forEach((subjectData, subjectName) => {
-
-                                    const subjectDisplay = `${categoryLabel}${subjectName}(${subjectData.credits}학점)${hoursText}`;
-
-                                    if (currentRowIndex === 0) {
-
-                                        studentTableHtml += `<tr>
-
-                                            <td rowspan="${totalRowCount}" style="vertical-align: top;">${fullStudent.id}</td>
-
-                                            <td rowspan="${totalRowCount}" style="vertical-align: top;">${fullStudent.name}</td>
-
-                                            <td class="text-left">${subjectDisplay}</td>
-
-                                            <td>${Array.from(subjectData.reasons).join(' & ')}</td>
-
-                                        </tr>`;
-
-                                    } else {
-
-                                        studentTableHtml += `<tr>
-
-                                            <td class="text-left">${subjectDisplay}</td>
-
-                                            <td>${Array.from(subjectData.reasons).join(' & ')}</td>
-
-                                        </tr>`;
-
-                                    }
-
-                                    currentRowIndex++;
-
-                                });
+                                subjectIndex++;
 
                             });
 
@@ -11260,11 +11090,7 @@
 
                             if (!isNaN(credits) && credits > 0) {
 
-                                const subjectCategory = subject['분류'] ? String(subject['분류']).trim() : this.teacherPlan.subjectCategory;
-
-                                const hoursPerCredit = this.getHoursPerCredit(subjectCategory);
-
-                                calculatedHours = credits * hoursPerCredit;
+                                calculatedHours = credits * this.moduleConfig.hoursPerCredit;
 
                                 }
 
@@ -12899,11 +12725,7 @@
 
                                                 
                                                 
-                                                const subjectCategory = subjectInfo['분류'] ? String(subjectInfo['분류']).trim() : this.teacherPlan.subjectCategory;
-
-                                                const hoursPerCredit = this.getHoursPerCredit(subjectCategory);
-
-                                                const supplementaryHours = requiredSubjectCredits * hoursPerCredit;
+                                                const supplementaryHours = requiredSubjectCredits * this.moduleConfig.hoursPerCredit;
 
                                                 const requiredHoursForCompletion = Math.ceil((supplementaryHours * 2) / 3 * 10) / 10;
 
