@@ -10194,7 +10194,271 @@
 
                         const totalFiles = files.length;
 
+                        // 모든 파일 처리가 완료되었는지 확인하는 함수
 
+                        const checkAllFilesProcessed = () => {
+
+                            if (filesProcessed === totalFiles) {
+
+                                // 모든 파일 처리 완료 후 데이터 정리 및 할당
+
+                                resultData.forEach((data, id) => {
+
+                                    const existingIndex = processedUnderachievers.findIndex(s => s.id === id);
+
+                                    // Map에서 과목 정보 추출 (학년/학기/분류 정보 포함)
+
+                                    const gradeSubjectsData = Array.from(data.subjects.values()).map(subjectInfo => {
+
+                                        // 학년, 학기, 분류 정보를 사용하여 정확한 과목 검색
+
+                                        try {
+
+                                            if (!this.findSubjectInCurriculum) {
+
+                                                console.error('findSubjectInCurriculum 함수가 정의되지 않았습니다.');
+
+                                                return { 
+
+                                                    name: subjectInfo.name, 
+
+                                                    credits: 'N/A',
+
+                                                    grade: subjectInfo.grade,
+
+                                                    semester: subjectInfo.semester,
+
+                                                    category: subjectInfo.category
+
+                                                };
+
+                                            }
+
+                                            // 먼저 추출된 분류로 검색 시도
+                                            let curriculumInfo = this.findSubjectInCurriculum(
+
+                                                subjectInfo.name,
+
+                                                subjectInfo.grade,
+
+                                                subjectInfo.semester,
+
+                                                subjectInfo.category
+
+                                            );
+
+                                            // 찾지 못했고 분류가 있는 경우, 다른 분류로도 시도 (fallback)
+                                            if (!curriculumInfo && subjectInfo.category) {
+
+                                                const alternativeCategory = subjectInfo.category === '전문계열' ? '인문계열' : '전문계열';
+
+                                                console.log(`[processGradeFiles] 분류 "${subjectInfo.category}"로 찾지 못함. "${alternativeCategory}"로 재시도: ${subjectInfo.name}`);
+
+                                                curriculumInfo = this.findSubjectInCurriculum(
+
+                                                    subjectInfo.name,
+
+                                                    subjectInfo.grade,
+
+                                                    subjectInfo.semester,
+
+                                                    alternativeCategory
+
+                                                );
+
+                                                // 다른 분류에서 찾았으면 해당 분류로 업데이트
+                                                if (curriculumInfo) {
+
+                                                    console.log(`[processGradeFiles] "${alternativeCategory}"에서 찾음: ${subjectInfo.name}, 학점=${curriculumInfo.학점}`);
+
+                                                    subjectInfo.category = alternativeCategory;
+
+                                                }
+
+                                            }
+
+                                            if (!curriculumInfo) {
+
+                                                console.warn(`과목을 찾을 수 없음: ${subjectInfo.name}, 학년=${subjectInfo.grade}, 학기=${subjectInfo.semester}, 분류=${subjectInfo.category}`);
+
+                                            }
+
+                                            return { 
+
+                                                name: subjectInfo.name, 
+
+                                                credits: curriculumInfo ? curriculumInfo.학점 : 'N/A',
+
+                                                grade: subjectInfo.grade,
+
+                                                semester: subjectInfo.semester,
+
+                                                category: curriculumInfo ? (curriculumInfo['분류'] || subjectInfo.category) : subjectInfo.category
+
+                                            };
+
+                                        } catch (error) {
+
+                                            console.error(`과목 검색 오류: ${subjectInfo.name}`, error);
+
+                                            return { 
+
+                                                name: subjectInfo.name, 
+
+                                                credits: 'N/A',
+
+                                                grade: subjectInfo.grade,
+
+                                                semester: subjectInfo.semester,
+
+                                                category: subjectInfo.category
+
+                                            };
+
+                                        }
+
+                                    }).filter(gs => gs && gs.name); // 빈 과목명 제거
+
+                                    
+                                    
+                                    if (existingIndex > -1) {
+
+                                        if (!processedUnderachievers[existingIndex].gradeSubjects) processedUnderachievers[existingIndex].gradeSubjects = [];
+
+                                        // 기존 과목과 비교할 때 학년/학기/분류도 함께 비교
+
+                                        const existingGradeSubjectsKeys = new Set(
+
+                                            processedUnderachievers[existingIndex].gradeSubjects.map(s => 
+
+                                                `${s.name}|${s.grade || ''}|${s.semester || ''}|${s.category || ''}`
+
+                                            )
+
+                                        );
+
+                                        gradeSubjectsData.forEach(gs => {
+
+                                            const subjectKey = `${gs.name}|${gs.grade || ''}|${gs.semester || ''}|${gs.category || ''}`;
+
+                                            if (!existingGradeSubjectsKeys.has(subjectKey)) {
+
+                                                processedUnderachievers[existingIndex].gradeSubjects.push(gs);
+
+                                            }
+
+                                        });
+
+                                    } else {
+
+                                        processedUnderachievers.push({
+
+                                            id: id,
+
+                                            name: data.name,
+
+                                            gradeSubjects: gradeSubjectsData,
+
+                                            attendanceSubjects: [],
+
+                                            exceptionReason: ''
+
+                                        });
+
+                                    }
+
+                                });
+
+                                processedUnderachievers = this.normalizeUnderachieverList(processedUnderachievers);
+
+                                // Vue 반응성을 위해 배열을 새로 할당
+
+                                this.$set(this, 'underachievers', [...processedUnderachievers]);
+
+                                
+                                
+                                // Firestore에 저장 (로그아웃 후에도 유지)
+
+                                // currentSchoolCode를 우선 사용, 없으면 schoolId 사용
+
+                                const activeSchoolId = this.currentSchoolCode || this.schoolId;
+
+                                if (activeSchoolId && db && this.role === '관리자') {
+
+                                    (async () => {
+
+                                        try {
+
+                                            const docRef = doc(db, `schools/${activeSchoolId}/commonData`, "underachieversProcessed");
+
+                                            await setDoc(docRef, { data: JSON.parse(JSON.stringify(processedUnderachievers)) });
+
+                                            
+                                            // localStorage에도 저장 (페이지 새로고침 후에도 유지)
+                                            const adminStorageKey = this.getAdminLocalStorageKey();
+                                            if (adminStorageKey) {
+                                                try {
+                                                    const dataToSave = {
+                                                        underachievers: JSON.parse(JSON.stringify(processedUnderachievers)),
+                                                        lastUpdated: new Date().toISOString(),
+                                                        count: processedUnderachievers.length
+                                                    };
+                                                    localStorage.setItem(adminStorageKey, JSON.stringify(dataToSave));
+                                                    console.log('관리자 미도달 대상자 명단이 localStorage에 저장되었습니다.', { adminStorageKey, count: processedUnderachievers.length });
+                                                
+                                                    // 사용자에게 저장 완료 메시지 표시
+                                                    const savedTime = new Date().toLocaleString('ko-KR', { 
+                                                        year: 'numeric', 
+                                                        month: '2-digit', 
+                                                        day: '2-digit', 
+                                                        hour: '2-digit', 
+                                                        minute: '2-digit',
+                                                        second: '2-digit'
+                                                    });
+                                                    this.underachieversStatus = `✓ 성적 파일 처리 완료: ${totalFiles}개 파일에서 ${processedUnderachievers.length}명의 미도달 학생 확인. 로컬 환경에 저장 완료 (${savedTime})`;
+                                                    setTimeout(() => (this.underachieversStatus = ''), 8000);
+                                                } catch (localStorageError) {
+                                                    console.warn('localStorage 저장 실패:', localStorageError);
+                                                    this.underachieversStatus = `성적 파일 처리 완료: ${totalFiles}개 파일에서 ${processedUnderachievers.length}명의 미도달 학생 확인. (로컬 저장 실패: ${localStorageError.message})`;
+                                                    setTimeout(() => (this.underachieversStatus = ''), 8000);
+                                                }
+                                            }
+                                            
+                                            this.fileProcessingError = '';
+
+                                            alert(`성적 파일 처리 완료: ${totalFiles}개 파일에서 ${processedUnderachievers.length}명의 미도달 학생이 확인되었습니다. 데이터가 저장되었습니다.`);
+
+                                        } catch (saveError) {
+
+                                            console.error("Error saving processed underachievers:", saveError);
+
+                                            this.fileProcessingError = `처리 완료되었으나 저장 중 오류 발생: ${saveError.message}`;
+
+                                        }
+
+                                    })();
+
+                                } else {
+
+                                    // Firestore 저장이 불가능한 경우에도 화면에는 표시
+
+                                    this.fileProcessingError = '';
+
+                                    if (processedUnderachievers.length > 0) {
+
+                                        alert(`성적 파일 처리 완료: ${totalFiles}개 파일에서 ${processedUnderachievers.length}명의 미도달 학생이 확인되었습니다.`);
+
+                                    } else {
+
+                                        alert(`성적 파일 처리가 완료되었으나 미도달 학생이 발견되지 않았습니다.`);
+
+                                    }
+
+                                }
+
+                            }
+
+                        };
 
                         Array.from(files).forEach(file => {
 
@@ -10518,249 +10782,9 @@
 
                                     filesProcessed++;
 
-                                    if (filesProcessed === totalFiles) {
+                                    // 모든 파일 처리 완료 확인
 
-                                        resultData.forEach((data, id) => {
-
-                                            const existingIndex = processedUnderachievers.findIndex(s => s.id === id);
-
-                                            // Map에서 과목 정보 추출 (학년/학기/분류 정보 포함)
-
-                                            const gradeSubjectsData = Array.from(data.subjects.values()).map(subjectInfo => {
-
-                                                // 학년, 학기, 분류 정보를 사용하여 정확한 과목 검색
-
-                                                try {
-
-                                                    if (!this.findSubjectInCurriculum) {
-
-                                                        console.error('findSubjectInCurriculum 함수가 정의되지 않았습니다.');
-
-                                                        return { 
-
-                                                            name: subjectInfo.name, 
-
-                                                            credits: 'N/A',
-
-                                                            grade: subjectInfo.grade,
-
-                                                            semester: subjectInfo.semester,
-
-                                                            category: subjectInfo.category
-
-                                                        };
-
-                                                    }
-
-                                                    // 먼저 추출된 분류로 검색 시도
-                                                    let curriculumInfo = this.findSubjectInCurriculum(
-
-                                                        subjectInfo.name,
-
-                                                        subjectInfo.grade,
-
-                                                        subjectInfo.semester,
-
-                                                        subjectInfo.category
-
-                                                    );
-
-                                                    // 찾지 못했고 분류가 있는 경우, 다른 분류로도 시도 (fallback)
-                                                    if (!curriculumInfo && subjectInfo.category) {
-
-                                                        const alternativeCategory = subjectInfo.category === '전문계열' ? '인문계열' : '전문계열';
-
-                                                        console.log(`[processGradeFiles] 분류 "${subjectInfo.category}"로 찾지 못함. "${alternativeCategory}"로 재시도: ${subjectInfo.name}`);
-
-                                                        curriculumInfo = this.findSubjectInCurriculum(
-
-                                                            subjectInfo.name,
-
-                                                            subjectInfo.grade,
-
-                                                            subjectInfo.semester,
-
-                                                            alternativeCategory
-
-                                                        );
-
-                                                        // 다른 분류에서 찾았으면 해당 분류로 업데이트
-                                                        if (curriculumInfo) {
-
-                                                            console.log(`[processGradeFiles] "${alternativeCategory}"에서 찾음: ${subjectInfo.name}, 학점=${curriculumInfo.학점}`);
-
-                                                            subjectInfo.category = alternativeCategory;
-
-                                                        }
-
-                                                    }
-
-                                                    if (!curriculumInfo) {
-
-                                                        console.warn(`과목을 찾을 수 없음: ${subjectInfo.name}, 학년=${subjectInfo.grade}, 학기=${subjectInfo.semester}, 분류=${subjectInfo.category}`);
-
-                                                    }
-
-                                                    return { 
-
-                                                        name: subjectInfo.name, 
-
-                                                        credits: curriculumInfo ? curriculumInfo.학점 : 'N/A',
-
-                                                        grade: subjectInfo.grade,
-
-                                                        semester: subjectInfo.semester,
-
-                                                        category: curriculumInfo ? (curriculumInfo['분류'] || subjectInfo.category) : subjectInfo.category
-
-                                                    };
-
-                                                } catch (error) {
-
-                                                    console.error(`과목 검색 오류: ${subjectInfo.name}`, error);
-
-                                                    return { 
-
-                                                        name: subjectInfo.name, 
-
-                                                        credits: 'N/A',
-
-                                                        grade: subjectInfo.grade,
-
-                                                        semester: subjectInfo.semester,
-
-                                                        category: subjectInfo.category
-
-                                                    };
-
-                                                }
-
-                                            }).filter(gs => gs && gs.name); // 빈 과목명 제거
-
-                                            
-                                            
-                                            if (existingIndex > -1) {
-
-                                                if (!processedUnderachievers[existingIndex].gradeSubjects) processedUnderachievers[existingIndex].gradeSubjects = [];
-
-                                                // 기존 과목과 비교할 때 학년/학기/분류도 함께 비교
-
-                                                const existingGradeSubjectsKeys = new Set(
-
-                                                    processedUnderachievers[existingIndex].gradeSubjects.map(s => 
-
-                                                        `${s.name}|${s.grade || ''}|${s.semester || ''}|${s.category || ''}`
-
-                                                    )
-
-                                                );
-
-                                                gradeSubjectsData.forEach(gs => {
-
-                                                    const subjectKey = `${gs.name}|${gs.grade || ''}|${gs.semester || ''}|${gs.category || ''}`;
-
-                                                    if (!existingGradeSubjectsKeys.has(subjectKey)) {
-
-                                                        processedUnderachievers[existingIndex].gradeSubjects.push(gs);
-
-                                                    }
-
-                                                });
-
-                                            } else {
-
-                                                processedUnderachievers.push({
-
-                                                    id: id,
-
-                                                    name: data.name,
-
-                                                    gradeSubjects: gradeSubjectsData,
-
-                                                    attendanceSubjects: [],
-
-                                                    exceptionReason: ''
-
-                                                });
-
-                                            }
-
-                                        });
-
-                                        processedUnderachievers = this.normalizeUnderachieverList(processedUnderachievers);
-
-                                        this.underachievers = processedUnderachievers;
-
-                                        
-                                        
-                                        // Firestore에 저장 (로그아웃 후에도 유지)
-
-                                        // currentSchoolCode를 우선 사용, 없으면 schoolId 사용
-
-                                        const activeSchoolId = this.currentSchoolCode || this.schoolId;
-
-                                        if (activeSchoolId && db && this.role === '관리자') {
-
-                                            (async () => {
-
-                                                try {
-
-                                                    const docRef = doc(db, `schools/${activeSchoolId}/commonData`, "underachieversProcessed");
-
-                                                    await setDoc(docRef, { data: JSON.parse(JSON.stringify(processedUnderachievers)) });
-
-                                                    
-                                                    // localStorage에도 저장 (페이지 새로고침 후에도 유지)
-                                                    const adminStorageKey = this.getAdminLocalStorageKey();
-                                                    if (adminStorageKey) {
-                                                        try {
-                                                            const dataToSave = {
-                                                                underachievers: JSON.parse(JSON.stringify(processedUnderachievers)),
-                                                                lastUpdated: new Date().toISOString(),
-                                                                count: processedUnderachievers.length
-                                                            };
-                                                            localStorage.setItem(adminStorageKey, JSON.stringify(dataToSave));
-                                                            console.log('관리자 미도달 대상자 명단이 localStorage에 저장되었습니다.', { adminStorageKey, count: processedUnderachievers.length });
-                                                        
-                                                        // 사용자에게 저장 완료 메시지 표시
-                                                        const savedTime = new Date().toLocaleString('ko-KR', { 
-                                                            year: 'numeric', 
-                                                            month: '2-digit', 
-                                                            day: '2-digit', 
-                                                            hour: '2-digit', 
-                                                            minute: '2-digit',
-                                                            second: '2-digit'
-                                                        });
-                                                            this.underachieversStatus = `✓ 성적 파일 처리 완료: ${totalFiles}개 파일에서 ${processedUnderachievers.length}명의 미도달 학생 확인. 로컬 환경에 저장 완료 (${savedTime})`;
-                                                            setTimeout(() => (this.underachieversStatus = ''), 8000);
-                                                        } catch (localStorageError) {
-                                                            console.warn('localStorage 저장 실패:', localStorageError);
-                                                            this.underachieversStatus = `성적 파일 처리 완료: ${totalFiles}개 파일에서 ${processedUnderachievers.length}명의 미도달 학생 확인. (로컬 저장 실패: ${localStorageError.message})`;
-                                                            setTimeout(() => (this.underachieversStatus = ''), 8000);
-                                                        }
-                                                    }
-                                                    
-                                                    this.fileProcessingError = '';
-
-                                                    alert(`성적 파일 처리 완료: ${totalFiles}개 파일에서 ${processedUnderachievers.length}명의 미도달 학생이 확인되었습니다. 데이터가 저장되었습니다.`);
-
-                                                } catch (saveError) {
-
-                                                    console.error("Error saving processed underachievers:", saveError);
-
-                                                    this.fileProcessingError = `처리 완료되었으나 저장 중 오류 발생: ${saveError.message}`;
-
-                                                }
-
-                                            })();
-
-                                        }
-
-                                        
-                                        
-                                        if (event && event.target) event.target.value = null;
-
-                                    }
+                                    checkAllFilesProcessed();
 
                                 }
 
