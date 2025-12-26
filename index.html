@@ -4040,9 +4040,19 @@
 
                         // 계열별 시수가 설정되어 있으면 사용, 없으면 기본값 사용
 
-                        if (category && this.moduleConfig.hoursPerCreditByCategory && this.moduleConfig.hoursPerCreditByCategory[category] != null) {
+                        // category가 객체인 경우 문자열로 변환
 
-                            return this.moduleConfig.hoursPerCreditByCategory[category];
+                        const categoryKey = category ? String(category).trim() : '';
+
+                        if (categoryKey && this.moduleConfig.hoursPerCreditByCategory && typeof this.moduleConfig.hoursPerCreditByCategory === 'object') {
+
+                            const hoursPerCredit = this.moduleConfig.hoursPerCreditByCategory[categoryKey];
+
+                            if (hoursPerCredit != null && !isNaN(Number(hoursPerCredit))) {
+
+                                return Number(hoursPerCredit);
+
+                            }
 
                         }
 
@@ -4170,21 +4180,37 @@
 
                                     let subjectCategory = '';
 
-                                    const subjectInfo = this.findSubjectInCurriculum(s.name, null, null, null);
+                                    try {
 
-                                    if (subjectInfo && subjectInfo['분류']) {
+                                        const subjectInfo = this.findSubjectInCurriculum(s.name, null, null, null);
 
-                                        subjectCategory = String(subjectInfo['분류']).trim();
+                                        if (subjectInfo && typeof subjectInfo === 'object' && subjectInfo['분류']) {
+
+                                            const categoryValue = subjectInfo['분류'];
+
+                                            subjectCategory = categoryValue != null ? String(categoryValue).trim() : '';
+
+                                        }
+
+                                    } catch (error) {
+
+                                        console.warn('과목 계열 정보 추출 오류:', s.name, error);
+
+                                        subjectCategory = '';
 
                                     }
 
-                                    if (!subjectsByCategory.has(subjectCategory)) {
+                                    // Map의 키는 항상 문자열로 보장
 
-                                        subjectsByCategory.set(subjectCategory, []);
+                                    const categoryKey = subjectCategory || '';
+
+                                    if (!subjectsByCategory.has(categoryKey)) {
+
+                                        subjectsByCategory.set(categoryKey, []);
 
                                     }
 
-                                    subjectsByCategory.get(subjectCategory).push(s);
+                                    subjectsByCategory.get(categoryKey).push(s);
 
                                 });
 
@@ -4198,11 +4224,23 @@
 
                                     let subjectCategory = '';
 
-                                    const subjectInfo = this.findSubjectInCurriculum(s.name, null, null, null);
+                                    try {
 
-                                    if (subjectInfo && subjectInfo['분류']) {
+                                        const subjectInfo = this.findSubjectInCurriculum(s.name, null, null, null);
 
-                                        subjectCategory = String(subjectInfo['분류']).trim();
+                                        if (subjectInfo && typeof subjectInfo === 'object' && subjectInfo['분류']) {
+
+                                            const categoryValue = subjectInfo['분류'];
+
+                                            subjectCategory = categoryValue != null ? String(categoryValue).trim() : '';
+
+                                        }
+
+                                    } catch (error) {
+
+                                        console.warn('과목 계열 정보 추출 오류:', s.name, error);
+
+                                        subjectCategory = '';
 
                                     }
 
@@ -9884,27 +9922,41 @@
 
                                     let subjectCategory = '';
 
-                                    const subjectInfo = this.findSubjectInCurriculum(s.name, null, null, null);
+                                    try {
 
-                                    if (subjectInfo && subjectInfo['분류']) {
+                                        const subjectInfo = this.findSubjectInCurriculum(s.name, null, null, null);
 
-                                        subjectCategory = String(subjectInfo['분류']).trim();
+                                        if (subjectInfo && typeof subjectInfo === 'object' && subjectInfo['분류']) {
+
+                                            const categoryValue = subjectInfo['분류'];
+
+                                            subjectCategory = categoryValue != null ? String(categoryValue).trim() : '';
+
+                                        }
+
+                                    } catch (error) {
+
+                                        console.warn('과목 계열 정보 추출 오류:', s.name, error);
+
+                                        subjectCategory = '';
 
                                     }
 
-                                    if (!subjectsByCategory.has(subjectCategory)) {
+                                    const categoryKey = subjectCategory || '';
 
-                                        subjectsByCategory.set(subjectCategory, new Map());
+                                    if (!subjectsByCategory.has(categoryKey)) {
 
-                                    }
-
-                                    if (!subjectsByCategory.get(subjectCategory).has(s.name)) {
-
-                                        subjectsByCategory.get(subjectCategory).set(s.name, { reasons: new Set(), credits: s.credits || 'N/A' });
+                                        subjectsByCategory.set(categoryKey, new Map());
 
                                     }
 
-                                    subjectsByCategory.get(subjectCategory).get(s.name).reasons.add('학업성취율');
+                                    if (!subjectsByCategory.get(categoryKey).has(s.name)) {
+
+                                        subjectsByCategory.get(categoryKey).set(s.name, { reasons: new Set(), credits: s.credits || 'N/A' });
+
+                                    }
+
+                                    subjectsByCategory.get(categoryKey).get(s.name).reasons.add('학업성취율');
 
                                 }
 
@@ -9918,31 +9970,45 @@
 
                                     let subjectCategory = '';
 
-                                    const subjectInfo = this.findSubjectInCurriculum(sName, null, null, null);
+                                    try {
 
-                                    if (subjectInfo && subjectInfo['분류']) {
+                                        const subjectInfo = this.findSubjectInCurriculum(sName, null, null, null);
 
-                                        subjectCategory = String(subjectInfo['분류']).trim();
+                                        if (subjectInfo && typeof subjectInfo === 'object' && subjectInfo['분류']) {
+
+                                            const categoryValue = subjectInfo['분류'];
+
+                                            subjectCategory = categoryValue != null ? String(categoryValue).trim() : '';
+
+                                        }
+
+                                    } catch (error) {
+
+                                        console.warn('과목 계열 정보 추출 오류:', sName, error);
+
+                                        subjectCategory = '';
 
                                     }
 
-                                    if (!subjectsByCategory.has(subjectCategory)) {
+                                    const categoryKey = subjectCategory || '';
 
-                                        subjectsByCategory.set(subjectCategory, new Map());
+                                    if (!subjectsByCategory.has(categoryKey)) {
+
+                                        subjectsByCategory.set(categoryKey, new Map());
 
                                     }
 
-                                    if (!subjectsByCategory.get(subjectCategory).has(sName)) {
+                                    if (!subjectsByCategory.get(categoryKey).has(sName)) {
 
                                         const curriculumInfo = this.curriculumData.find(c => c.과목명 === sName);
 
                                         const credits = curriculumInfo ? curriculumInfo.학점 : 'N/A';
 
-                                        subjectsByCategory.get(subjectCategory).set(sName, { reasons: new Set(), credits: credits });
+                                        subjectsByCategory.get(categoryKey).set(sName, { reasons: new Set(), credits: credits });
 
                                     }
 
-                                    subjectsByCategory.get(subjectCategory).get(sName).reasons.add('과목출석률');
+                                    subjectsByCategory.get(categoryKey).get(sName).reasons.add('과목출석률');
 
                                 }
 
