@@ -1194,14 +1194,14 @@
 
                                    <div>
 
-                                       <label class="block text-sm font-medium text-gray-700 mb-2">계열별 학점당 시수</label>
+                                       <label class="block text-sm font-medium text-gray-700 mb-2">교과별 학점당 시수</label>
                                        
                                        <div v-for="category in availableCategories" :key="category" class="mb-3">
                                            <label class="block text-xs font-medium text-gray-600 mb-1">{{ category }}</label>
                                            <input type="number" v-model.number="moduleConfig.hoursPerCreditByCategory[category]" :placeholder="`${category} 학점당 시수`" class="block w-full p-2 border border-gray-300 rounded-md">
                                        </div>
                                        
-                                       <p class="text-xs text-gray-500 mt-2">교육과정 편제표에 등록된 계열별로 학점당 시수를 입력하세요.</p>
+                                       <p class="text-xs text-gray-500 mt-2">교육과정 편제표의 분류(보통교과/전문교과)별로 학점당 시수를 입력하세요.</p>
 
                                    </div>
 
@@ -4081,15 +4081,20 @@
                                 if (!subject || !subject.name) return;
 
                                 if (!allSubjects.has(subject.name)) {
-                                    const curriculumInfo = this.findSubjectInCurriculum(subject.name, student.grade, student.semester, subject.category || student.category);
-                                    const category = curriculumInfo ? (curriculumInfo['분류'] || subject.category || student.category || '') : (subject.category || student.category || '');
-                                    allSubjects.set(subject.name, { grade: true, attendance: false, credits: subject.credits, category: category });
+                                    // 계열 정보 사용 (series가 있으면 사용, 없으면 category를 계열로 간주 - 기존 호환성)
+                                    const series = subject.series || student.series || (subject.category && (subject.category === '인문계열' || subject.category === '전문계열') ? subject.category : null) || (student.category && (student.category === '인문계열' || student.category === '전문계열') ? student.category : '인문계열');
+                                    const curriculumInfo = this.findSubjectInCurriculum(subject.name, student.grade, student.semester, series, null);
+                                    // 분류는 교육과정 편제표에서 찾은 값 사용 (보통교과/전문교과)
+                                    const category = curriculumInfo ? (curriculumInfo['분류'] || subject.category || '') : (subject.category || '');
+                                    allSubjects.set(subject.name, { grade: true, attendance: false, credits: subject.credits, category: category, series: series });
 
                                 } else { 
-                                    const curriculumInfo = this.findSubjectInCurriculum(subject.name, student.grade, student.semester, subject.category || student.category);
-                                    const category = curriculumInfo ? (curriculumInfo['분류'] || subject.category || student.category || '') : (subject.category || student.category || '');
+                                    const series = subject.series || student.series || (subject.category && (subject.category === '인문계열' || subject.category === '전문계열') ? subject.category : null) || (student.category && (student.category === '인문계열' || student.category === '전문계열') ? student.category : '인문계열');
+                                    const curriculumInfo = this.findSubjectInCurriculum(subject.name, student.grade, student.semester, series, null);
+                                    const category = curriculumInfo ? (curriculumInfo['분류'] || subject.category || '') : (subject.category || '');
                                     allSubjects.get(subject.name).grade = true;
                                     if (category) allSubjects.get(subject.name).category = category;
+                                    if (series) allSubjects.get(subject.name).series = series;
                                 }
 
                             });
@@ -4099,20 +4104,24 @@
                                 if (!subjectName) return;
 
                                 if (!allSubjects.has(subjectName)) {
-
-                                    const curriculumInfo = this.curriculumData.find(c => c.과목명 === subjectName);
+                                    // 출석 과목의 경우 계열 정보가 없을 수 있으므로, 교육과정 편제표에서 찾기
+                                    // 계열 정보가 있으면 사용, 없으면 전체에서 검색
+                                    const series = student.series || (student.category && (student.category === '인문계열' || student.category === '전문계열') ? student.category : '인문계열');
+                                    const curriculumInfo = this.findSubjectInCurriculum(subjectName, student.grade, student.semester, series, null);
 
                                     const credits = curriculumInfo ? curriculumInfo.학점 : 'N/A';
-                                    const category = curriculumInfo ? (curriculumInfo['분류'] || student.category || '') : (student.category || '');
+                                    const category = curriculumInfo ? (curriculumInfo['분류'] || '') : '';
 
-                                    allSubjects.set(subjectName, { grade: false, attendance: true, credits: credits, category: category });
+                                    allSubjects.set(subjectName, { grade: false, attendance: true, credits: credits, category: category, series: series });
 
                                 } else { 
                                     allSubjects.get(subjectName).attendance = true;
-                                    const curriculumInfo = this.curriculumData.find(c => c.과목명 === subjectName);
+                                    const series = student.series || (student.category && (student.category === '인문계열' || student.category === '전문계열') ? student.category : '인문계열');
+                                    const curriculumInfo = this.findSubjectInCurriculum(subjectName, student.grade, student.semester, series, null);
                                     if (curriculumInfo && curriculumInfo['분류']) {
                                         allSubjects.get(subjectName).category = curriculumInfo['분류'];
                                     }
+                                    if (series) allSubjects.get(subjectName).series = series;
                                 }
 
                             });
@@ -4280,6 +4289,9 @@
 
                             try {
 
+                                // teacherPlan.subjectCategory는 분류(보통교과/전문교과)를 의미하지만,
+                                // findSubjectInCurriculum은 계열을 필요로 하므로, 계열 없이 검색하거나 기본값 사용
+                                // 교육과정 편제표에서 과목을 찾을 때 계열 정보가 없으면 전체에서 검색
                                 const subjectInfo = this.findSubjectInCurriculum(
 
                                     this.teacherPlan.subjectName,
@@ -4288,7 +4300,9 @@
 
                                     this.teacherPlan.subjectSemester,
 
-                                    this.teacherPlan.subjectCategory
+                                    null,  // 계열 정보 없음 (전체 검색)
+
+                                    this.teacherPlan.subjectCategory  // 분류는 시수 적용에만 사용
 
                                 );
 
@@ -5974,7 +5988,7 @@
 
                                 if (grade != null && semester != null) {
 
-                                    subjectInfo = this.findSubjectInCurriculum(subjectName, grade, semester, category);
+                                    subjectInfo = this.findSubjectInCurriculum(subjectName, grade, semester, null, category);
 
                                 } else {
 
@@ -9190,7 +9204,8 @@
                     },
 
                     getHoursPerCredit(category) {
-                        // 계열별 학점당 시수를 가져오는 헬퍼 함수
+                        // 교과별(분류별) 학점당 시수를 가져오는 헬퍼 함수
+                        // category는 분류(보통교과/전문교과)를 의미
                         if (!category || !this.moduleConfig.hoursPerCreditByCategory) {
                             // 기본값 반환 (기존 hoursPerCredit이 있으면 사용, 없으면 1)
                             return this.moduleConfig.hoursPerCreditByCategory && Object.keys(this.moduleConfig.hoursPerCreditByCategory).length > 0 
@@ -9200,9 +9215,11 @@
                         return this.moduleConfig.hoursPerCreditByCategory[category] || 1;
                     },
 
-                    findSubjectInCurriculum(subjectName, grade, semester, category) {
+                    findSubjectInCurriculum(subjectName, grade, semester, series, category) {
 
-                        // 교육과정 편제표에서 과목명, 학년, 학기, 분류가 모두 일치하는 과목 검색
+                        // 교육과정 편제표에서 과목명, 학년, 학기, 계열, 분류가 모두 일치하는 과목 검색
+                        // series: 계열 (인문계열/전문계열)
+                        // category: 분류 (보통교과/전문교과) - 시수 적용 기준
 
                         if (!this.curriculumData || this.curriculumData.length === 0) {
 
@@ -9214,9 +9231,17 @@
 
                         
                         
-                        // category는 이미 '전문계열' 또는 '인문계열'로 정규화되어 있음
+                        // 기존 호출 호환성: 4개 파라미터로 호출된 경우 (category만 전달)
+                        if (arguments.length === 4 && typeof series === 'string') {
+                            // 기존 방식: 4번째 파라미터가 계열로 사용되던 경우
+                            // 이제는 series로 처리하고, category는 null
+                            const temp = series;
+                            series = temp; // 기존 category를 series로 사용
+                            category = null;
+                        }
 
-                        const normalizedCategory = category || '인문계열';
+                        const normalizedSeries = series || null;
+                        const normalizedCategory = category || null;
 
                         
                         
@@ -9228,35 +9253,35 @@
 
                             semester,
 
-                            category,
+                            series: normalizedSeries,
 
-                            normalizedCategory
+                            category: normalizedCategory
 
                         });
 
                         
                         
-                        // 1차 필터링: 분류로 먼저 필터링 (분류가 있는 경우만)
+                        // 1차 필터링: 계열로 먼저 필터링 (계열이 있는 경우만)
 
                         let searchData = this.curriculumData;
 
-                        if (normalizedCategory && normalizedCategory !== '') {
+                        if (normalizedSeries && normalizedSeries !== '') {
 
                             searchData = this.curriculumData.filter(row => {
 
-                                if (!row || !row['분류']) return false;
+                                if (!row || !row['계열']) return false;
 
-                                const rowCategory = String(row['분류']).trim();
+                                const rowSeries = String(row['계열']).trim();
 
-                                return rowCategory === normalizedCategory;
+                                return rowSeries === normalizedSeries;
 
                             });
 
-                            console.log(`[findSubjectInCurriculum] 분류 "${normalizedCategory}"로 필터링: ${searchData.length}개 과목`);
+                            console.log(`[findSubjectInCurriculum] 계열 "${normalizedSeries}"로 필터링: ${searchData.length}개 과목`);
 
                         } else {
 
-                            console.log(`[findSubjectInCurriculum] 분류 없음. 전체 데이터에서 검색: ${searchData.length}개 과목`);
+                            console.log(`[findSubjectInCurriculum] 계열 없음. 전체 데이터에서 검색: ${searchData.length}개 과목`);
 
                         }
 
@@ -9304,23 +9329,23 @@
 
                         
                         
-                        // 분류로 찾지 못했고, 분류가 지정된 경우 다른 분류에서도 시도
+                        // 계열로 찾지 못했고, 계열이 지정된 경우 다른 계열에서도 시도
 
-                        if (!result && normalizedCategory && normalizedCategory !== '') {
+                        if (!result && normalizedSeries && normalizedSeries !== '') {
 
-                            const alternativeCategory = normalizedCategory === '전문계열' ? '인문계열' : '전문계열';
+                            const alternativeSeries = normalizedSeries === '전문계열' ? '인문계열' : '전문계열';
 
-                            console.log(`[findSubjectInCurriculum] "${normalizedCategory}"에서 찾지 못함. "${alternativeCategory}"로 재시도`);
+                            console.log(`[findSubjectInCurriculum] 계열 "${normalizedSeries}"에서 찾지 못함. "${alternativeSeries}"로 재시도`);
 
                             
 
                             const alternativeData = this.curriculumData.filter(row => {
 
-                                if (!row || !row['분류']) return false;
+                                if (!row || !row['계열']) return false;
 
-                                const rowCategory = String(row['분류']).trim();
+                                const rowSeries = String(row['계열']).trim();
 
-                                return rowCategory === alternativeCategory;
+                                return rowSeries === alternativeSeries;
 
                             });
 
@@ -9368,7 +9393,7 @@
 
                             if (result) {
 
-                                console.log(`[findSubjectInCurriculum] "${alternativeCategory}"에서 찾음: ${result['과목명']}, 학점=${result['학점']}`);
+                                console.log(`[findSubjectInCurriculum] 계열 "${alternativeSeries}"에서 찾음: ${result['과목명']}, 학점=${result['학점']}`);
 
                             }
 
@@ -9386,6 +9411,8 @@
 
                                 semester: result['학기'],
 
+                                series: result['계열'],
+
                                 category: result['분류'],
 
                                 credits: result['학점']
@@ -9402,11 +9429,13 @@
 
                                 semester,
 
-                                normalizedCategory,
+                                series: normalizedSeries,
+
+                                category: normalizedCategory,
 
                                 totalCurriculumDataLength: this.curriculumData.length,
 
-                                filteredByCategoryLength: searchData.length,
+                                filteredBySeriesLength: searchData.length,
 
                                 sampleFilteredRows: searchData.slice(0, 5).map(r => ({
 
@@ -9581,13 +9610,15 @@
 
                                 this.teacherPlan.subjectSemester,
 
-                                this.teacherPlan.subjectCategory
+                                null,  // 계열 정보 없음
+
+                                this.teacherPlan.subjectCategory  // 분류는 시수 적용에만 사용
 
                             );
 
                             if (!subjectInfo) {
 
-                                this.teacherPlanError = '입력한 조건에 맞는 과목을 교육과정 편제표에서 찾을 수 없습니다. 과목명, 학년, 학기, 계열을 확인해주세요.';
+                                this.teacherPlanError = '입력한 조건에 맞는 과목을 교육과정 편제표에서 찾을 수 없습니다. 과목명, 학년, 학기, 분류를 확인해주세요.';
 
                             } else {
 
@@ -9726,7 +9757,7 @@
 
                         let data, filename;
 
-                        if (type === 'curriculum') { data = [["분류", "과목명", "학년", "학기", "학점", "교과군"]]; filename = "교육과정_편제표_양식.xlsx"; }
+                        if (type === 'curriculum') { data = [["계열", "분류", "과목명", "학년", "학기", "학점", "교과군"]]; filename = "교육과정_편제표_양식.xlsx"; }
 
                         else if (type === 'student') { data = [["학번", "이름", "특기사항"]]; filename = "학적정보_양식.xlsx"; }
 
@@ -10197,9 +10228,9 @@
 
 
 
-                                    // 분류 추출: 학년 앞에 있는 '계' 정보로 판단
+                                    // 계열 추출: 학년 앞에 있는 '계' 정보로 판단
                                     // 일반계면 인문계열, 상업계면 전문계열
-                                    let category = '인문계열'; // 기본값
+                                    let series = '인문계열'; // 기본값
                                     
                                     // 학년 앞의 텍스트에서 '일반계' 또는 '상업계' 찾기
                                     // 예: "2025학년도   1학기   주간   상업계   1학년   웹디자인과  8반"
@@ -10209,35 +10240,35 @@
                                         const beforeGrade = beforeGradeMatch[1];
                                         
                                         if (beforeGrade.includes('상업계')) {
-                                            category = '전문계열';
+                                            series = '전문계열';
                                         } else if (beforeGrade.includes('일반계')) {
-                                            category = '인문계열';
+                                            series = '인문계열';
                                         } else {
                                             // 학년 앞에 '계' 정보가 없으면 전체 문자열에서 확인
                                             if (classInfo.includes('상업계')) {
-                                                category = '전문계열';
+                                                series = '전문계열';
                                             } else if (classInfo.includes('일반계')) {
-                                                category = '인문계열';
+                                                series = '인문계열';
                                             } else {
                                                 // '계'가 없거나 다른 경우, 기존 로직으로 fallback ('과' 유무로 판단)
                                                 const categoryMatch = classInfo.match(/([^과]+)\s*과/);
-                                                category = categoryMatch ? '전문계열' : '인문계열';
+                                                series = categoryMatch ? '전문계열' : '인문계열';
                                             }
                                         }
                                     } else {
                                         // 학년 패턴을 찾지 못한 경우, 전체 문자열에서 확인
                                         if (classInfo.includes('상업계')) {
-                                            category = '전문계열';
+                                            series = '전문계열';
                                         } else if (classInfo.includes('일반계')) {
-                                            category = '인문계열';
+                                            series = '인문계열';
                                         } else {
                                             // '계'가 없거나 다른 경우, 기존 로직으로 fallback ('과' 유무로 판단)
                                             const categoryMatch = classInfo.match(/([^과]+)\s*과/);
-                                            category = categoryMatch ? '전문계열' : '인문계열';
+                                            series = categoryMatch ? '전문계열' : '인문계열';
                                         }
                                     }
 
-                                    console.log(`[processGradeFiles] 분류 추출: "${classInfo}" → ${category}`);
+                                    console.log(`[processGradeFiles] 계열 추출: "${classInfo}" → ${series}`);
 
 
 
@@ -10405,9 +10436,9 @@
 
                                                 
                                                 
-                                                // 과목명, 학년, 학기, 분류를 모두 포함한 고유 키 생성
+                                                // 과목명, 학년, 학기, 계열을 모두 포함한 고유 키 생성
 
-                                                const subjectKey = `${subject}|${classGrade}|${semester}|${category}`;
+                                                const subjectKey = `${subject}|${classGrade}|${semester}|${series}`;
 
                                                 
                                                 
@@ -10417,19 +10448,19 @@
 
                                                         name: actualStudentName, 
 
-                                                        subjects: new Map(), // Set 대신 Map 사용하여 과목별 학년/학기/분류 정보 저장
+                                                        subjects: new Map(), // Set 대신 Map 사용하여 과목별 학년/학기/계열 정보 저장
 
                                                         grade: classGrade ? Number(classGrade) : null,
 
                                                         semester: semester,
 
-                                                        category: category
+                                                        series: series
 
                                                     });
 
                                                 }
 
-                                                // 과목별로 학년/학기/분류 정보 저장
+                                                // 과목별로 학년/학기/계열 정보 저장
 
                                                 const studentData = resultData.get(actualStudentId);
 
@@ -10443,7 +10474,7 @@
 
                                                         semester: semester,
 
-                                                        category: category
+                                                        series: series
 
                                                     });
 
@@ -10499,7 +10530,7 @@
 
                                                     }
 
-                                                    // 먼저 추출된 분류로 검색 시도
+                                                    // 계열로 검색 시도 (분류는 null로 전달하여 교육과정 편제표에서 찾은 분류 사용)
                                                     let curriculumInfo = this.findSubjectInCurriculum(
 
                                                         subjectInfo.name,
@@ -10508,16 +10539,18 @@
 
                                                         subjectInfo.semester,
 
-                                                        subjectInfo.category
+                                                        subjectInfo.series,  // 계열
+
+                                                        null  // 분류는 교육과정 편제표에서 찾은 값 사용
 
                                                     );
 
-                                                    // 찾지 못했고 분류가 있는 경우, 다른 분류로도 시도 (fallback)
-                                                    if (!curriculumInfo && subjectInfo.category) {
+                                                    // 찾지 못했고 계열이 있는 경우, 다른 계열로도 시도 (fallback)
+                                                    if (!curriculumInfo && subjectInfo.series) {
 
-                                                        const alternativeCategory = subjectInfo.category === '전문계열' ? '인문계열' : '전문계열';
+                                                        const alternativeSeries = subjectInfo.series === '전문계열' ? '인문계열' : '전문계열';
 
-                                                        console.log(`[processGradeFiles] 분류 "${subjectInfo.category}"로 찾지 못함. "${alternativeCategory}"로 재시도: ${subjectInfo.name}`);
+                                                        console.log(`[processGradeFiles] 계열 "${subjectInfo.series}"로 찾지 못함. "${alternativeSeries}"로 재시도: ${subjectInfo.name}`);
 
                                                         curriculumInfo = this.findSubjectInCurriculum(
 
@@ -10527,16 +10560,18 @@
 
                                                             subjectInfo.semester,
 
-                                                            alternativeCategory
+                                                            alternativeSeries,
+
+                                                            null
 
                                                         );
 
-                                                        // 다른 분류에서 찾았으면 해당 분류로 업데이트
+                                                        // 다른 계열에서 찾았으면 해당 계열로 업데이트
                                                         if (curriculumInfo) {
 
-                                                            console.log(`[processGradeFiles] "${alternativeCategory}"에서 찾음: ${subjectInfo.name}, 학점=${curriculumInfo.학점}`);
+                                                            console.log(`[processGradeFiles] 계열 "${alternativeSeries}"에서 찾음: ${subjectInfo.name}, 학점=${curriculumInfo.학점}, 분류=${curriculumInfo['분류']}`);
 
-                                                            subjectInfo.category = alternativeCategory;
+                                                            subjectInfo.series = alternativeSeries;
 
                                                         }
 
@@ -10544,9 +10579,12 @@
 
                                                     if (!curriculumInfo) {
 
-                                                        console.warn(`과목을 찾을 수 없음: ${subjectInfo.name}, 학년=${subjectInfo.grade}, 학기=${subjectInfo.semester}, 분류=${subjectInfo.category}`);
+                                                        console.warn(`과목을 찾을 수 없음: ${subjectInfo.name}, 학년=${subjectInfo.grade}, 학기=${subjectInfo.semester}, 계열=${subjectInfo.series}`);
 
                                                     }
+
+                                                    // 분류는 교육과정 편제표에서 찾은 값 사용 (보통교과/전문교과)
+                                                    const subjectCategory = curriculumInfo ? curriculumInfo['분류'] : null;
 
                                                     return { 
 
@@ -10558,7 +10596,9 @@
 
                                                         semester: subjectInfo.semester,
 
-                                                        category: curriculumInfo ? (curriculumInfo['분류'] || subjectInfo.category) : subjectInfo.category
+                                                        series: subjectInfo.series,  // 계열 (인문계열/전문계열)
+
+                                                        category: subjectCategory  // 분류 (보통교과/전문교과) - 시수 적용 기준
 
                                                     };
 
@@ -10785,7 +10825,7 @@
 
                         const subjectsWithCredits = validSubjects.map(subjectName => {
 
-                            const curriculumInfo = this.findSubjectInCurriculum(subjectName, grade, semester, category);
+                            const curriculumInfo = this.findSubjectInCurriculum(subjectName, grade, semester, null, category);
 
                             return { name: subjectName, credits: curriculumInfo ? curriculumInfo.학점 : 'N/A' };
 
@@ -11209,7 +11249,9 @@
 
                                 this.teacherPlan.subjectSemester,
 
-                                this.teacherPlan.subjectCategory
+                                null,  // 계열 정보 없음
+
+                                this.teacherPlan.subjectCategory  // 분류는 시수 적용에만 사용
 
                             );
 
@@ -11218,7 +11260,8 @@
                             const credits = Number(subject.학점);
 
                             if (!isNaN(credits) && credits > 0) {
-                                const category = this.teacherPlan.subjectCategory || '';
+                                // 찾은 과목의 분류를 사용 (보통교과/전문교과)
+                                const category = subject['분류'] || this.teacherPlan.subjectCategory || '';
                                 const hoursPerCredit = this.getHoursPerCredit(category);
                                 calculatedHours = credits * hoursPerCredit;
 
@@ -11974,7 +12017,8 @@
                                     this.teacherPlan.subjectName,
                                     subjectGrade,
                                     subjectSemester,
-                                    subjectCategory
+                                    null,  // 계열 정보 없음
+                                    subjectCategory  // 분류는 시수 적용에만 사용
                                 );
                                 if (subjectInfo) {
                                     subjectCredits = Number(subjectInfo.학점) || 0;
