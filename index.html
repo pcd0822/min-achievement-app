@@ -1194,9 +1194,14 @@
 
                                    <div>
 
-                                       <label class="block text-sm font-medium text-gray-700">학점당 시수</label>
-
-                                       <input type="number" v-model.number="moduleConfig.hoursPerCredit" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                                       <label class="block text-sm font-medium text-gray-700 mb-2">계열별 학점당 시수</label>
+                                       
+                                       <div v-for="category in availableCategories" :key="category" class="mb-3">
+                                           <label class="block text-xs font-medium text-gray-600 mb-1">{{ category }}</label>
+                                           <input type="number" v-model.number="moduleConfig.hoursPerCreditByCategory[category]" :placeholder="`${category} 학점당 시수`" class="block w-full p-2 border border-gray-300 rounded-md">
+                                       </div>
+                                       
+                                       <p class="text-xs text-gray-500 mt-2">교육과정 편제표에 등록된 계열별로 학점당 시수를 입력하세요.</p>
 
                                    </div>
 
@@ -1312,7 +1317,10 @@
 
                                                    <td class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200">{{ detail.reason }}</td>
 
-                                                        <td class="px-6 py-4 whitespace-normal align-top border-b border-gray-200 table-wide-cell">{{ detail.subjects }}</td>
+                                                        <td class="px-6 py-4 whitespace-normal align-top border-b border-gray-200 table-wide-cell">
+                                                            <div v-if="detail.category" class="text-xs text-gray-500 mb-1">{{ detail.category }}</div>
+                                                            <div>{{ detail.subjects }}</div>
+                                                        </td>
 
                                                    <td class="px-6 py-4 whitespace-nowrap align-top border-b border-gray-200">{{ detail.lessonDetails }}</td>
 
@@ -3552,7 +3560,7 @@
 
                         moduleConfig: {
 
-                            hoursPerCredit: 1,
+                            hoursPerCreditByCategory: {},
 
                             preventiveRatio: 50,
 
@@ -4073,10 +4081,16 @@
                                 if (!subject || !subject.name) return;
 
                                 if (!allSubjects.has(subject.name)) {
+                                    const curriculumInfo = this.findSubjectInCurriculum(subject.name, student.grade, student.semester, subject.category || student.category);
+                                    const category = curriculumInfo ? (curriculumInfo['분류'] || subject.category || student.category || '') : (subject.category || student.category || '');
+                                    allSubjects.set(subject.name, { grade: true, attendance: false, credits: subject.credits, category: category });
 
-                                    allSubjects.set(subject.name, { grade: true, attendance: false, credits: subject.credits });
-
-                                } else { allSubjects.get(subject.name).grade = true; }
+                                } else { 
+                                    const curriculumInfo = this.findSubjectInCurriculum(subject.name, student.grade, student.semester, subject.category || student.category);
+                                    const category = curriculumInfo ? (curriculumInfo['분류'] || subject.category || student.category || '') : (subject.category || student.category || '');
+                                    allSubjects.get(subject.name).grade = true;
+                                    if (category) allSubjects.get(subject.name).category = category;
+                                }
 
                             });
 
@@ -4089,10 +4103,17 @@
                                     const curriculumInfo = this.curriculumData.find(c => c.과목명 === subjectName);
 
                                     const credits = curriculumInfo ? curriculumInfo.학점 : 'N/A';
+                                    const category = curriculumInfo ? (curriculumInfo['분류'] || student.category || '') : (student.category || '');
 
-                                    allSubjects.set(subjectName, { grade: false, attendance: true, credits: credits });
+                                    allSubjects.set(subjectName, { grade: false, attendance: true, credits: credits, category: category });
 
-                                } else { allSubjects.get(subjectName).attendance = true; }
+                                } else { 
+                                    allSubjects.get(subjectName).attendance = true;
+                                    const curriculumInfo = this.curriculumData.find(c => c.과목명 === subjectName);
+                                    if (curriculumInfo && curriculumInfo['분류']) {
+                                        allSubjects.get(subjectName).category = curriculumInfo['분류'];
+                                    }
+                                }
 
                             });
 
@@ -4122,26 +4143,42 @@
 
 
 
+                            // 계열별로 그룹핑
+                            const subjectsByCategoryAndReason = new Map();
+                            
                             subjectsByReason.forEach((subjectsArray, reason) => {
-
-                                const consolidatedSubjects = subjectsArray.map(s => `${s.name}(${s.credits}학점)`).join(', ');
-
-                                const lessonType = subjectsArray.some(s => s.grade) ? '보충지도' : '추가학습';
-
-                                const hoursText = this.moduleConfig.hoursPerCredit ? `*${this.moduleConfig.hoursPerCredit}시수` : '';
-
-                                const lessonDetails = `${lessonType}(과목 학점수${hoursText})`;
-
-
-
-                                studentEntry.details.push({
-
-                                    reason: reason, subjects: consolidatedSubjects, lessonDetails: lessonDetails,
-
-                                    originalSubjects: subjectsArray, id: student.id, name: student.name
-
+                                // 계열별로 그룹핑
+                                const groupedByCategory = new Map();
+                                
+                                subjectsArray.forEach(subject => {
+                                    const category = subject.category || '';
+                                    if (!groupedByCategory.has(category)) {
+                                        groupedByCategory.set(category, []);
+                                    }
+                                    groupedByCategory.get(category).push(subject);
                                 });
+                                
+                                // 각 계열별로 처리
+                                groupedByCategory.forEach((categorySubjects, category) => {
+                                    // 과목명만 표시 (계열명 제거)
+                                    const consolidatedSubjects = categorySubjects.map(s => `${s.name}(${s.credits}학점)`).join(', ');
+                                    const lessonType = categorySubjects.some(s => s.grade) ? '보충지도' : '추가학습';
+                                    
+                                    // 계열별 시수 가져오기
+                                    const hoursPerCredit = this.getHoursPerCredit(category);
+                                    const hoursText = hoursPerCredit ? `*${hoursPerCredit}시수` : '';
+                                    const lessonDetails = `${lessonType}(과목 학점수${hoursText})`;
 
+                                    studentEntry.details.push({
+                                        reason: reason, 
+                                        subjects: consolidatedSubjects, 
+                                        lessonDetails: lessonDetails,
+                                        originalSubjects: categorySubjects, 
+                                        id: student.id, 
+                                        name: student.name,
+                                        category: category
+                                    });
+                                });
                             });
 
 
@@ -4258,8 +4295,11 @@
                             if (subjectInfo) {
 
                                 requiredSubjectCredits = Number(subjectInfo.학점) || 0;
+                                
+                                const category = this.teacherPlan.subjectCategory || '';
+                                const hoursPerCredit = this.getHoursPerCredit(category);
 
-                                supplementaryHours = requiredSubjectCredits * this.moduleConfig.hoursPerCredit;
+                                supplementaryHours = requiredSubjectCredits * hoursPerCredit;
 
                                 requiredHoursForCompletion = Math.ceil((supplementaryHours * 2) / 3 * 10) / 10;
 
@@ -8369,8 +8409,34 @@
                             
                             
                             const defaultModuleConfig = this.$options.data().moduleConfig;
+                            
+                            const loadedConfig = moduleConfigSnap.exists() ? moduleConfigSnap.data() : {};
+                            
+                            // 기존 hoursPerCredit을 hoursPerCreditByCategory로 마이그레이션
+                            if (loadedConfig.hoursPerCredit && (!loadedConfig.hoursPerCreditByCategory || Object.keys(loadedConfig.hoursPerCreditByCategory).length === 0)) {
+                                // 모든 계열에 동일한 값 적용
+                                const hoursPerCredit = loadedConfig.hoursPerCredit;
+                                loadedConfig.hoursPerCreditByCategory = {};
+                                if (this.curriculumData && this.curriculumData.length > 0) {
+                                    const categories = new Set();
+                                    this.curriculumData.forEach(row => {
+                                        if (row && row['분류']) {
+                                            const category = String(row['분류']).trim();
+                                            if (category) categories.add(category);
+                                        }
+                                    });
+                                    if (categories.size === 0) categories.add('인문계열');
+                                    categories.forEach(cat => {
+                                        loadedConfig.hoursPerCreditByCategory[cat] = hoursPerCredit;
+                                    });
+                                } else {
+                                    loadedConfig.hoursPerCreditByCategory['인문계열'] = hoursPerCredit;
+                                }
+                                // 기존 필드 제거
+                                delete loadedConfig.hoursPerCredit;
+                            }
 
-                            this.moduleConfig = moduleConfigSnap.exists() ? { ...defaultModuleConfig, ...moduleConfigSnap.data() } : defaultModuleConfig;
+                            this.moduleConfig = { ...defaultModuleConfig, ...loadedConfig };
 
                             
                             
@@ -8599,6 +8665,11 @@
                             const docRef = doc(db, `schools/${activeSchoolId}/commonData`, "moduleConfig");
 
                             const configToSave = JSON.parse(JSON.stringify(this.moduleConfig));
+                            
+                            // 기존 hoursPerCredit 필드 제거 (있으면)
+                            if (configToSave.hoursPerCredit) {
+                                delete configToSave.hoursPerCredit;
+                            }
 
                             await setDoc(docRef, configToSave);
 
@@ -9116,6 +9187,17 @@
                         console.log("saveGuidanceData: 로컬 저장 완료");
                             return { success: true, message: '출석부 및 수업일지가 저장되었습니다.' };
 
+                    },
+
+                    getHoursPerCredit(category) {
+                        // 계열별 학점당 시수를 가져오는 헬퍼 함수
+                        if (!category || !this.moduleConfig.hoursPerCreditByCategory) {
+                            // 기본값 반환 (기존 hoursPerCredit이 있으면 사용, 없으면 1)
+                            return this.moduleConfig.hoursPerCreditByCategory && Object.keys(this.moduleConfig.hoursPerCreditByCategory).length > 0 
+                                ? Object.values(this.moduleConfig.hoursPerCreditByCategory)[0] || 1 
+                                : 1;
+                        }
+                        return this.moduleConfig.hoursPerCreditByCategory[category] || 1;
                     },
 
                     findSubjectInCurriculum(subjectName, grade, semester, category) {
@@ -9780,58 +9862,105 @@
 
 
 
-                            const subjectsMap = new Map();
+                            // 계열별로 그룹핑된 과목 정보 사용
+                            const subjectsByCategory = new Map();
+                            
+                            // groupedUnderachievers에서 가져온 정보 사용
+                            const groupedInfo = this.groupedUnderachievers.find(g => g.id === fullStudent.id);
+                            
+                            if (groupedInfo && groupedInfo.details) {
+                                // 계열별로 그룹핑된 정보 사용
+                                groupedInfo.details.forEach(detail => {
+                                    const category = detail.category || '';
+                                    if (!subjectsByCategory.has(category)) {
+                                        subjectsByCategory.set(category, []);
+                                    }
+                                    
+                                    // originalSubjects에서 과목 정보 추출
+                                    if (detail.originalSubjects) {
+                                        detail.originalSubjects.forEach(subject => {
+                                            const reasons = new Set();
+                                            if (subject.grade) reasons.add('학업성취율');
+                                            if (subject.attendance) reasons.add('과목출석률');
+                                            
+                                            subjectsByCategory.get(category).push({
+                                                name: subject.name,
+                                                reasons: reasons,
+                                                credits: subject.credits,
+                                                hoursPerCredit: this.getHoursPerCredit(category)
+                                            });
+                                        });
+                                    }
+                                });
+                            } else {
+                                // 기존 방식 (fallback)
+                                const subjectsMap = new Map();
+                                
+                                (fullStudent.gradeSubjects || []).forEach(s => {
+                                    if (s && s.name) { 
+                                        const category = s.category || fullStudent.category || '';
+                                        if (!subjectsMap.has(`${category}|${s.name}`)) {
+                                            subjectsMap.set(`${category}|${s.name}`, { name: s.name, category: category, reasons: new Set(['학업성취율']), credits: s.credits });
+                                        } else {
+                                            subjectsMap.get(`${category}|${s.name}`).reasons.add('학업성취율');
+                                        }
+                                    }
+                                });
+                                
+                                (fullStudent.attendanceSubjects || []).forEach(sName => {
+                                    if (sName) {
+                                        const curriculumInfo = this.curriculumData.find(c => c.과목명 === sName);
+                                        const category = curriculumInfo ? (curriculumInfo['분류'] || fullStudent.category || '') : (fullStudent.category || '');
+                                        if (!subjectsMap.has(`${category}|${sName}`)) {
+                                            subjectsMap.set(`${category}|${sName}`, { name: sName, category: category, reasons: new Set(['과목출석률']), credits: curriculumInfo ? curriculumInfo.학점 : 'N/A' });
+                                        } else {
+                                            subjectsMap.get(`${category}|${sName}`).reasons.add('과목출석률');
+                                        }
+                                    }
+                                });
+                                
+                                // 계열별로 그룹핑
+                                subjectsMap.forEach((subjectInfo, key) => {
+                                    const category = subjectInfo.category || '';
+                                    if (!subjectsByCategory.has(category)) {
+                                        subjectsByCategory.set(category, []);
+                                    }
+                                    subjectsByCategory.get(category).push({
+                                        name: subjectInfo.name,
+                                        reasons: subjectInfo.reasons,
+                                        credits: subjectInfo.credits,
+                                        hoursPerCredit: this.getHoursPerCredit(category)
+                                    });
+                                });
+                            }
 
-                            (fullStudent.gradeSubjects || []).forEach(s => {
-
-                                if (s && s.name) { if (!subjectsMap.has(s.name)) subjectsMap.set(s.name, new Set()); subjectsMap.get(s.name).add('학업성취율'); }
-
+                        if (subjectsByCategory.size > 0) {
+                            let totalRows = 0;
+                            subjectsByCategory.forEach((subjects) => {
+                                totalRows += subjects.length;
                             });
-
-                            (fullStudent.attendanceSubjects || []).forEach(sName => {
-
-                                if (sName) { if (!subjectsMap.has(sName)) subjectsMap.set(sName, new Set()); subjectsMap.get(sName).add('과목출석률'); }
-
-                            });
-
-
-
-                        if (subjectsMap.size > 0) {
-
-                            let subjectIndex = 0;
-
-                            const subjectCount = subjectsMap.size;
-
-                            subjectsMap.forEach((reasons, subjectName) => {
-
-                                if (subjectIndex === 0) {
-
-                                    studentTableHtml += `<tr>
-
-                                        <td rowspan="${subjectCount}" style="vertical-align: top;">${fullStudent.id}</td>
-
-                                        <td rowspan="${subjectCount}" style="vertical-align: top;">${fullStudent.name}</td>
-
-                                        <td class="text-left">${subjectName}</td>
-
-                                        <td>${Array.from(reasons).join(' & ')}</td>
-
-                                    </tr>`;
-
-                                } else {
-
-                                    studentTableHtml += `<tr>
-
-                                        <td class="text-left">${subjectName}</td>
-
-                                        <td>${Array.from(reasons).join(' & ')}</td>
-
-                                    </tr>`;
-
-                                }
-
-                                subjectIndex++;
-
+                            
+                            let currentRow = 0;
+                            let isFirstRow = true;
+                            
+                            subjectsByCategory.forEach((subjects, category) => {
+                                subjects.forEach((subject, index) => {
+                                    if (isFirstRow) {
+                                        studentTableHtml += `<tr>
+                                            <td rowspan="${totalRows}" style="vertical-align: top;">${fullStudent.id}</td>
+                                            <td rowspan="${totalRows}" style="vertical-align: top;">${fullStudent.name}</td>
+                                            <td class="text-left">${subject.name}</td>
+                                            <td>${Array.from(subject.reasons).join(' & ')}</td>
+                                        </tr>`;
+                                        isFirstRow = false;
+                                    } else {
+                                        studentTableHtml += `<tr>
+                                            <td class="text-left">${subject.name}</td>
+                                            <td>${Array.from(subject.reasons).join(' & ')}</td>
+                                        </tr>`;
+                                    }
+                                    currentRow++;
+                                });
                             });
 
                         } else {
@@ -11089,8 +11218,9 @@
                             const credits = Number(subject.학점);
 
                             if (!isNaN(credits) && credits > 0) {
-
-                                calculatedHours = credits * this.moduleConfig.hoursPerCredit;
+                                const category = this.teacherPlan.subjectCategory || '';
+                                const hoursPerCredit = this.getHoursPerCredit(category);
+                                calculatedHours = credits * hoursPerCredit;
 
                                 }
 
@@ -12725,7 +12855,9 @@
 
                                                 
                                                 
-                                                const supplementaryHours = requiredSubjectCredits * this.moduleConfig.hoursPerCredit;
+                                                const category = subjectInfo['분류'] || '';
+                                                const hoursPerCredit = this.getHoursPerCredit(category);
+                                                const supplementaryHours = requiredSubjectCredits * hoursPerCredit;
 
                                                 const requiredHoursForCompletion = Math.ceil((supplementaryHours * 2) / 3 * 10) / 10;
 
