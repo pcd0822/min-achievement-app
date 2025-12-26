@@ -4040,9 +4040,59 @@
 
                         // 계열별 시수가 설정되어 있으면 사용, 없으면 기본값 사용
 
-                        // category가 객체인 경우 문자열로 변환
+                        // category를 안전하게 문자열로 변환
 
-                        const categoryKey = category ? String(category).trim() : '';
+                        let categoryKey = '';
+
+                        try {
+
+                            if (category == null) {
+
+                                categoryKey = '';
+
+                            } else if (typeof category === 'string') {
+
+                                categoryKey = category.trim();
+
+                            } else if (typeof category === 'number') {
+
+                                categoryKey = String(category);
+
+                            } else if (typeof category === 'object') {
+
+                                // 객체인 경우, 특정 속성을 추출하거나 빈 문자열로 처리
+
+                                if (category.toString && typeof category.toString === 'function') {
+
+                                    try {
+
+                                        categoryKey = String(category.toString()).trim();
+
+                                    } catch (e) {
+
+                                        categoryKey = '';
+
+                                    }
+
+                                } else {
+
+                                    categoryKey = '';
+
+                                }
+
+                            } else {
+
+                                categoryKey = String(category).trim();
+
+                            }
+
+                        } catch (error) {
+
+                            console.warn('getHoursPerCredit: category 변환 오류', category, error);
+
+                            categoryKey = '';
+
+                        }
 
                         if (categoryKey && this.moduleConfig.hoursPerCreditByCategory && typeof this.moduleConfig.hoursPerCreditByCategory === 'object') {
 
@@ -4188,7 +4238,27 @@
 
                                             const categoryValue = subjectInfo['분류'];
 
-                                            subjectCategory = categoryValue != null ? String(categoryValue).trim() : '';
+                                            // categoryValue를 안전하게 문자열로 변환
+
+                                            if (categoryValue == null) {
+
+                                                subjectCategory = '';
+
+                                            } else if (typeof categoryValue === 'string') {
+
+                                                subjectCategory = categoryValue.trim();
+
+                                            } else if (typeof categoryValue === 'number') {
+
+                                                subjectCategory = String(categoryValue);
+
+                                            } else {
+
+                                                // 객체인 경우 빈 문자열로 처리
+
+                                                subjectCategory = '';
+
+                                            }
 
                                         }
 
@@ -4232,7 +4302,27 @@
 
                                             const categoryValue = subjectInfo['분류'];
 
-                                            subjectCategory = categoryValue != null ? String(categoryValue).trim() : '';
+                                            // categoryValue를 안전하게 문자열로 변환
+
+                                            if (categoryValue == null) {
+
+                                                subjectCategory = '';
+
+                                            } else if (typeof categoryValue === 'string') {
+
+                                                subjectCategory = categoryValue.trim();
+
+                                            } else if (typeof categoryValue === 'number') {
+
+                                                subjectCategory = String(categoryValue);
+
+                                            } else {
+
+                                                // 객체인 경우 빈 문자열로 처리
+
+                                                subjectCategory = '';
+
+                                            }
 
                                         }
 
@@ -4385,7 +4475,31 @@
 
                                 requiredSubjectCredits = Number(subjectInfo.학점) || 0;
 
-                                const subjectCategory = subjectInfo['분류'] ? String(subjectInfo['분류']).trim() : this.teacherPlan.subjectCategory;
+                                // subjectCategory를 안전하게 문자열로 변환
+                                let subjectCategory = '';
+                                try {
+                                    if (subjectInfo && subjectInfo['분류']) {
+                                        const categoryValue = subjectInfo['분류'];
+                                        if (categoryValue != null) {
+                                            if (typeof categoryValue === 'string') {
+                                                subjectCategory = categoryValue.trim();
+                                            } else if (typeof categoryValue === 'number') {
+                                                subjectCategory = String(categoryValue);
+                                            } else {
+                                                subjectCategory = '';
+                                            }
+                                        }
+                                    }
+                                } catch (error) {
+                                    console.warn('subjectCategory 변환 오류:', error);
+                                    subjectCategory = '';
+                                }
+                                
+                                if (!subjectCategory && this.teacherPlan.subjectCategory) {
+                                    subjectCategory = typeof this.teacherPlan.subjectCategory === 'string' 
+                                        ? this.teacherPlan.subjectCategory.trim() 
+                                        : String(this.teacherPlan.subjectCategory || '').trim();
+                                }
 
                                 const hoursPerCredit = this.getHoursPerCredit(subjectCategory);
 
@@ -9930,7 +10044,27 @@
 
                                             const categoryValue = subjectInfo['분류'];
 
-                                            subjectCategory = categoryValue != null ? String(categoryValue).trim() : '';
+                                            // categoryValue를 안전하게 문자열로 변환
+
+                                            if (categoryValue == null) {
+
+                                                subjectCategory = '';
+
+                                            } else if (typeof categoryValue === 'string') {
+
+                                                subjectCategory = categoryValue.trim();
+
+                                            } else if (typeof categoryValue === 'number') {
+
+                                                subjectCategory = String(categoryValue);
+
+                                            } else {
+
+                                                // 객체인 경우 빈 문자열로 처리
+
+                                                subjectCategory = '';
+
+                                            }
 
                                         }
 
@@ -9978,7 +10112,27 @@
 
                                             const categoryValue = subjectInfo['분류'];
 
-                                            subjectCategory = categoryValue != null ? String(categoryValue).trim() : '';
+                                            // categoryValue를 안전하게 문자열로 변환
+
+                                            if (categoryValue == null) {
+
+                                                subjectCategory = '';
+
+                                            } else if (typeof categoryValue === 'string') {
+
+                                                subjectCategory = categoryValue.trim();
+
+                                            } else if (typeof categoryValue === 'number') {
+
+                                                subjectCategory = String(categoryValue);
+
+                                            } else {
+
+                                                // 객체인 경우 빈 문자열로 처리
+
+                                                subjectCategory = '';
+
+                                            }
 
                                         }
 
