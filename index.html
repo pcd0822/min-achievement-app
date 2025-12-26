@@ -4188,41 +4188,43 @@
 
                                 });
 
-                                // 계열별로 과목 목록과 시수 정보 생성
+                                // 계열별로 시수는 다르게 적용하되, 표시는 과목명만 사용
 
-                                const categoryDetails = [];
+                                const subjectDisplayList = [];
 
-                                const subjectsByCategoryForDisplay = [];
+                                subjectsArray.forEach(s => {
 
-                                subjectsByCategory.forEach((categorySubjects, category) => {
+                                    // 각 과목의 계열 정보 찾기
 
-                                    const consolidatedSubjects = categorySubjects.map(s => `${s.name}(${s.credits}학점)`).join(', ');
+                                    let subjectCategory = '';
 
-                                    const hoursPerCredit = this.getHoursPerCredit(category);
+                                    const subjectInfo = this.findSubjectInCurriculum(s.name, null, null, null);
+
+                                    if (subjectInfo && subjectInfo['분류']) {
+
+                                        subjectCategory = String(subjectInfo['분류']).trim();
+
+                                    }
+
+                                    const hoursPerCredit = this.getHoursPerCredit(subjectCategory);
 
                                     const hoursText = hoursPerCredit ? `*${hoursPerCredit}시수` : '';
 
-                                    const categoryLabel = category ? `[${category}] ` : '';
-
-                                    categoryDetails.push(`${categoryLabel}${consolidatedSubjects}${hoursText ? ` ${hoursText}` : ''}`);
-
-                                    subjectsByCategoryForDisplay.push(`${categoryLabel}${consolidatedSubjects}`);
+                                    subjectDisplayList.push(`${s.name}(${s.credits}학점)${hoursText ? ` ${hoursText}` : ''}`);
 
                                 });
 
+                                const consolidatedSubjects = subjectDisplayList.join(', ');
+
                                 const lessonType = subjectsArray.some(s => s.grade) ? '보충지도' : '추가학습';
 
-                                const lessonDetails = `${lessonType}(${categoryDetails.join(', ')})`;
-
-                                // subjects 필드에도 계열 정보 포함
-
-                                const consolidatedSubjectsWithCategory = subjectsByCategoryForDisplay.join(', ');
+                                const lessonDetails = `${lessonType}(과목 학점수)`;
 
 
 
                                 studentEntry.details.push({
 
-                                    reason: reason, subjects: consolidatedSubjectsWithCategory, lessonDetails: lessonDetails,
+                                    reason: reason, subjects: consolidatedSubjects, lessonDetails: lessonDetails,
 
                                     originalSubjects: subjectsArray, id: student.id, name: student.name
 
@@ -9950,57 +9952,67 @@
 
                         if (subjectsByCategory.size > 0) {
 
-                            let totalRowCount = 0;
+                            // 모든 과목을 하나의 리스트로 합치되, 각 과목의 계열별 시수 적용
+
+                            const allSubjectsList = [];
 
                             subjectsByCategory.forEach((categorySubjects, category) => {
 
-                                totalRowCount += categorySubjects.size;
+                                categorySubjects.forEach((subjectData, subjectName) => {
+
+                                    const hoursPerCredit = this.getHoursPerCredit(category);
+
+                                    const hoursText = hoursPerCredit ? ` (학점당 ${hoursPerCredit}시수)` : '';
+
+                                    allSubjectsList.push({
+
+                                        name: subjectName,
+
+                                        credits: subjectData.credits,
+
+                                        reasons: subjectData.reasons,
+
+                                        hoursText: hoursText
+
+                                    });
+
+                                });
 
                             });
 
                             let currentRowIndex = 0;
 
-                            subjectsByCategory.forEach((categorySubjects, category) => {
+                            allSubjectsList.forEach(subjectData => {
 
-                                const categoryLabel = category ? `[${category}] ` : '';
+                                const subjectDisplay = `${subjectData.name}(${subjectData.credits}학점)${subjectData.hoursText}`;
 
-                                const hoursPerCredit = this.getHoursPerCredit(category);
+                                if (currentRowIndex === 0) {
 
-                                const hoursText = hoursPerCredit ? ` (학점당 ${hoursPerCredit}시수)` : '';
+                                    studentTableHtml += `<tr>
 
-                                categorySubjects.forEach((subjectData, subjectName) => {
+                                        <td rowspan="${allSubjectsList.length}" style="vertical-align: top;">${fullStudent.id}</td>
 
-                                    const subjectDisplay = `${categoryLabel}${subjectName}(${subjectData.credits}학점)${hoursText}`;
+                                        <td rowspan="${allSubjectsList.length}" style="vertical-align: top;">${fullStudent.name}</td>
 
-                                    if (currentRowIndex === 0) {
+                                        <td class="text-left">${subjectDisplay}</td>
 
-                                        studentTableHtml += `<tr>
+                                        <td>${Array.from(subjectData.reasons).join(' & ')}</td>
 
-                                            <td rowspan="${totalRowCount}" style="vertical-align: top;">${fullStudent.id}</td>
+                                    </tr>`;
 
-                                            <td rowspan="${totalRowCount}" style="vertical-align: top;">${fullStudent.name}</td>
+                                } else {
 
-                                            <td class="text-left">${subjectDisplay}</td>
+                                    studentTableHtml += `<tr>
 
-                                            <td>${Array.from(subjectData.reasons).join(' & ')}</td>
+                                        <td class="text-left">${subjectDisplay}</td>
 
-                                        </tr>`;
+                                        <td>${Array.from(subjectData.reasons).join(' & ')}</td>
 
-                                    } else {
+                                    </tr>`;
 
-                                        studentTableHtml += `<tr>
+                                }
 
-                                            <td class="text-left">${subjectDisplay}</td>
-
-                                            <td>${Array.from(subjectData.reasons).join(' & ')}</td>
-
-                                        </tr>`;
-
-                                    }
-
-                                    currentRowIndex++;
-
-                                });
+                                currentRowIndex++;
 
                             });
 
