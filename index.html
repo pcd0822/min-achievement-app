@@ -9424,78 +9424,6 @@
 
                         
                         
-                        // 계열로 찾지 못했고, 계열이 지정된 경우 다른 계열에서도 시도
-
-                        if (!result && normalizedSeries && normalizedSeries !== '') {
-
-                            const alternativeSeries = normalizedSeries === '전문계열' ? '인문계열' : '전문계열';
-
-                            console.log(`[findSubjectInCurriculum] 계열 "${normalizedSeries}"에서 찾지 못함. "${alternativeSeries}"로 재시도`);
-
-                            
-
-                            const alternativeData = this.curriculumData.filter(row => {
-
-                                if (!row || !row['계열']) return false;
-
-                                const rowSeries = String(row['계열']).trim();
-
-                                return rowSeries === alternativeSeries;
-
-                            });
-
-                            
-
-                            result = alternativeData.find(row => {
-
-                                if (!row || !row['과목명']) return false;
-
-                                const nameMatch = String(row['과목명']).trim() === String(subjectName || '').trim();
-
-                                if (!nameMatch) return false;
-
-                                
-                                
-                                // 학년 매칭 (있으면 일치해야 함)
-
-                                if (grade != null && grade !== '') {
-
-                                    const rowGrade = row['학년'] != null ? Number(row['학년']) : null;
-
-                                    if (rowGrade === null || rowGrade !== Number(grade)) return false;
-
-                                }
-
-                                
-                                
-                                // 학기 매칭 (있으면 일치해야 함)
-
-                                if (semester != null && semester !== '') {
-
-                                    const rowSemester = row['학기'] != null ? Number(row['학기']) : null;
-
-                                    if (rowSemester === null || rowSemester !== Number(semester)) return false;
-
-                                }
-
-                                
-                                
-                                return true;
-
-                            });
-
-                            
-
-                            if (result) {
-
-                                console.log(`[findSubjectInCurriculum] 계열 "${alternativeSeries}"에서 찾음: ${result['과목명']}, 학점=${result['학점']}`);
-
-                            }
-
-                        }
-
-                        
-                        
                         if (result) {
 
                             console.log('[findSubjectInCurriculum] 찾음:', {
@@ -10681,7 +10609,8 @@
                                                     }
 
                                                     // 계열로 검색 시도 (분류는 null로 전달하여 교육과정 편제표에서 찾은 분류 사용)
-                                                    let curriculumInfo = this.findSubjectInCurriculum(
+                                                    // 정확히 일치하는 과목만 반환 (fallback 없음)
+                                                    const curriculumInfo = this.findSubjectInCurriculum(
 
                                                         subjectInfo.name,
 
@@ -10694,38 +10623,6 @@
                                                         null  // 분류는 교육과정 편제표에서 찾은 값 사용
 
                                                     );
-
-                                                    // 찾지 못했고 계열이 있는 경우, 다른 계열로도 시도 (fallback)
-                                                    if (!curriculumInfo && subjectInfo.series) {
-
-                                                        const alternativeSeries = subjectInfo.series === '전문계열' ? '인문계열' : '전문계열';
-
-                                                        console.log(`[processGradeFiles] 계열 "${subjectInfo.series}"로 찾지 못함. "${alternativeSeries}"로 재시도: ${subjectInfo.name}`);
-
-                                                        curriculumInfo = this.findSubjectInCurriculum(
-
-                                                            subjectInfo.name,
-
-                                                            subjectInfo.grade,
-
-                                                            subjectInfo.semester,
-
-                                                            alternativeSeries,
-
-                                                            null
-
-                                                        );
-
-                                                        // 다른 계열에서 찾았으면 해당 계열로 업데이트
-                                                        if (curriculumInfo) {
-
-                                                            console.log(`[processGradeFiles] 계열 "${alternativeSeries}"에서 찾음: ${subjectInfo.name}, 학점=${curriculumInfo.학점}, 분류=${curriculumInfo['분류']}`);
-
-                                                            subjectInfo.series = alternativeSeries;
-
-                                                        }
-
-                                                    }
 
                                                     if (!curriculumInfo) {
 
