@@ -1193,7 +1193,10 @@
                                <!-- 교과별 학점당 시수 (전체 너비) -->
                                <div class="mb-6">
 
-                                   <label class="block text-sm font-medium text-gray-700 mb-2">교과별 학점당 시수</label>
+                                   <label class="block text-sm font-medium text-gray-700 mb-2">
+                                       교과별 학점당 시수 
+                                       <span class="text-xs font-normal text-gray-500">(교육과정 편제표의 분류(보통교과/전문교과)별로 학점당 시수를 입력하세요)</span>
+                                   </label>
                                    
                                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                        <div v-for="category in availableCategories" :key="category" class="mb-3">
@@ -1201,8 +1204,6 @@
                                            <input type="number" v-model.number="moduleConfig.hoursPerCreditByCategory[category]" :placeholder="`${category} 학점당 시수`" class="block w-full p-2 border border-gray-300 rounded-md">
                                        </div>
                                    </div>
-                                   
-                                   <p class="text-xs text-gray-500 mt-2">교육과정 편제표의 분류(보통교과/전문교과)별로 학점당 시수를 입력하세요.</p>
 
                                </div>
 
@@ -1669,7 +1670,7 @@
 
                                   <option v-for="(plan, index) in teacherPlanList" :key="index" :value="index">
 
-                                      {{ plan.subjectName }} ({{ plan.subjectGrade ? plan.subjectGrade + '학년' : '' }} {{ plan.subjectSemester ? plan.subjectSemester + '학기' : '' }} {{ plan.subjectCategory || '' }})
+                                      {{ plan.subjectName }} ({{ plan.subjectGrade ? plan.subjectGrade + '학년' : '' }} {{ plan.subjectSemester ? plan.subjectSemester + '학기' : '' }} {{ plan.subjectSeries || '' }} {{ plan.subjectCategory || '' }})
 
                                   </option>
 
@@ -1711,7 +1712,7 @@
 
                                </div>
 
-                               <div class="grid grid-cols-3 gap-4">
+                               <div class="grid grid-cols-2 gap-4">
 
                                    <div>
 
@@ -1747,9 +1748,27 @@
 
                                    </div>
 
+                               </div>
+
+                               <div class="grid grid-cols-2 gap-4">
+
                                    <div>
 
-                                       <label for="subjectCategory" class="block text-sm font-medium text-gray-700">계열(분류)</label>
+                                       <label for="subjectSeries" class="block text-sm font-medium text-gray-700">계열</label>
+
+                                       <select id="subjectSeries" v-model="teacherPlan.subjectSeries" @change="handleSubjectChange" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+
+                                           <option value="">선택</option>
+
+                                           <option v-for="series in availableSeries" :key="series" :value="series">{{ series }}</option>
+
+                                       </select>
+
+                                   </div>
+
+                                   <div>
+
+                                       <label for="subjectCategory" class="block text-sm font-medium text-gray-700">분류</label>
 
                                        <select id="subjectCategory" v-model="teacherPlan.subjectCategory" @change="handleSubjectChange" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
 
@@ -3734,7 +3753,17 @@
 
                         teacherPlan: {
 
-                            subjectName: '', teacherNames: [''],
+                            subjectName: '', 
+
+                            subjectGrade: null,
+
+                            subjectSemester: null,
+
+                            subjectSeries: '',  // 계열 (인문계열/전문계열)
+
+                            subjectCategory: '',  // 분류 (보통교과/전문교과)
+
+                            teacherNames: [''],
 
                             achievements: [createEmptyAchievement()],
 
@@ -3816,6 +3845,40 @@
 
                 computed: {
 
+                    availableSeries() {
+
+                        // 교육과정 편제표에서 계열 열의 중복값을 제거하여 드롭다운 목록 생성
+
+                        if (!this.curriculumData || this.curriculumData.length === 0) return [];
+
+                        const series = new Set();
+
+                        this.curriculumData.forEach(row => {
+
+                            if (row && row['계열']) {
+
+                                const seriesValue = String(row['계열']).trim();
+
+                                if (seriesValue) series.add(seriesValue);
+
+                            }
+
+                        });
+
+                        // 기본값 추가
+
+                        if (series.size === 0) {
+
+                            series.add('인문계열');
+
+                            series.add('전문계열');
+
+                        }
+
+                        return Array.from(series).sort();
+
+                    },
+
                     availableCategories() {
 
                         // 교육과정 편제표에서 분류 열의 중복값을 제거하여 드롭다운 목록 생성
@@ -3836,9 +3899,15 @@
 
                         });
 
-                        // '과'가 없으면 '인문계열'을 기본값으로 추가
+                        // 기본값 추가
 
-                        if (categories.size === 0) categories.add('인문계열');
+                        if (categories.size === 0) {
+
+                            categories.add('보통교과');
+
+                            categories.add('전문교과');
+
+                        }
 
                         return Array.from(categories).sort();
 
@@ -4293,9 +4362,8 @@
 
                             try {
 
-                                // teacherPlan.subjectCategory는 분류(보통교과/전문교과)를 의미하지만,
-                                // findSubjectInCurriculum은 계열을 필요로 하므로, 계열 없이 검색하거나 기본값 사용
-                                // 교육과정 편제표에서 과목을 찾을 때 계열 정보가 없으면 전체에서 검색
+                                // teacherPlan.subjectSeries는 계열(인문계열/전문계열)
+                                // teacherPlan.subjectCategory는 분류(보통교과/전문교과) - 시수 적용 기준
                                 const subjectInfo = this.findSubjectInCurriculum(
 
                                     this.teacherPlan.subjectName,
@@ -4304,7 +4372,7 @@
 
                                     this.teacherPlan.subjectSemester,
 
-                                    null,  // 계열 정보 없음 (전체 검색)
+                                    this.teacherPlan.subjectSeries,  // 계열
 
                                     this.teacherPlan.subjectCategory  // 분류는 시수 적용에만 사용
 
@@ -4780,7 +4848,7 @@
                                 plan.subjectName === this.newSubjectForm.subjectName.trim() &&
                                 plan.subjectGrade === this.newSubjectForm.subjectGrade &&
                                 plan.subjectSemester === this.newSubjectForm.subjectSemester &&
-                                plan.subjectCategory === this.newSubjectForm.subjectCategory
+                                plan.subjectSeries === this.newSubjectForm.subjectSeries
                             );
                             
                             if (existingSubject) {
@@ -5132,7 +5200,7 @@
 
                             subjectName: '', teacherNames: [''],
 
-                            subjectGrade: null, subjectSemester: null, subjectCategory: '',
+                            subjectGrade: null, subjectSemester: null, subjectSeries: '', subjectCategory: '',
 
                             achievements: [createEmptyAchievement()],
 
@@ -9291,13 +9359,15 @@
 
                         
                         
-                        // 2차 필터링: 과목명, 학년, 학기로 검색
+                        // 2차 필터링: 과목명, 학년, 학기로 검색 (띄어쓰기 무시)
+                        // 과목명 비교 시 띄어쓰기 제거하여 비교
+                        const normalizeName = (name) => String(name || '').trim().replace(/\s+/g, '');
 
                         let result = searchData.find(row => {
 
                             if (!row || !row['과목명']) return false;
 
-                            const nameMatch = String(row['과목명']).trim() === String(subjectName || '').trim();
+                            const nameMatch = normalizeName(row['과목명']) === normalizeName(subjectName);
 
                             if (!nameMatch) return false;
 
@@ -11243,6 +11313,8 @@
 
                             this.teacherPlan.subjectSemester != null && 
 
+                            this.teacherPlan.subjectSeries &&
+                            
                             this.teacherPlan.subjectCategory) {
 
                             const subject = this.findSubjectInCurriculum(
@@ -11253,7 +11325,7 @@
 
                                 this.teacherPlan.subjectSemester,
 
-                                null,  // 계열 정보 없음
+                                this.teacherPlan.subjectSeries,  // 계열
 
                                 this.teacherPlan.subjectCategory  // 분류는 시수 적용에만 사용
 
@@ -12262,10 +12334,11 @@
                             const subjectName = (this.teacherPlan.subjectName || '').trim();
                             const grade = this.teacherPlan.subjectGrade != null ? Number(this.teacherPlan.subjectGrade) : null;
                             const semester = this.teacherPlan.subjectSemester != null ? Number(this.teacherPlan.subjectSemester) : null;
+                            const series = (this.teacherPlan.subjectSeries || '').trim();
                             const category = (this.teacherPlan.subjectCategory || '').trim();
 
-                            if (!subjectName || grade == null || semester == null || !category) {
-                                this.importModalError = '계획서 작성 탭에서 과목명, 학년, 학기, 계열을 모두 입력하고 저장한 후 다시 시도해주세요.';
+                            if (!subjectName || grade == null || semester == null || !series || !category) {
+                                this.importModalError = '계획서 작성 탭에서 과목명, 학년, 학기, 계열, 분류를 모두 입력하고 저장한 후 다시 시도해주세요.';
                                 return;
 
                         }
@@ -12361,16 +12434,19 @@
                                         const namePart = token.split('(')[0].trim();
                                         if (!namePart || namePart !== subjectName) return;
 
-                                        // 교육과정 편제표에서 학년/학기/계열이 일치하는 과목인지 확인
+                                        // 교육과정 편제표에서 학년/학기/계열/분류가 일치하는 과목인지 확인 (띄어쓰기 무시)
+                                        const normalizeName = (name) => String(name || '').trim().replace(/\s+/g, '');
                                         const match = (this.curriculumData || []).find(rowCur => {
                                             if (!rowCur || !rowCur['과목명']) return false;
-                                            const curName = String(rowCur['과목명']).trim();
+                                            const curName = normalizeName(rowCur['과목명']);
                                             const curGrade = rowCur['학년'] != null ? Number(rowCur['학년']) : null;
                                             const curSemester = rowCur['학기'] != null ? Number(rowCur['학기']) : null;
+                                            const curSeries = rowCur['계열'] ? String(rowCur['계열']).trim() : '';
                                             const curCategory = rowCur['분류'] ? String(rowCur['분류']).trim() : '';
-                                            return curName === subjectName &&
+                                            return normalizeName(subjectName) === curName &&
                                                 curGrade === grade &&
                                                 curSemester === semester &&
+                                                curSeries === series &&
                                                 curCategory === category;
                         });
 
