@@ -9379,15 +9379,16 @@
 
                         
                         
-                        // 2차 필터링: 과목명, 학년, 학기로 검색 (띄어쓰기 무시)
-                        // 과목명 비교 시 띄어쓰기 제거하여 비교
-                        const normalizeName = (name) => String(name || '').trim().replace(/\s+/g, '');
+                        // 2차 필터링: 과목명, 학년, 학기로 검색 (정확한 일치 필요)
+                        // 과목명은 앞뒤 공백만 제거하고 정확히 일치해야 함
 
                         let result = searchData.find(row => {
 
                             if (!row || !row['과목명']) return false;
 
-                            const nameMatch = normalizeName(row['과목명']) === normalizeName(subjectName);
+                            const rowName = String(row['과목명']).trim();
+                            const searchName = String(subjectName || '').trim();
+                            const nameMatch = rowName === searchName;
 
                             if (!nameMatch) return false;
 
@@ -9738,7 +9739,7 @@
 
                         }
 
-                        // 교육과정 편제표에서 과목 검색 (띄어쓰기 무시)
+                        // 교육과정 편제표에서 과목 검색 (정확한 일치 필요)
 
                         const subjectInfo = this.findSubjectInCurriculum(
 
@@ -12527,16 +12528,16 @@
                                         const namePart = token.split('(')[0].trim();
                                         if (!namePart || namePart !== subjectName) return;
 
-                                        // 교육과정 편제표에서 학년/학기/계열/분류가 일치하는 과목인지 확인 (띄어쓰기 무시)
-                                        const normalizeName = (name) => String(name || '').trim().replace(/\s+/g, '');
+                                        // 교육과정 편제표에서 학년/학기/계열/분류가 일치하는 과목인지 확인 (정확한 일치 필요)
                                         const match = (this.curriculumData || []).find(rowCur => {
                                             if (!rowCur || !rowCur['과목명']) return false;
-                                            const curName = normalizeName(rowCur['과목명']);
+                                            const curName = String(rowCur['과목명']).trim();
+                                            const searchName = String(subjectName || '').trim();
                                             const curGrade = rowCur['학년'] != null ? Number(rowCur['학년']) : null;
                                             const curSemester = rowCur['학기'] != null ? Number(rowCur['학기']) : null;
                                             const curSeries = rowCur['계열'] ? String(rowCur['계열']).trim() : '';
                                             const curCategory = rowCur['분류'] ? String(rowCur['분류']).trim() : '';
-                                            return normalizeName(subjectName) === curName &&
+                                            return searchName === curName &&
                                                 curGrade === grade &&
                                                 curSemester === semester &&
                                                 curSeries === series &&
