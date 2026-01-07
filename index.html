@@ -2182,17 +2182,17 @@
 
                                                <th v-if="teacherTab === 'supplementary'" class="p-2 border">미도달 항목</th>
 
-                                               <th v-if="teacherTab === 'supplementary'" class="p-2 border">예방지도</th>
+                                               <th v-if="teacherTab === 'supplementary' || teacherTab === 'additional'" class="p-2 border">예방지도</th>
 
-                                               <th v-if="teacherTab === 'supplementary'" class="p-2 border">정서지원프로그램</th>
+                                               <th v-if="teacherTab === 'supplementary' || teacherTab === 'additional'" class="p-2 border">정서지원프로그램</th>
 
                                                <th v-for="rh in moduleConfig.recognizedHours" :key="rh.name" class="p-2 border">{{ rh.name }}</th>
 
                                                <th class="p-2 border bg-gray-100">총계</th>
 
-                                               <th v-if="teacherTab === 'supplementary'" class="p-2 border bg-gray-100">이수여부</th>
+                                               <th v-if="teacherTab === 'supplementary' || teacherTab === 'additional'" class="p-2 border bg-gray-100">이수여부</th>
 
-                                               <th v-if="teacherTab === 'supplementary'" class="p-2 border bg-gray-100">비고</th>
+                                               <th v-if="teacherTab === 'supplementary' || teacherTab === 'additional'" class="p-2 border bg-gray-100">비고</th>
 
                                            </tr>
 
@@ -2212,13 +2212,13 @@
 
                                                <td v-if="teacherTab === 'supplementary'" class="p-2 border">{{ student.reason }}</td>
 
-                                               <td v-if="teacherTab === 'supplementary'" class="p-2 border">
+                                               <td v-if="teacherTab === 'supplementary' || teacherTab === 'additional'" class="p-2 border">
 
                                                    {{ guidanceCompletionStatus[student.id] ? guidanceCompletionStatus[student.id].preventiveHours : 0 }}
 
                                                </td>
 
-                                               <td v-if="teacherTab === 'supplementary'" class="p-2 border">
+                                               <td v-if="teacherTab === 'supplementary' || teacherTab === 'additional'" class="p-2 border">
 
                                                    {{ guidanceCompletionStatus[student.id] ? guidanceCompletionStatus[student.id].emotionalSupportHours : 0 }}
 
@@ -2236,7 +2236,7 @@
 
                                                </td>
 
-                                               <td v-if="teacherTab === 'supplementary'"
+                                               <td v-if="teacherTab === 'supplementary' || teacherTab === 'additional'"
 
                                                    class="p-2 border font-bold"
 
@@ -2252,7 +2252,7 @@
 
                                                </td>
 
-                                               <td v-if="teacherTab === 'supplementary'" class="p-2 border text-sm text-gray-700">
+                                               <td v-if="teacherTab === 'supplementary' || teacherTab === 'additional'" class="p-2 border text-sm text-gray-700">
 
                                                    {{ student.note || '' }}
 
@@ -2262,7 +2262,7 @@
 
                                             <tr v-if="!currentGuidanceData.students || currentGuidanceData.students.length === 0">
 
-                                               <td :colspan="moduleConfig.recognizedHours.length + (teacherTab === 'supplementary' ? 8 : 2)" class="text-center p-4 text-gray-500">학생이 없습니다.</td>
+                                               <td :colspan="moduleConfig.recognizedHours.length + (teacherTab === 'supplementary' ? 8 : teacherTab === 'additional' ? 6 : 2)" class="text-center p-4 text-gray-500">학생이 없습니다.</td>
 
                                            </tr>
 
@@ -4449,6 +4449,16 @@
 
                             }
 
+                            if (this.teacherTab === 'additional') {
+
+                                status[student.id].preventiveHours = 0;
+
+                                status[student.id].emotionalSupportHours = 0;
+
+                                status[student.id].completionStatus = '미이수';
+
+                            }
+
                         });
 
 
@@ -4493,7 +4503,7 @@
 
 
 
-                        if (this.teacherTab === 'supplementary' && requiredSubjectCredits > 0) {
+                        if ((this.teacherTab === 'supplementary' || this.teacherTab === 'additional') && requiredSubjectCredits > 0) {
 
                             data.students.forEach(student => {
 
@@ -4547,29 +4557,35 @@
 
                                 //    (예방지도 인정 + 정서지원 인정) 합이 예방지도 최대 연계 가능 시간을 초과하지 않도록 추가 캡 적용
 
-                                const emotionalData = this.emotionalSupportData.find(e => String(e['학번']) === student.id);
+                                // 보충지도와 추가학습 모두에서 정서지원프로그램 시간 계산
 
-                                const uploadedHours = emotionalData ? Number(emotionalData['정서지원프로그램 참여시간']) : 0;
+                                if (this.teacherTab === 'supplementary' || this.teacherTab === 'additional') {
 
-                                // 표시용(정서지원) 시간: 학점당 이수시간 × 연계비율로 산출한 최대시수까지만 표시
+                                    const emotionalData = this.emotionalSupportData.find(e => String(e['학번']) === student.id);
 
-                                const displayEmotionalHours = Math.min(uploadedHours, maxEmotionalSupportHours);
+                                    const uploadedHours = emotionalData ? Number(emotionalData['정서지원프로그램 참여시간']) : 0;
 
-                                // 표시값은 소수점 절삭
+                                    // 표시용(정서지원) 시간: 학점당 이수시간 × 연계비율로 산출한 최대시수까지만 표시
 
-                                status[student.id].emotionalSupportHours = Math.floor(displayEmotionalHours || 0);
+                                    const displayEmotionalHours = Math.min(uploadedHours, maxEmotionalSupportHours);
 
-                                // 합산용: 비율 기반 1차 캡 (소수점 유지)
+                                    // 표시값은 소수점 절삭
 
-                                const baseEmotionalHours = Math.min((displayEmotionalHours || 0), maxEmotionalSupportHours);
+                                    status[student.id].emotionalSupportHours = Math.floor(displayEmotionalHours || 0);
 
-                                // 예방지도 최대 연계 가능 시수 내에서 남은 여유
+                                    // 합산용: 비율 기반 1차 캡 (소수점 유지)
 
-                                const remainingPreventiveCapacity = Math.max(0, maxPreventiveLinkedHours - creditedPreventiveHours);
+                                    const baseEmotionalHours = Math.min((displayEmotionalHours || 0), maxEmotionalSupportHours);
 
-                                const creditedEmotionalHours = Math.min(baseEmotionalHours, remainingPreventiveCapacity);
+                                    // 예방지도 최대 연계 가능 시수 내에서 남은 여유
 
-                                currentStudentTotal += creditedEmotionalHours;
+                                    const remainingPreventiveCapacity = Math.max(0, maxPreventiveLinkedHours - creditedPreventiveHours);
+
+                                    const creditedEmotionalHours = Math.min(baseEmotionalHours, remainingPreventiveCapacity);
+
+                                    currentStudentTotal += creditedEmotionalHours;
+
+                                }
 
 
 
@@ -12085,15 +12101,15 @@
                     },
 
                     exportCompletionStatusExcel() {
-                        if (this.role !== '교과교사' || this.teacherTab !== 'supplementary') return;
+                        if (this.role !== '교과교사' || (this.teacherTab !== 'supplementary' && this.teacherTab !== 'additional')) return;
                         if (!this.teacherPlan.subjectName) {
                             alert('과목명을 입력하고 저장해주세요.');
                             return;
                         }
 
-                        const data = this.teacherGuidanceData.supplementary;
+                        const data = this.teacherGuidanceData[this.teacherTab];
                         if (!data || !data.students || data.students.length === 0) {
-                            alert('보충지도 대상 학생이 없습니다.');
+                            alert(`${this.teacherTab === 'supplementary' ? '보충지도' : '추가학습'} 대상 학생이 없습니다.`);
                             return;
                         }
 
@@ -12128,8 +12144,10 @@
                             const base = {
                                 학번: student.id,
                                 이름: student.name || '',
-                                특기사항: status.specialNotes || '일반학생',
-                                미도달항목: student.reason || '',
+                                ...(this.teacherTab === 'supplementary' ? {
+                                    특기사항: status.specialNotes || '일반학생',
+                                    미도달항목: student.reason || ''
+                                } : {}),
                                 예방지도시간: status.preventiveHours || 0,
                                 정서지원시간: status.emotionalSupportHours || 0,
                                 // 과목 정보 추가 (통계 대시보드에서 사용)
@@ -12186,11 +12204,13 @@
 
                             ${type === 'supplementary' ? '<th>특기사항</th><th>미도달 항목</th><th>예방지도</th><th>정서지원프로그램</th>' : ''}
 
+                            ${type === 'additional' ? '<th>예방지도</th><th>정서지원프로그램</th>' : ''}
+
                             ${this.moduleConfig.recognizedHours.map(rh => `<th>${rh.name}</th>`).join('')}
 
                             <th>총계</th>
 
-                            ${type === 'supplementary' ? '<th>이수여부</th><th>비고</th>' : ''}
+                            ${type === 'supplementary' || type === 'additional' ? '<th>이수여부</th><th>비고</th>' : ''}
 
                             </tr></thead><tbody>`;
 
@@ -12210,6 +12230,10 @@
 
                                     tableHtml += `<td>${studentStatus.specialNotes || '일반학생'}</td><td>${student.reason || ''}</td><td>${studentStatus.preventiveHours || 0}</td><td>${studentStatus.emotionalSupportHours || 0}</td>`;
 
+                                } else if (type === 'additional') {
+
+                                    tableHtml += `<td>${studentStatus.preventiveHours || 0}</td><td>${studentStatus.emotionalSupportHours || 0}</td>`;
+
                                 }
 
                                 this.moduleConfig.recognizedHours.forEach(rh => {
@@ -12220,7 +12244,7 @@
 
                                 tableHtml += `<td>${studentStatus.total || 0}</td>`;
 
-                                if (type === 'supplementary') {
+                                if (type === 'supplementary' || type === 'additional') {
 
                                     const status = studentStatus.completionStatus || '미이수';
 
@@ -12236,7 +12260,7 @@
 
                         } else {
 
-                            const colspan = this.moduleConfig.recognizedHours.length + (type === 'supplementary' ? 8 : 2);
+                            const colspan = this.moduleConfig.recognizedHours.length + (type === 'supplementary' ? 8 : type === 'additional' ? 6 : 2);
 
                             tableHtml += `<tr><td colspan="${colspan}">학생 정보가 없습니다.</td></tr>`;
 
