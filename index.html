@@ -12009,9 +12009,13 @@
 
                                                         if (shouldUpdate) {
 
-                                                            supplementaryStudent.reason = '학업성취율&과목출석률';
+                                                            // Vue 반응성을 위해 $set 사용
+                                                            this.$set(supplementaryStudent, 'reason', '학업성취율&과목출석률');
 
-                                                            this.saveGuidanceData();
+                                                            await this.saveGuidanceData();
+
+                                                            // 화면 업데이트를 위해 강제 갱신
+                                                            this.$forceUpdate();
 
                                                         }
 
@@ -12104,7 +12108,10 @@
 
                                                         });
 
-                                                        this.saveGuidanceData();
+                                                        await this.saveGuidanceData();
+
+                                                        // 화면 업데이트를 위해 강제 갱신
+                                                        this.$forceUpdate();
 
                                                     }
 
