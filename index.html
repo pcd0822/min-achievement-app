@@ -11990,92 +11990,49 @@
 
                                             console.log('[추가학습 학생추가] 보충지도 대상자에 이미 있는 학생:', {
                                                 studentId,
-                                                currentReason: supplementaryStudent.reason,
-                                                deployedUnderachievers: this.deployedUnderachievers.length
+                                                currentReason: supplementaryStudent.reason
                                             });
 
-                                            // deployedUnderachievers에서 과목출석률 미도달 여부 확인
-                                            const deployed = this.deployedUnderachievers.find(s => s.id === studentId);
+                                            // 보충지도 대상자 명단에 있는 학생이 추가학습에서 추가 시도한 경우
+                                            // 현재 미도달 항목 확인
+                                            const currentReason = supplementaryStudent.reason || '';
+                                            
+                                            // 현재 미도달 항목이 '학업성취율'인 경우 확인 팝업 표시
+                                            if (currentReason === '학업성취율') {
 
-                                            if (deployed) {
+                                                console.log('[추가학습 학생추가] 확인 팝업 표시 시작');
+                                                const shouldUpdate = confirm('해당 학생은 학업성취율 미도달자이므로 보충지도 관리 탭에서 관리해야 합니다. 해당 학생의 미도달 항목에 과목출석률을 추가하시겠습니까?');
+                                                console.log('[추가학습 학생추가] 확인 팝업 결과:', shouldUpdate);
 
-                                                const subject = this.teacherPlan.subjectName;
+                                                if (shouldUpdate) {
 
-                                                const gradeMatch = (deployed.gradeSubjects || []).some(s => s && s.name === subject);
-
-                                                const attendanceMatch = (deployed.attendanceSubjects || []).includes(subject);
-
-                                                console.log('[추가학습 학생추가] deployed 확인:', {
-                                                    studentId,
-                                                    subject,
-                                                    gradeMatch,
-                                                    attendanceMatch,
-                                                    currentReason: supplementaryStudent.reason
-                                                });
-
-                                                // 학업성취율과 과목출석률 모두 미도달인 경우 미도달 항목 업데이트 확인
-                                                if (gradeMatch && attendanceMatch) {
-
-                                                    // 현재 미도달 항목이 '학업성취율'이거나 빈 값이거나 '과목출석률'만 있는 경우 확인 팝업 표시
-                                                    const currentReason = supplementaryStudent.reason || '';
-                                                    const needsUpdate = currentReason === '학업성취율' || 
-                                                                        currentReason === '' || 
-                                                                        currentReason === '과목출석률' ||
-                                                                        !currentReason.includes('학업성취율&과목출석률');
-
-                                                    console.log('[추가학습 학생추가] 업데이트 필요 여부:', {
-                                                        currentReason,
-                                                        needsUpdate
+                                                    console.log('[추가학습 학생추가] 미도달 항목 업데이트:', {
+                                                        studentId,
+                                                        before: supplementaryStudent.reason,
+                                                        after: '학업성취율&과목출석률'
                                                     });
 
-                                                    if (needsUpdate) {
+                                                    // Vue 반응성을 위해 $set 사용
+                                                    this.$set(supplementaryStudent, 'reason', '학업성취율&과목출석률');
 
-                                                        const shouldUpdate = confirm('해당 학생은 학업성취율 미도달자이므로 보충지도 관리 탭에서 관리해야 합니다. 해당 학생의 미도달 항목에 과목출석률을 추가하시겠습니까?');
+                                                    await this.saveGuidanceData();
 
-                                                        if (shouldUpdate) {
-
-                                                            console.log('[추가학습 학생추가] 미도달 항목 업데이트:', {
-                                                                studentId,
-                                                                before: supplementaryStudent.reason,
-                                                                after: '학업성취율&과목출석률'
-                                                            });
-
-                                                            // Vue 반응성을 위해 $set 사용
-                                                            this.$set(supplementaryStudent, 'reason', '학업성취율&과목출석률');
-
-                                                            await this.saveGuidanceData();
-
-                                                            // 화면 업데이트를 위해 강제 갱신
-                                                            this.$nextTick(() => {
-                                                                this.$forceUpdate();
-                                                                console.log('[추가학습 학생추가] 화면 업데이트 완료');
-                                                            });
-
-                                                        }
-
-                                                    } else {
-
-                                                        // 이미 '학업성취율&과목출석률'인 경우 안내만 표시
-                                                        alert('해당 학생은 학업성취율 미도달자이므로 보충지도 관리 탭에서 관리하십시오.');
-
-                                                    }
-
-                                                } else if (gradeMatch) {
-
-                                                    // 학업성취율만 미도달인 경우 안내만 표시
-                                                    alert('해당 학생은 학업성취율 미도달자이므로 보충지도 관리 탭에서 관리하십시오.');
-
-                                                } else {
-
-                                                    // 학업성취율 미도달이 아닌 경우 (이 경우는 발생하지 않아야 함)
-                                                    alert('해당 학생은 학업성취율 미도달자이므로 보충지도 관리 탭에서 관리하십시오.');
+                                                    // 화면 업데이트를 위해 강제 갱신
+                                                    this.$nextTick(() => {
+                                                        this.$forceUpdate();
+                                                        console.log('[추가학습 학생추가] 화면 업데이트 완료');
+                                                    });
 
                                                 }
 
+                                            } else if (currentReason === '학업성취율&과목출석률') {
+
+                                                // 이미 '학업성취율&과목출석률'인 경우 안내만 표시
+                                                alert('해당 학생은 학업성취율 미도달자이므로 보충지도 관리 탭에서 관리하십시오.');
+
                                             } else {
 
-                                                // deployedUnderachievers에 없는 경우 안내만 표시
-                                                console.warn('[추가학습 학생추가] deployedUnderachievers에서 학생을 찾을 수 없음:', studentId);
+                                                // 다른 미도달 항목인 경우도 안내만 표시
                                                 alert('해당 학생은 학업성취율 미도달자이므로 보충지도 관리 탭에서 관리하십시오.');
 
                                             }
