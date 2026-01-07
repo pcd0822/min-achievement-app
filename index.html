@@ -2178,9 +2178,9 @@
 
                                                <th class="p-2 border">학생</th>
 
-                                               <th v-if="teacherTab === 'supplementary'" class="p-2 border">특기사항</th>
+                                               <th v-if="teacherTab === 'supplementary' || teacherTab === 'additional'" class="p-2 border">특기사항</th>
 
-                                               <th v-if="teacherTab === 'supplementary'" class="p-2 border">미도달 항목</th>
+                                               <th v-if="teacherTab === 'supplementary' || teacherTab === 'additional'" class="p-2 border">미도달 항목</th>
 
                                                <th v-if="teacherTab === 'supplementary' || teacherTab === 'additional'" class="p-2 border">예방지도</th>
 
@@ -2204,13 +2204,13 @@
 
                                                <td class="p-2 border font-semibold whitespace-nowrap">{{ student.name }} ({{ student.id }})</td>
 
-                                               <td v-if="teacherTab === 'supplementary'" class="p-2 border">
+                                               <td v-if="teacherTab === 'supplementary' || teacherTab === 'additional'" class="p-2 border">
 
                                                    {{ guidanceCompletionStatus[student.id] ? guidanceCompletionStatus[student.id].specialNotes : '일반학생' }}
 
                                                </td>
 
-                                               <td v-if="teacherTab === 'supplementary'" class="p-2 border">{{ student.reason }}</td>
+                                               <td v-if="teacherTab === 'supplementary' || teacherTab === 'additional'" class="p-2 border">{{ student.reason || '과목출석률' }}</td>
 
                                                <td v-if="teacherTab === 'supplementary' || teacherTab === 'additional'" class="p-2 border">
 
@@ -2273,7 +2273,7 @@
 
                                             <tr v-if="!currentGuidanceData.students || currentGuidanceData.students.length === 0">
 
-                                               <td :colspan="moduleConfig.recognizedHours.length + (teacherTab === 'supplementary' ? 8 : teacherTab === 'additional' ? 6 : 2)" class="text-center p-4 text-gray-500">학생이 없습니다.</td>
+                                               <td :colspan="moduleConfig.recognizedHours.length + (teacherTab === 'supplementary' ? 8 : teacherTab === 'additional' ? 8 : 2)" class="text-center p-4 text-gray-500">학생이 없습니다.</td>
 
                                            </tr>
 
@@ -11972,6 +11972,117 @@
 
                                 }
 
+                            } else if (type === 'additional') {
+
+                                // 추가학습에서 보충지도 대상자(학업성취율 미도달자) 추가 시도 시 차단
+                                const supplementary = this.teacherGuidanceData.supplementary;
+
+                                if (supplementary && supplementary.students) {
+
+                                    const isInSupplementary = supplementary.students.some(s => s && s.id === studentId);
+
+                                    if (isInSupplementary) {
+
+                                        // 보충지도 대상자에 이미 있는 경우, 미도달 항목을 '학업성취율&과목출석률'로 업데이트
+                                        const supplementaryStudent = supplementary.students.find(s => s && s.id === studentId);
+
+                                        if (supplementaryStudent) {
+
+                                            const deployed = this.deployedUnderachievers.find(s => s.id === studentId);
+
+                                            if (deployed) {
+
+                                                const subject = this.teacherPlan.subjectName;
+
+                                                const gradeMatch = (deployed.gradeSubjects || []).some(s => s && s.name === subject);
+
+                                                const attendanceMatch = (deployed.attendanceSubjects || []).includes(subject);
+
+                                                if (gradeMatch && attendanceMatch) {
+
+                                                    supplementaryStudent.reason = '학업성취율&과목출석률';
+
+                                                    this.saveGuidanceData();
+
+                                                    alert('해당 학생은 학업성취율 미도달자이므로 보충지도 관리 탭에서 관리하십시오.');
+
+                                                    this.newGuidanceStudentId = '';
+
+                                                    return;
+
+                                                }
+
+                                            }
+
+                                        }
+
+                                    } else {
+
+                                        // 보충지도 대상자에 없지만 deployedUnderachievers에서 학업성취율 미도달자인 경우
+                                        const deployed = this.deployedUnderachievers.find(s => s.id === studentId);
+
+                                        if (deployed) {
+
+                                            const subject = this.teacherPlan.subjectName;
+
+                                            const gradeMatch = (deployed.gradeSubjects || []).some(s => s && s.name === subject);
+
+                                            const attendanceMatch = (deployed.attendanceSubjects || []).includes(subject);
+
+                                            if (gradeMatch && attendanceMatch) {
+
+                                                // 보충지도 대상자에 추가하고 미도달 항목을 '학업성취율&과목출석률'로 설정
+                                                const supplementaryStudentToAdd = { id: studentId, name: name, reason: '학업성취율&과목출석률', isException: false, exceptionReason: '' };
+
+                                                supplementary.students.push(supplementaryStudentToAdd);
+
+                                                supplementary.students.sort((a, b) => a.id.localeCompare(b.id));
+
+                                                supplementary.sessions.forEach(session => { 
+
+                                                    if (session) {
+
+                                                        if (!session.attendance.hasOwnProperty(studentId)) { 
+
+                                                            session.attendance[studentId] = ''; 
+
+                                                        }
+
+                                                        if (!session.originalAttendance) {
+
+                                                            session.originalAttendance = {};
+
+                                                        }
+
+                                                        if (!session.originalAttendance.hasOwnProperty(studentId)) {
+
+                                                            session.originalAttendance[studentId] = '';
+
+                                                        }
+
+                                                    }
+
+                                                });
+
+                                                this.saveGuidanceData();
+
+                                                alert('해당 학생은 학업성취율 미도달자이므로 보충지도 관리 탭에서 관리하십시오.');
+
+                                                this.newGuidanceStudentId = '';
+
+                                                return;
+
+                                            }
+
+                                        }
+
+                                    }
+
+                                }
+
+                                // 추가학습 대상자로 추가 (과목출석률만 미도달)
+                                studentToAdd.reason = '과목출석률';
+
                             }
 
                             data.students.push(studentToAdd);
@@ -12193,9 +12304,9 @@
                             const base = {
                                 학번: student.id,
                                 이름: student.name || '',
-                                ...(this.teacherTab === 'supplementary' ? {
+                                ...(this.teacherTab === 'supplementary' || this.teacherTab === 'additional' ? {
                                     특기사항: status.specialNotes || '일반학생',
-                                    미도달항목: student.reason || ''
+                                    미도달항목: this.teacherTab === 'additional' ? (student.reason || '과목출석률') : (student.reason || '')
                                 } : {}),
                                 예방지도시간: status.preventiveHours || 0,
                                 정서지원시간: status.emotionalSupportHours || 0,
@@ -12253,7 +12364,7 @@
 
                             ${type === 'supplementary' ? '<th>특기사항</th><th>미도달 항목</th><th>예방지도</th><th>정서지원프로그램</th>' : ''}
 
-                            ${type === 'additional' ? '<th>예방지도</th><th>정서지원프로그램</th>' : ''}
+                            ${type === 'additional' ? '<th>특기사항</th><th>미도달 항목</th><th>예방지도</th><th>정서지원프로그램</th>' : ''}
 
                             ${this.moduleConfig.recognizedHours.map(rh => `<th>${rh.name}</th>`).join('')}
 
@@ -12281,7 +12392,7 @@
 
                                 } else if (type === 'additional') {
 
-                                    tableHtml += `<td>${studentStatus.preventiveHours || 0}</td><td>${studentStatus.emotionalSupportHours || 0}</td>`;
+                                    tableHtml += `<td>${studentStatus.specialNotes || '일반학생'}</td><td>${student.reason || '과목출석률'}</td><td>${studentStatus.preventiveHours || 0}</td><td>${studentStatus.emotionalSupportHours || 0}</td>`;
 
                                 }
 
@@ -12309,7 +12420,7 @@
 
                         } else {
 
-                            const colspan = this.moduleConfig.recognizedHours.length + (type === 'supplementary' ? 8 : type === 'additional' ? 6 : 2);
+                            const colspan = this.moduleConfig.recognizedHours.length + (type === 'supplementary' ? 8 : type === 'additional' ? 8 : 2);
 
                             tableHtml += `<tr><td colspan="${colspan}">학생 정보가 없습니다.</td></tr>`;
 
@@ -12617,13 +12728,69 @@
                                         .map(s => String(s.id))
                                 );
 
-                                // 미도달내역에 관계없이 명단에 있는 모든 학생을 추가학습 대상자로 추가
-                                // (보충지도 대상자로 추가되지 않은 학생들)
+                                // 추가학습 대상자 추가 (과목출석률만 미도달한 학생, 학업성취율 미도달 제외)
                                 const supplementaryIds = new Set(supplementaryStudents.map(s => s.id));
+                                
+                                // 학업성취율 미도달자인 경우 보충지도 대상자로 추가하고 미도달 항목 업데이트
+                                const studentsToMoveToSupplementary = [];
                                 const additionalStudents = newStudents.filter(s => {
-                                    // 보충지도 대상자로 추가되지 않은 학생만 추가학습 대상자로 추가
-                                    return !supplementaryIds.has(s.id) && !existingAdditionalIds.has(s.id);
+                                    // 보충지도 대상자로 이미 추가된 학생은 제외
+                                    if (supplementaryIds.has(s.id)) return false;
+                                    
+                                    // 추가학습 대상자에 이미 있는 학생은 제외
+                                    if (existingAdditionalIds.has(s.id)) return false;
+                                    
+                                    // 미도달내역 확인
+                                    const reason = s.reason || '';
+                                    
+                                    // 학업성취율 미도달자인 경우 (학업성취율 포함)
+                                    if (reason.includes('학업성취율')) {
+                                        // 보충지도 대상자에 추가하고 미도달 항목을 '학업성취율&과목출석률'로 설정
+                                        studentsToMoveToSupplementary.push(s);
+                                        return false; // 추가학습 대상자로는 추가하지 않음
+                                    }
+                                    
+                                    // 과목출석률만 미도달한 학생만 추가학습 대상자로 추가
+                                    return reason.includes('과목출석률') || !reason.includes('학업성취율');
                                 });
+
+                                // 학업성취율 미도달자를 보충지도 대상자로 추가
+                                if (studentsToMoveToSupplementary.length > 0) {
+                                    studentsToMoveToSupplementary.forEach(student => {
+                                        const supplementaryStudent = {
+                                            id: student.id,
+                                            name: student.name,
+                                            reason: '학업성취율&과목출석률',
+                                            isException: student.isException || false,
+                                            exceptionReason: student.exceptionReason || '',
+                                            note: student.note || ''
+                                        };
+                                        
+                                        // 보충지도 대상자에 이미 있는 경우 미도달 항목만 업데이트
+                                        const existingStudent = supplementary.students.find(s => s && s.id === student.id);
+                                        if (existingStudent) {
+                                            existingStudent.reason = '학업성취율&과목출석률';
+                                        } else {
+                                            supplementary.students.push(supplementaryStudent);
+                                        }
+                                    });
+                                    
+                                    supplementary.students.sort((a, b) => String(a.id).localeCompare(String(b.id)));
+                                    
+                                    supplementary.sessions.forEach(session => {
+                                        if (!session) return;
+                                        if (!session.attendance) session.attendance = {};
+                                        if (!session.originalAttendance) session.originalAttendance = {};
+                                        studentsToMoveToSupplementary.forEach(student => {
+                                            if (!session.attendance.hasOwnProperty(student.id)) {
+                                                session.attendance[student.id] = '';
+                                            }
+                                            if (!session.originalAttendance.hasOwnProperty(student.id)) {
+                                                session.originalAttendance[student.id] = '';
+                                            }
+                                        });
+                                    });
+                                }
 
                                 if (additionalStudents.length > 0) {
                                     additionalStudents.forEach(student => {
@@ -12646,6 +12813,19 @@
                                             }
                                         });
                                     });
+                                }
+                                
+                                // 학업성취율 미도달자가 있는 경우 안내 메시지
+                                if (studentsToMoveToSupplementary.length > 0) {
+                                    const movedCount = studentsToMoveToSupplementary.length;
+                                    const message = `학업성취율 미도달자 ${movedCount}명은 보충지도 관리 탭에서 관리하십시오.`;
+                                    if (additionalStudents.length > 0) {
+                                        this.importModalError = `${message} 추가학습 대상자 ${additionalStudents.length}명이 추가되었습니다.`;
+                                    } else {
+                                        this.importModalError = message;
+                                    }
+                                } else if (additionalStudents.length > 0) {
+                                    this.importModalError = '';
                                 }
 
                                 this.importModalError = '';
