@@ -2253,9 +2253,20 @@
                                                </td>
 
                                                <td v-if="teacherTab === 'supplementary' || teacherTab === 'additional'" class="p-2 border text-sm text-gray-700">
-
-                                                   {{ student.note || '' }}
-
+                                                   <div v-if="teacherTab === 'additional'" class="space-y-1">
+                                                       <select
+                                                           class="w-full border border-gray-300 rounded-md text-xs px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                                           :value="student.exceptionReason || ''"
+                                                           @change="updateAdditionalStudentExceptionReason(student.id, $event.target.value)"
+                                                       >
+                                                           <option value="">예외처리 없음</option>
+                                                           <option v-for="option in exceptionOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+                                                       </select>
+                                                       <p class="text-xs text-gray-500" v-if="student.exceptionReason">예외처리: {{ student.exceptionReason }}</p>
+                                                   </div>
+                                                   <div v-else>
+                                                       {{ student.note || '' }}
+                                                   </div>
                                                </td>
 
                                            </tr>
@@ -2373,7 +2384,7 @@
 
                                                            <span>{{ student.name }}</span>
 
-                                                           <button v-if="teacherTab === 'preventive'" @click="removeGuidanceStudent(teacherTab, student.id)" class="ml-2 text-red-600 hover:text-red-900 font-bold" title="삭제">×</button>
+                                                           <button v-if="teacherTab === 'preventive' || teacherTab === 'supplementary' || teacherTab === 'additional'" @click="removeGuidanceStudent(teacherTab, student.id)" class="ml-2 text-red-600 hover:text-red-900 font-bold" title="삭제">×</button>
 
                                                        </div>
 
@@ -4607,7 +4618,7 @@
 
                                 if (student.isException) {
 
-                                    // 예외처리 학생은 보충지도 이수시간이 0이어도 '이수'로 표시
+                                    // 예외처리 학생은 보충지도/추가학습 이수시간이 0이어도 '이수'로 표시
                                     // 단, 합계(total)는 실제 참여한 이수시간을 그대로 유지
                                     status[student.id].completionStatus = '이수';
 
@@ -5465,6 +5476,44 @@
                             // 필요 시, 이후 엑셀 내보내기 시에 반영됨
                             console.log('예외처리 사유가 업데이트되었습니다.', { studentId, reason: trimmedReason });
                         }
+
+                    },
+
+                    updateAdditionalStudentExceptionReason(studentId, reason) {
+
+                        if (this.role !== '교과교사') return;
+
+                        const id = studentId ? String(studentId) : '';
+
+                        const trimmedReason = reason ? String(reason).trim() : '';
+
+                        if (!id) return;
+
+                        const data = this.teacherGuidanceData.additional;
+
+                        if (!data || !data.students) return;
+
+                        const student = data.students.find(s => s && s.id === id);
+
+                        if (!student) return;
+
+                        student.exceptionReason = trimmedReason;
+
+                        student.isException = !!trimmedReason;
+
+                        if (trimmedReason) {
+
+                            student.note = `추가학습 예외처리 대상자 (${trimmedReason})`;
+
+                        } else {
+
+                            student.note = '';
+
+                        }
+
+                        this.saveGuidanceData();
+
+                        console.log('추가학습 예외처리 사유가 업데이트되었습니다.', { studentId, reason: trimmedReason });
 
                     },
 
@@ -11901,7 +11950,7 @@
 
                             const name = studentInfo['이름'] || studentInfo['name'] || studentInfo['이름_'] || '이름 없음';
 
-                            const studentToAdd = { id: studentId, name: name };
+                            const studentToAdd = { id: studentId, name: name, isException: false, exceptionReason: '' };
 
                             if (type === 'supplementary') {
 
