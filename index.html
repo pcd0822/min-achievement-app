@@ -14823,6 +14823,17 @@
                         if (this.assignmentList && this.assignmentList.length > 0) {
                             this.studentAssignment = this.assignmentList.find(a => a.id === assignmentId);
                             if (this.studentAssignment) {
+                                // 스프레드시트 URL이 없으면 localStorage에서 찾기
+                                if (!this.assignmentSpreadsheetUrl) {
+                                    const storageKey = this.getTeacherLocalStorageKey();
+                                    if (storageKey) {
+                                        const data = JSON.parse(localStorage.getItem(storageKey) || '{}');
+                                        if (data.assignmentSpreadsheetUrl) {
+                                            this.assignmentSpreadsheetUrl = data.assignmentSpreadsheetUrl;
+                                            console.log('[학생 과제 로드] 스프레드시트 URL 로드됨 (교사 로그인 상태):', this.assignmentSpreadsheetUrl);
+                                        }
+                                    }
+                                }
                                 // 객관식 문제의 응답을 배열로 초기화
                                 this.studentResponseForm.responses = {};
                                 this.studentAssignment.questions.forEach(q => {
@@ -14846,6 +14857,11 @@
                                         const assignment = data.assignmentList.find(a => a.id === assignmentId);
                                         if (assignment) {
                                             this.studentAssignment = assignment;
+                                            // 스프레드시트 URL도 함께 로드 (학생 제출 시 필요)
+                                            if (data.assignmentSpreadsheetUrl) {
+                                                this.assignmentSpreadsheetUrl = data.assignmentSpreadsheetUrl;
+                                                console.log('[학생 과제 로드] 스프레드시트 URL 로드됨:', this.assignmentSpreadsheetUrl);
+                                            }
                                             // 객관식 문제의 응답을 배열로 초기화
                                             this.studentResponseForm.responses = {};
                                             assignment.questions.forEach(q => {
