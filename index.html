@@ -2579,7 +2579,7 @@
 
                                                        placeholder="학습 주제를 입력하세요 (예: 함수의 개념)">
 
-                                               </div>
+                                   </div>
 
                                                <div>
 
@@ -2645,6 +2645,24 @@
                                     </button>
                                 </div>
                             </div>
+                            
+                            <!-- Google 스프레드시트 링크 설정 -->
+                            <div class="mb-4 p-4 bg-gray-50 rounded-lg">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Google 스프레드시트 링크</label>
+                                <div class="flex space-x-2">
+                                    <input 
+                                        type="text" 
+                                        v-model="assignmentSpreadsheetUrl" 
+                                        @blur="saveAssignmentSpreadsheetUrl"
+                                        placeholder="https://docs.google.com/spreadsheets/d/..." 
+                                        class="flex-1 p-2 border rounded-md"
+                                    >
+                                    <button @click="testSpreadsheetConnection" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">
+                                        연결 테스트
+                                    </button>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">과제 제출 데이터가 저장될 Google 스프레드시트 링크를 입력하세요.</p>
+                            </div>
 
                                 <!-- 과제 목록 -->
                                 <div v-if="assignmentList.length > 0" class="space-y-4">
@@ -2683,7 +2701,7 @@
                                     생성된 과제가 없습니다. 새 과제를 생성해주세요.
                                 </div>
                             </div>
-                        </div>
+                       </div>
 
                         <!-- Message when teacher tab is not 'plan' but guidance data isn't ready -->
 
@@ -4123,6 +4141,7 @@
                         
                         // --- 과제방 관련 상태 ---
                         assignmentList: [], // 과제 목록
+                        assignmentSpreadsheetUrl: '', // Google 스프레드시트 링크
                         showAssignmentModal: false, // 과제 생성 모달 표시 여부
                         showAssignmentDetailsModal: false, // 과제 상세 모달 표시 여부
                         showSubmissionStatusModal: false, // 제출현황 모달 표시 여부
@@ -5490,6 +5509,8 @@
                                 assignmentList: this.assignmentList || [],
                                 
                                 assignmentResponseData: this.assignmentResponseData || {},
+                                
+                                assignmentSpreadsheetUrl: this.assignmentSpreadsheetUrl || '',
 
                                 lastUpdated: new Date().toISOString()
 
@@ -5545,6 +5566,11 @@
                                 if (!this.assignmentResponseData || Object.keys(this.assignmentResponseData).length === 0) {
                                     this.assignmentResponseData = {};
                                 }
+                            }
+                            
+                            // 스프레드시트 링크 로드
+                            if (data.assignmentSpreadsheetUrl) {
+                                this.assignmentSpreadsheetUrl = data.assignmentSpreadsheetUrl;
                             }
                             
                             // 이미 데이터가 로드되어 있고, localStorage의 데이터와 동일한지 확인
@@ -8538,7 +8564,7 @@
                         // 새로 생성하는 경우에는 fetchCurrentSchoolCode를 호출하지 않음
                         // (이미 currentSchoolCode가 설정됨)
                         if (!isNewCreation) {
-                            await this.fetchCurrentSchoolCode();
+                        await this.fetchCurrentSchoolCode();
                         }
 
                             this.$nextTick(() => { 
@@ -14627,9 +14653,13 @@
                     },
                     
                     
-                    showSubmissionStatus(assignmentId) {
+                    async showSubmissionStatus(assignmentId) {
                         const assignment = this.assignmentList.find(a => a.id === assignmentId);
                         if (assignment) {
+                            // 스프레드시트에서 최신 데이터 로드
+                            await this.loadFromSpreadsheet(assignmentId);
+                            // localStorage에서도 최신 데이터 로드
+                            this.loadLatestAssignmentResponseData(assignmentId);
                             this.currentSubmissionAssignment = assignment;
                             this.showSubmissionStatusModal = true;
                         }
@@ -14706,11 +14736,65 @@
                         }
                     },
                     
-                    showSubmissionStatus(assignmentId) {
+                    async showSubmissionStatus(assignmentId) {
                         const assignment = this.assignmentList.find(a => a.id === assignmentId);
                         if (assignment) {
+                            // 스프레드시트에서 최신 데이터 로드
+                            await this.loadFromSpreadsheet(assignmentId);
+                            // localStorage에서도 최신 데이터 로드
+                            this.loadLatestAssignmentResponseData(assignmentId);
                             this.currentSubmissionAssignment = assignment;
                             this.showSubmissionStatusModal = true;
+                        }
+                    },
+                    
+                    loadLatestAssignmentResponseData(assignmentId) {
+                        // localStorage에서 최신 응답 데이터를 로드하여 assignmentResponseData 업데이트
+                        try {
+                            const storageKey = this.getTeacherLocalStorageKey();
+                            if (!storageKey) {
+                                // 교사가 로그인하지 않은 경우, 모든 teacher 키를 검색
+                                const keys = Object.keys(localStorage);
+                                for (const key of keys) {
+                                    if (key.startsWith('minAchieve_teacher_')) {
+                                        const data = JSON.parse(localStorage.getItem(key) || '{}');
+                                        if (data.assignmentList && data.assignmentList.find(a => a.id === assignmentId)) {
+                                            if (data.assignmentResponseData && data.assignmentResponseData[assignmentId]) {
+                                                if (!this.assignmentResponseData[assignmentId]) {
+                                                    this.assignmentResponseData[assignmentId] = {};
+                                                }
+                                                // localStorage의 최신 데이터로 업데이트
+                                                Object.assign(this.assignmentResponseData[assignmentId], data.assignmentResponseData[assignmentId]);
+                                                // responseCount도 업데이트
+                                                const assignment = this.assignmentList.find(a => a.id === assignmentId);
+                                                if (assignment) {
+                                                    assignment.responseCount = Object.keys(this.assignmentResponseData[assignmentId]).length;
+                                                }
+                                            }
+                                            break;
+                                        }
+                                    }
+                                }
+                            } else {
+                                const raw = localStorage.getItem(storageKey);
+                                if (raw) {
+                                    const data = JSON.parse(raw);
+                                    if (data.assignmentResponseData && data.assignmentResponseData[assignmentId]) {
+                                        if (!this.assignmentResponseData[assignmentId]) {
+                                            this.assignmentResponseData[assignmentId] = {};
+                                        }
+                                        // localStorage의 최신 데이터로 업데이트
+                                        Object.assign(this.assignmentResponseData[assignmentId], data.assignmentResponseData[assignmentId]);
+                                        // responseCount도 업데이트
+                                        const assignment = this.assignmentList.find(a => a.id === assignmentId);
+                                        if (assignment) {
+                                            assignment.responseCount = Object.keys(this.assignmentResponseData[assignmentId]).length;
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (error) {
+                            console.error('응답 데이터 로드 실패:', error);
                         }
                     },
                     
@@ -14783,7 +14867,7 @@
                         return false;
                     },
                     
-                    submitStudentAssignment() {
+                    async submitStudentAssignment() {
                         if (!this.studentResponseForm.studentId || !this.studentAssignment) {
                             alert('학번을 입력해주세요.');
                             return;
@@ -14852,6 +14936,17 @@
                         // 교사의 localStorage에 저장 (과제를 생성한 교사의 데이터에 저장)
                         this.saveStudentAssignmentResponse();
                         
+                        // Google 스프레드시트에 저장
+                        await this.saveToSpreadsheet(this.studentAssignment.id, this.studentResponseForm.studentId, {
+                            responses: {...this.studentResponseForm.responses},
+                            score: totalScore,
+                            maxScore: maxScore,
+                            percentage: percentage,
+                            completed: completed,
+                            timeSpent: timeSpent,
+                            submittedAt: new Date().toISOString()
+                        });
+                        
                         alert(`과제 제출이 완료되었습니다.\n점수: ${totalScore}/${maxScore}점 (${percentage}%)\n${completed ? '통과' : '미통과'}`);
                         
                         // 페이지 초기화
@@ -14877,8 +14972,13 @@
                                             if (!data.assignmentResponseData) {
                                                 data.assignmentResponseData = {};
                                             }
-                                            data.assignmentResponseData[this.studentAssignment.id] = 
-                                                this.assignmentResponseData[this.studentAssignment.id];
+                                            // 전체 assignmentResponseData 객체를 복사하여 저장
+                                            if (!data.assignmentResponseData[this.studentAssignment.id]) {
+                                                data.assignmentResponseData[this.studentAssignment.id] = {};
+                                            }
+                                            // 최신 응답 데이터로 업데이트 (기존 데이터와 병합)
+                                            Object.assign(data.assignmentResponseData[this.studentAssignment.id], 
+                                                this.assignmentResponseData[this.studentAssignment.id]);
                                             
                                             // assignmentList의 responseCount도 업데이트
                                             const assignmentIndex = data.assignmentList.findIndex(a => a.id === this.studentAssignment.id);
@@ -14888,7 +14988,11 @@
                                             }
                                             
                                             localStorage.setItem(key, JSON.stringify(data));
-                                            console.log('학생 응답이 교사의 localStorage에 저장되었습니다:', key);
+                                            console.log('학생 응답이 교사의 localStorage에 저장되었습니다:', key, {
+                                                assignmentId: this.studentAssignment.id,
+                                                studentId: this.studentResponseForm.studentId,
+                                                responseCount: Object.keys(data.assignmentResponseData[this.studentAssignment.id] || {}).length
+                                            });
                                             break;
                                         }
                                     }
@@ -14896,6 +15000,192 @@
                             }
                         } catch (error) {
                             console.error('학생 응답 저장 실패:', error);
+                        }
+                    },
+                    
+                    // Google 스프레드시트 관련 함수
+                    async getGoogleAppsScriptUrl() {
+                        // Netlify Function을 통해 환경 변수에서 URL 가져오기
+                        try {
+                            const response = await fetch('/.netlify/functions/get-apps-script-url');
+                            if (response.ok) {
+                                const data = await response.json();
+                                return data.url || '';
+                            }
+                        } catch (error) {
+                            console.error('Google Apps Script URL 로드 실패:', error);
+                        }
+                        return '';
+                    },
+                    
+                    extractSpreadsheetId(url) {
+                        // Google 스프레드시트 URL에서 ID 추출
+                        // 형식: https://docs.google.com/spreadsheets/d/{ID}/edit
+                        const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+                        return match ? match[1] : null;
+                    },
+                    
+                    saveAssignmentSpreadsheetUrl() {
+                        // 스프레드시트 링크 저장
+                        this.saveAllTeacherData();
+                    },
+                    
+                    async testSpreadsheetConnection() {
+                        if (!this.assignmentSpreadsheetUrl) {
+                            alert('스프레드시트 링크를 입력해주세요.');
+                            return;
+                        }
+                        
+                        const spreadsheetId = this.extractSpreadsheetId(this.assignmentSpreadsheetUrl);
+                        if (!spreadsheetId) {
+                            alert('올바른 Google 스프레드시트 링크를 입력해주세요.');
+                            return;
+                        }
+                        
+                        const appsScriptUrl = await this.getGoogleAppsScriptUrl();
+                        if (!appsScriptUrl) {
+                            alert('Google Apps Script URL이 설정되지 않았습니다. Netlify 환경 변수를 확인해주세요.');
+                            return;
+                        }
+                        
+                        try {
+                            const response = await fetch(appsScriptUrl, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                    action: 'test',
+                                    spreadsheetId: spreadsheetId
+                                })
+                            });
+                            
+                            const result = await response.json();
+                            if (result.success) {
+                                alert('스프레드시트 연결이 성공했습니다.');
+                            } else {
+                                alert('스프레드시트 연결 실패: ' + (result.error || '알 수 없는 오류'));
+                            }
+                        } catch (error) {
+                            console.error('스프레드시트 연결 테스트 실패:', error);
+                            alert('스프레드시트 연결 테스트 중 오류가 발생했습니다: ' + error.message);
+                        }
+                    },
+                    
+                    async saveToSpreadsheet(assignmentId, studentId, responseData) {
+                        // Google 스프레드시트에 학생 응답 저장
+                        if (!this.assignmentSpreadsheetUrl) {
+                            console.log('스프레드시트 링크가 설정되지 않아 스프레드시트에 저장하지 않습니다.');
+                            return;
+                        }
+                        
+                        const spreadsheetId = this.extractSpreadsheetId(this.assignmentSpreadsheetUrl);
+                        if (!spreadsheetId) {
+                            console.error('스프레드시트 ID를 추출할 수 없습니다.');
+                            return;
+                        }
+                        
+                        const appsScriptUrl = await this.getGoogleAppsScriptUrl();
+                        if (!appsScriptUrl) {
+                            console.log('Google Apps Script URL이 설정되지 않아 스프레드시트에 저장하지 않습니다.');
+                            return;
+                        }
+                        
+                        try {
+                            // 과제 정보 찾기
+                            let assignment = this.assignmentList.find(a => a.id === assignmentId);
+                            if (!assignment) {
+                                // localStorage에서 찾기
+                                const keys = Object.keys(localStorage);
+                                for (const key of keys) {
+                                    if (key.startsWith('minAchieve_teacher_')) {
+                                        const data = JSON.parse(localStorage.getItem(key) || '{}');
+                                        if (data.assignmentList) {
+                                            const foundAssignment = data.assignmentList.find(a => a.id === assignmentId);
+                                            if (foundAssignment) {
+                                                assignment = foundAssignment;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            const response = await fetch(appsScriptUrl, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                    action: 'save',
+                                    spreadsheetId: spreadsheetId,
+                                    assignmentId: assignmentId,
+                                    assignmentTitle: assignment ? assignment.title : '',
+                                    studentId: studentId,
+                                    responseData: responseData
+                                })
+                            });
+                            
+                            const result = await response.json();
+                            if (result.success) {
+                                console.log('스프레드시트에 저장되었습니다:', studentId);
+                            } else {
+                                console.error('스프레드시트 저장 실패:', result.error);
+                            }
+                        } catch (error) {
+                            console.error('스프레드시트 저장 중 오류:', error);
+                        }
+                    },
+                    
+                    async loadFromSpreadsheet(assignmentId) {
+                        // Google 스프레드시트에서 학생 응답 로드
+                        if (!this.assignmentSpreadsheetUrl) {
+                            return;
+                        }
+                        
+                        const spreadsheetId = this.extractSpreadsheetId(this.assignmentSpreadsheetUrl);
+                        if (!spreadsheetId) {
+                            return;
+                        }
+                        
+                        const appsScriptUrl = await this.getGoogleAppsScriptUrl();
+                        if (!appsScriptUrl) {
+                            return;
+                        }
+                        
+                        try {
+                            const response = await fetch(appsScriptUrl, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                    action: 'load',
+                                    spreadsheetId: spreadsheetId,
+                                    assignmentId: assignmentId
+                                })
+                            });
+                            
+                            const result = await response.json();
+                            if (result.success && result.data) {
+                                // 스프레드시트에서 로드한 데이터로 assignmentResponseData 업데이트
+                                if (!this.assignmentResponseData[assignmentId]) {
+                                    this.assignmentResponseData[assignmentId] = {};
+                                }
+                                
+                                // 스프레드시트 데이터와 기존 데이터 병합
+                                Object.assign(this.assignmentResponseData[assignmentId], result.data);
+                                
+                                // responseCount 업데이트
+                                const assignment = this.assignmentList.find(a => a.id === assignmentId);
+                                if (assignment) {
+                                    assignment.responseCount = Object.keys(this.assignmentResponseData[assignmentId]).length;
+                                }
+                                
+                                console.log('스프레드시트에서 데이터를 로드했습니다:', assignmentId);
+                            }
+                        } catch (error) {
+                            console.error('스프레드시트 로드 중 오류:', error);
                         }
                     },
 
