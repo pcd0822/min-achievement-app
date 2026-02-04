@@ -2822,7 +2822,7 @@
 
         <!-- Attendance Modal (Restored for Admin) -->
 
-         <div v-if="showAttendanceModal" class="modal-overlay" @click.self="closeAttendanceModal">
+         <div v-if="showAttendanceModal" class="modal-overlay">
 
              <div class="modal-content">
 
@@ -2920,7 +2920,7 @@
 
         <!-- Preview Modal -->
 
-        <div v-if="showPreviewModal" class="modal-overlay" @click.self="closePreviewModal">
+        <div v-if="showPreviewModal" class="modal-overlay">
 
             <div class="modal-content modal-preview"> <!-- Apply A4-like width -->
 
@@ -2951,7 +2951,7 @@
         </div>
 
         <!-- 과제 생성 모달 -->
-        <div v-if="showAssignmentModal" class="modal-overlay" @click.self="showAssignmentModal = false">
+        <div v-if="showAssignmentModal" class="modal-overlay">
             <div class="modal-content" style="max-width: 900px; max-height: 90vh; overflow-y: auto;">
                                 <div class="flex justify-between items-center mb-4">
                                     <h3 class="text-xl font-semibold">{{ isEditingAssignment ? '과제 수정' : '새 과제 생성' }}</h3>
@@ -3005,6 +3005,7 @@
                                                 <input type="checkbox" v-model="question.correctAnswers" :value="optIndex">
                                                 <span class="text-sm text-gray-600">정답</span>
                                             </label>
+                                            <button @click="removeQuestionOption(question, optIndex)" class="px-2 py-1 bg-red-500 text-white rounded text-sm">삭제</button>
                                         </div>
                                         <button @click="question.options.push('')" class="mt-2 px-4 py-2 bg-gray-200 rounded-md">+ 선택지 추가</button>
                                     </div>
@@ -3060,14 +3061,16 @@
                 </div>
                 
                 <div class="mt-6 flex justify-end space-x-2">
-                    <button @click="showAssignmentModal = false" class="px-4 py-2 bg-gray-300 rounded-md">취소</button>
-                    <button @click="createAssignment" class="px-4 py-2 bg-indigo-600 text-white rounded-md">생성</button>
+                    <button @click="closeAssignmentModal" class="px-4 py-2 bg-gray-300 rounded-md">취소</button>
+                    <button @click="isEditingAssignment ? updateAssignment() : createAssignment()" class="px-4 py-2 bg-indigo-600 text-white rounded-md">
+                        {{ isEditingAssignment ? '수정' : '생성' }}
+                    </button>
                 </div>
             </div>
         </div>
 
         <!-- 과제 상세 모달 -->
-        <div v-if="showAssignmentDetailsModal && currentAssignment" class="modal-overlay" @click.self="showAssignmentDetailsModal = false">
+        <div v-if="showAssignmentDetailsModal && currentAssignment" class="modal-overlay">
             <div class="modal-content" style="max-width: 1000px; max-height: 90vh; overflow-y: auto;">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-xl font-semibold">{{ currentAssignment.title }}</h3>
@@ -3113,7 +3116,7 @@
 
 
          <!-- Import Modal (Teacher - Upload Underachiever Excel) -->
-          <div v-if="showImportModal" class="modal-overlay" @click.self="closeImportModal">
+          <div v-if="showImportModal" class="modal-overlay">
 
              <div class="modal-content">
 
@@ -3228,7 +3231,7 @@
 
         <!-- NEW: Admin Modify Modal (SchoolId & Admin Code) -->
 
-        <div v-if="showAdminModifyModal" class="modal-overlay" @click.self="showAdminModifyModal = false">
+        <div v-if="showAdminModifyModal" class="modal-overlay">
 
             <div class="modal-content">
 
@@ -3296,7 +3299,7 @@
         
         <!-- Statistics Dashboard Modal -->
 
-        <div v-if="showStatisticsModal" class="modal-overlay" @click.self="closeStatisticsModal">
+        <div v-if="showStatisticsModal" class="modal-overlay">
 
             <div class="modal-content modal-large">
 
@@ -7918,7 +7921,16 @@
                             // 학생용 과제 페이지 표시
                             this.studentAssignmentId = assignmentId;
                             this.showStudentAssignmentView = true;
-                            // 과제 데이터는 나중에 로드 (localStorage 또는 Firestore에서)
+                            this.isLoading = false;
+                            // 과제 데이터 즉시 로드
+                            this.$nextTick(() => {
+                                if (this.loadStudentAssignment(assignmentId)) {
+                                    console.log('과제 데이터 로드 완료');
+                                } else {
+                                    alert('과제를 찾을 수 없습니다.');
+                                    this.showStudentAssignmentView = false;
+                                }
+                            });
                             return; // 로그인 없이도 과제 페이지 접근 가능
                         }
 
@@ -14330,6 +14342,22 @@
                         this.resetAssignmentForm();
                     },
                     
+                    removeQuestionOption(question, optIndex) {
+                        // 선택지 삭제
+                        question.options.splice(optIndex, 1);
+                        // 정답 체크박스 인덱스 업데이트
+                        if (question.correctAnswers && Array.isArray(question.correctAnswers)) {
+                            // 삭제된 인덱스보다 큰 인덱스들을 1씩 감소
+                            question.correctAnswers = question.correctAnswers
+                                .map(a => {
+                                    if (a > optIndex) return a - 1;
+                                    if (a === optIndex) return null; // 삭제된 인덱스는 제거
+                                    return a;
+                                })
+                                .filter(a => a !== null);
+                        }
+                    },
+                    
                     editAssignment(assignmentId) {
                         const assignment = this.assignmentList.find(a => a.id === assignmentId);
                         if (!assignment) return;
@@ -14356,15 +14384,20 @@
                         }
                         
                         const index = this.assignmentList.findIndex(a => a.id === this.currentAssignment.id);
-                        if (index === -1) return;
+                        if (index === -1) {
+                            alert('수정할 과제를 찾을 수 없습니다.');
+                            return;
+                        }
                         
+                        // 기존 과제의 ID와 응답 수 등은 유지하면서 내용만 업데이트
                         this.assignmentList[index] = {
-                            ...this.currentAssignment,
+                            ...this.currentAssignment, // 기존 데이터 유지 (id, createdAt, responseCount 등)
                             title: this.assignmentForm.title,
                             description: this.assignmentForm.description,
                             learningMaterials: [...this.assignmentForm.learningMaterials],
                             questions: this.assignmentForm.questions.map(q => ({
                                 ...q,
+                                // 기존 문제의 ID는 유지, 새로 추가된 문제만 새 ID 생성
                                 id: q.id || Date.now().toString() + Math.random()
                             })),
                             deadline: this.assignmentForm.deadline,
@@ -14372,6 +14405,7 @@
                             timeSpent: this.assignmentForm.timeSpent || 0,
                             guidanceMethod: this.assignmentForm.guidanceMethod || '',
                             maxScore: this.assignmentForm.questions.reduce((sum, q) => sum + (q.points || 1), 0)
+                            // responseCount는 기존 값 유지 (this.currentAssignment에서 가져옴)
                         };
                         
                         this.closeAssignmentModal();
