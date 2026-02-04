@@ -7963,7 +7963,7 @@
 
                     },
 
-                    async finalizeSchoolCodeSelection(code, canonicalId) {
+                    async finalizeSchoolCodeSelection(code, canonicalId, isNewCreation = false) {
 
                         const effectiveCanonicalId = canonicalId || code;
 
@@ -7978,39 +7978,63 @@
 
                         
                         
-                        console.log("학교코드 최종 확정:", this.currentSchoolCode, "실제 ID:", this.schoolId, "역할:", this.role);
+                        console.log("학교코드 최종 확정:", this.currentSchoolCode, "실제 ID:", this.schoolId, "역할:", this.role, "새로 생성:", isNewCreation);
 
                         
-                        // 학교코드가 변경된 경우 이전 학교코드의 로컬 데이터 초기화
-                        // previousSchoolCode가 없거나 변경된 경우 모두 처리 (새 학교코드 생성 포함)
-                        const isSchoolCodeChanged = !previousSchoolCode || previousSchoolCode !== this.currentSchoolCode;
+                        // 학교코드가 변경된 경우에만 이전 학교코드의 로컬 데이터를 새 학교코드로 마이그레이션
+                        // 새로 생성하는 경우(isNewCreation === true)는 기존 데이터를 삭제하지 않음
+                        // previousSchoolCode가 있고 변경된 경우에만 처리 (학교코드 변경 시)
+                        const isSchoolCodeChanged = previousSchoolCode && previousSchoolCode !== this.currentSchoolCode && !isNewCreation;
                         
                         if (this.user && isSchoolCodeChanged) {
-                            // 이전 학교코드가 있는 경우에만 localStorage에서 삭제
+                            // 이전 학교코드가 있고 변경된 경우 기존 데이터를 새 학교코드로 마이그레이션
                             if (previousSchoolCode) {
-                                // 교과교사 데이터 초기화
+                                // 교과교사 데이터 마이그레이션
                                 if (this.role === '교과교사') {
                                     const previousStorageKey = `minAchieve_teacher_${this.user.uid}_${previousSchoolCode}`;
+                                    const newStorageKey = `minAchieve_teacher_${this.user.uid}_${this.currentSchoolCode}`;
                                     try {
-                                        localStorage.removeItem(previousStorageKey);
-                                        console.log("이전 학교코드의 교과교사 데이터 초기화:", previousStorageKey);
+                                        const previousData = localStorage.getItem(previousStorageKey);
+                                        if (previousData) {
+                                            // 기존 데이터를 새 키로 복사
+                                            localStorage.setItem(newStorageKey, previousData);
+                                            console.log("이전 학교코드의 교과교사 데이터를 새 학교코드로 마이그레이션:", {
+                                                from: previousStorageKey,
+                                                to: newStorageKey
+                                            });
+                                            // 기존 데이터는 삭제하지 않고 유지 (백업용)
+                                            // 필요시 주석 해제하여 삭제 가능: localStorage.removeItem(previousStorageKey);
+                                        }
                                     } catch (error) {
-                                        console.warn("이전 학교코드 데이터 초기화 실패:", error);
+                                        console.warn("교과교사 데이터 마이그레이션 실패:", error);
                                     }
                                 }
-                                // 관리자 데이터 초기화
+                                // 관리자 데이터 마이그레이션
                                 if (this.role === '관리자') {
                                     const previousAdminStorageKey = `minAchieve_admin_${this.user.uid}_${previousSchoolCode}`;
+                                    const newAdminStorageKey = `minAchieve_admin_${this.user.uid}_${this.currentSchoolCode}`;
                                     try {
-                                        localStorage.removeItem(previousAdminStorageKey);
-                                        console.log("이전 학교코드의 관리자 미도달 대상자 명단 초기화:", previousAdminStorageKey);
+                                        const previousData = localStorage.getItem(previousAdminStorageKey);
+                                        if (previousData) {
+                                            // 기존 데이터를 새 키로 복사
+                                            localStorage.setItem(newAdminStorageKey, previousData);
+                                            console.log("이전 학교코드의 관리자 미도달 대상자 명단을 새 학교코드로 마이그레이션:", {
+                                                from: previousAdminStorageKey,
+                                                to: newAdminStorageKey
+                                            });
+                                            // 기존 데이터는 삭제하지 않고 유지 (백업용)
+                                            // 필요시 주석 해제하여 삭제 가능: localStorage.removeItem(previousAdminStorageKey);
+                                        }
                                     } catch (error) {
-                                        console.warn("이전 학교코드 관리자 데이터 초기화 실패:", error);
+                                        console.warn("관리자 데이터 마이그레이션 실패:", error);
                                     }
                                 }
                             }
                             
-                            // 메모리상의 데이터도 초기화 (새 학교코드 생성 또는 변경 시)
+                            // 메모리상의 데이터는 새로 로드할 예정이므로 초기화하지 않음
+                            // (loadAllTeacherData나 loadCommonData에서 새 키의 데이터를 로드함)
+                        } else if (isNewCreation) {
+                            // 새로 생성하는 경우에는 메모리상의 데이터만 초기화 (localStorage는 삭제하지 않음)
                             if (this.role === '교과교사') {
                                 this.teacherPlanList = [];
                                 this.teacherGuidanceDataList = [];
@@ -8085,7 +8109,11 @@
                             
                             this.newSchoolId = '';
 
-                        await this.fetchCurrentSchoolCode();
+                        // 새로 생성하는 경우에는 fetchCurrentSchoolCode를 호출하지 않음
+                        // (이미 currentSchoolCode가 설정됨)
+                        if (!isNewCreation) {
+                            await this.fetchCurrentSchoolCode();
+                        }
 
                             this.$nextTick(() => { 
 
@@ -8180,7 +8208,7 @@
                                 // 새 학교코드 생성 시 Firestore 공용 데이터 초기화
                                 try {
                                     const commonDataBasePath = `schools/${canonicalId}/commonData`;
-                                    const commonDataDocs = ['curriculum', 'students', 'emotionalSupport', 'underachievers', 'underachieversProcessed'];
+                                    const commonDataDocs = ['curriculum', 'students', 'emotionalSupport'];
                                     
                                     for (const docName of commonDataDocs) {
                                         const docRef = doc(db, commonDataBasePath, docName);
@@ -8257,9 +8285,18 @@
 
 
 
-                            await this.finalizeSchoolCodeSelection(codeInput, canonicalId);
+                            // 새로 생성하는 경우와 기존 코드를 입력하는 경우를 구분
+                            const isNewCreation = (this.role === '관리자' && this.schoolIdMode === 'create');
+                            await this.finalizeSchoolCodeSelection(codeInput, canonicalId, isNewCreation);
 
                             this.schoolIdError = '';
+                            
+                            // 새로 생성하는 경우에는 fetchCurrentSchoolCode를 호출하지 않음
+                            // (finalizeSchoolCodeSelection에서 이미 currentSchoolCode가 설정됨)
+                            // 기존 코드를 입력하는 경우에만 fetchCurrentSchoolCode 호출
+                            if (!isNewCreation) {
+                                await this.fetchCurrentSchoolCode();
+                            }
 
                         } catch (error) {
 
@@ -8447,7 +8484,7 @@
 
                                 curriculumSnap, studentsSnap, emotionalSupportSnap,
 
-                                moduleConfigSnap, formTemplatesSnap, underachieversSnap, underachieversProcessedSnap
+                                moduleConfigSnap, formTemplatesSnap
 
                             ] = await Promise.all([
 
@@ -8459,11 +8496,7 @@
 
                                 getDoc(doc(db, commonDataBasePath, "moduleConfig")),
 
-                                getDoc(doc(db, commonDataBasePath, "formTemplates")),
-
-                                getDoc(doc(db, commonDataBasePath, "underachievers")),
-
-                                getDoc(doc(db, commonDataBasePath, "underachieversProcessed"))
+                                getDoc(doc(db, commonDataBasePath, "formTemplates"))
 
                             ]);
 
@@ -8639,9 +8672,9 @@
 
 
 
-                            const deployedDataRaw = underachieversSnap.exists() ? underachieversSnap.data().data || [] : [];
-
-                            this.deployedUnderachievers = this.normalizeUnderachieverList(deployedDataRaw);
+                            // underachievers는 Firestore에 저장하지 않음 (파일 형식으로만 공유)
+                            // deployedUnderachievers는 빈 배열로 시작 (파일 업로드로만 설정됨)
+                            this.deployedUnderachievers = [];
 
                             
                             
@@ -8874,12 +8907,30 @@
 
                             const docRef = doc(db, `schools/${activeSchoolId}/commonData`, "formTemplates");
 
+                            // 양식 템플릿만 저장 (학생 명단 제외)
+                            const cleanNewsletterForm = {
+                                title: this.newsletterForm.title,
+                                docNumber: this.newsletterForm.docNumber,
+                                department: this.newsletterForm.department,
+                                logoUrl: this.newsletterForm.logoUrl,
+                                body: this.newsletterForm.body,
+                                dispatchDate: this.newsletterForm.dispatchDate,
+                                schoolName: this.newsletterForm.schoolName,
+                                includeSeal: this.newsletterForm.includeSeal,
+                                sealUrl: this.newsletterForm.sealUrl
+                            };
+                            
+                            const cleanPledgeForm = {
+                                content: this.pledgeForm.content,
+                                dispatchDate: this.pledgeForm.dispatchDate,
+                                schoolName: this.pledgeForm.schoolName,
+                                includeSeal: this.pledgeForm.includeSeal,
+                                sealUrl: this.pledgeForm.sealUrl
+                            };
+
                             const templatesToSave = {
-
-                                newsletter: JSON.parse(JSON.stringify(this.newsletterForm)),
-
-                                pledge: JSON.parse(JSON.stringify(this.pledgeForm))
-
+                                newsletter: cleanNewsletterForm,
+                                pledge: cleanPledgeForm
                             };
 
                             await setDoc(docRef, templatesToSave);
@@ -10823,24 +10874,19 @@
 
                                         
                                         
-                                        // Firestore에 저장 (로그아웃 후에도 유지)
+                                        // localStorage에만 저장 (Firestore에는 저장하지 않음 - 파일 형식으로만 공유)
 
                                         // currentSchoolCode를 우선 사용, 없으면 schoolId 사용
 
                                         const activeSchoolId = this.currentSchoolCode || this.schoolId;
 
-                                        if (activeSchoolId && db && this.role === '관리자') {
+                                        if (activeSchoolId && this.role === '관리자') {
 
                                             (async () => {
 
                                                 try {
 
-                                                    const docRef = doc(db, `schools/${activeSchoolId}/commonData`, "underachieversProcessed");
-
-                                                    await setDoc(docRef, { data: JSON.parse(JSON.stringify(processedUnderachievers)) });
-
-                                                    
-                                                    // localStorage에도 저장 (페이지 새로고침 후에도 유지)
+                                                    // localStorage에만 저장 (페이지 새로고침 후에도 유지)
                                                     const adminStorageKey = this.getAdminLocalStorageKey();
                                                     if (adminStorageKey) {
                                                         try {
@@ -10872,13 +10918,13 @@
                                                     
                                                     this.fileProcessingError = '';
 
-                                                    alert(`성적 파일 처리 완료: ${totalFiles}개 파일에서 ${processedUnderachievers.length}명의 미도달 학생이 확인되었습니다. 데이터가 저장되었습니다.`);
+                                                    alert(`성적 파일 처리 완료: ${totalFiles}개 파일에서 ${processedUnderachievers.length}명의 미도달 학생이 확인되었습니다. 로컬 환경에 저장되었습니다.`);
 
                                                 } catch (saveError) {
 
-                                                    console.error("Error saving processed underachievers:", saveError);
+                                                    console.error("Error saving processed underachievers to localStorage:", saveError);
 
-                                                    this.fileProcessingError = `처리 완료되었으나 저장 중 오류 발생: ${saveError.message}`;
+                                                    this.fileProcessingError = `처리 완료되었으나 로컬 저장 중 오류 발생: ${saveError.message}`;
 
                                                 }
 
@@ -13853,16 +13899,24 @@
                             const previousSchoolCode = this.currentSchoolCode;
                             this.currentSchoolCode = newCode;
                             
-                            // 이전 학교코드의 관리자 localStorage 데이터 초기화
+                            // 이전 학교코드의 관리자 localStorage 데이터를 새 학교코드로 마이그레이션
                             if (this.user && previousSchoolCode && previousSchoolCode !== this.currentSchoolCode) {
                                 const previousAdminStorageKey = `minAchieve_admin_${this.user.uid}_${previousSchoolCode}`;
+                                const newAdminStorageKey = `minAchieve_admin_${this.user.uid}_${this.currentSchoolCode}`;
                                 try {
-                                    localStorage.removeItem(previousAdminStorageKey);
-                                    console.log("이전 학교코드의 관리자 미도달 대상자 명단 초기화:", previousAdminStorageKey);
-                                    // 메모리상의 데이터도 초기화
-                                    this.underachievers = [];
+                                    const previousData = localStorage.getItem(previousAdminStorageKey);
+                                    if (previousData) {
+                                        // 기존 데이터를 새 키로 복사
+                                        localStorage.setItem(newAdminStorageKey, previousData);
+                                        console.log("이전 학교코드의 관리자 미도달 대상자 명단을 새 학교코드로 마이그레이션:", {
+                                            from: previousAdminStorageKey,
+                                            to: newAdminStorageKey
+                                        });
+                                        // 기존 데이터는 삭제하지 않고 유지 (백업용)
+                                        // 필요시 주석 해제하여 삭제 가능: localStorage.removeItem(previousAdminStorageKey);
+                                    }
                                 } catch (error) {
-                                    console.warn("이전 학교코드 관리자 데이터 초기화 실패:", error);
+                                    console.warn("관리자 데이터 마이그레이션 실패:", error);
                                 }
                             }
 
