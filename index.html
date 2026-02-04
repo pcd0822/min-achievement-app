@@ -5439,7 +5439,11 @@
 
                             };
                             localStorage.setItem(storageKey, JSON.stringify(payload));
-                            console.log('모든 과목 데이터가 로컬에 저장되었습니다.', { storageKey });
+                            console.log('모든 과목 데이터가 로컬에 저장되었습니다.', { 
+                                storageKey,
+                                assignmentCount: (this.assignmentList || []).length,
+                                assignmentList: this.assignmentList
+                            });
                         } catch (error) {
 
                             console.error('과목 데이터 로컬 저장 실패:', error);
@@ -14291,7 +14295,7 @@
                     },
 
                     // --- 과제방 관련 함수 ---
-                    createAssignment() {
+                    async createAssignment() {
                         if (!this.assignmentForm.title || this.assignmentForm.questions.length === 0) {
                             alert('과제 제목과 최소 1개 이상의 문제가 필요합니다.');
                             return;
@@ -14317,10 +14321,11 @@
                         };
                         
                         this.assignmentList.push(assignment);
+                        // saveAllTeacherData에 과제 데이터가 포함되므로 자동 저장됨
+                        await this.saveAllTeacherData();
+                        console.log('과제가 저장되었습니다:', { assignmentId: assignment.id, assignmentCount: this.assignmentList.length });
                         this.resetAssignmentForm();
                         this.showAssignmentModal = false;
-                        // saveAllTeacherData에 과제 데이터가 포함되므로 자동 저장됨
-                        this.saveAllTeacherData();
                     },
                     
                     resetAssignmentForm() {
@@ -14377,7 +14382,7 @@
                         this.showAssignmentModal = true;
                     },
                     
-                    updateAssignment() {
+                    async updateAssignment() {
                         if (!this.currentAssignment || !this.assignmentForm.title || this.assignmentForm.questions.length === 0) {
                             alert('과제 제목과 최소 1개 이상의 문제가 필요합니다.');
                             return;
@@ -14409,7 +14414,7 @@
                         };
                         
                         this.closeAssignmentModal();
-                        this.saveAllTeacherData();
+                        await this.saveAllTeacherData();
                     },
                     
                     syncAllAssignmentsToAttendance() {
