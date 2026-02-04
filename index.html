@@ -14684,6 +14684,49 @@
                         return null;
                     },
 
+                    findLastParticipatedSessionIndex(guidanceData, studentId) {
+                        if (!guidanceData || !Array.isArray(guidanceData.sessions)) return -1;
+                        const id = studentId != null ? String(studentId).trim() : '';
+                        if (!id) return -1;
+                        for (let i = guidanceData.sessions.length - 1; i >= 0; i--) {
+                            const ses = guidanceData.sessions[i];
+                            if (!ses || !ses.attendance) continue;
+                            if (ses.attendance[id]) return i;
+                        }
+                        return -1;
+                    },
+
+                    findLastSessionIndexWithAnyAttendance(guidanceData) {
+                        if (!guidanceData || !Array.isArray(guidanceData.sessions)) return -1;
+                        for (let i = guidanceData.sessions.length - 1; i >= 0; i--) {
+                            const ses = guidanceData.sessions[i];
+                            if (!ses || !ses.attendance) continue;
+                            if (Object.values(ses.attendance).some(v => !!v)) return i;
+                        }
+                        return -1;
+                    },
+
+                    ensureSessionAtIndex(guidanceData, indexToEnsure) {
+                        if (!guidanceData || !Array.isArray(guidanceData.sessions)) return null;
+                        if (indexToEnsure < 0) return null;
+                        while (guidanceData.sessions.length <= indexToEnsure) {
+                            guidanceData.sessions.push({
+                                date: '',
+                                time: '',
+                                isSaved: false,
+                                place: '',
+                                learningTopic: '',
+                                content: '',
+                                attendance: {},
+                                originalAttendance: {}
+                            });
+                        }
+                        const ses = guidanceData.sessions[indexToEnsure];
+                        if (!ses.attendance) ses.attendance = {};
+                        if (!ses.originalAttendance) ses.originalAttendance = {};
+                        return ses;
+                    },
+
                     async performAssignmentSyncToGuidance(assignmentId, targetType, methodOverride = '') {
                         if (!assignmentId) return 0;
                         const assignment = (this.assignmentList || []).find(a => a.id === assignmentId);
@@ -14735,21 +14778,21 @@
                                 guidanceData.students.push(student);
                             }
 
-                            // 마지막 참여 차시 찾기 (없으면 마지막 차시, 그래도 없으면 새로 생성)
-                            let targetSession = this.findLastParticipatedSession(guidanceData, id);
-                            if (!targetSession) {
-                                targetSession = guidanceData.sessions.length > 0 ? guidanceData.sessions[guidanceData.sessions.length - 1] : null;
-                            }
-                            if (!targetSession) {
-                                // 세션이 하나도 없으면 생성(차시 추가 → 수업일지에도 함께 생성됨)
-                                targetSession = { date: '', time: '', isSaved: false, place: '', learningTopic: '', content: '', attendance: {}, originalAttendance: {} };
-                                guidanceData.sessions.push(targetSession);
-                            }
+                            // 기존 입력된 내역이 있으면 "그 다음 차시"에 반영
+                            // - 해당 학생의 마지막 참여 차시가 있으면 last+1
+                            // - 없으면(첫 연동) 전체 출석부 기준 마지막 기록 차시(lastAny)+1
+                            const lastIdxForStudent = this.findLastParticipatedSessionIndex(guidanceData, id);
+                            const lastIdxAny = this.findLastSessionIndexWithAnyAttendance(guidanceData);
+                            const baseIdx = lastIdxForStudent >= 0 ? lastIdxForStudent : lastIdxAny;
+                            const targetIdx = (baseIdx >= 0 ? baseIdx + 1 : 0);
+                            const targetSession = this.ensureSessionAtIndex(guidanceData, targetIdx);
+                            if (!targetSession) continue;
 
                             if (!targetSession.attendance) targetSession.attendance = {};
                             if (!targetSession.originalAttendance) targetSession.originalAttendance = {};
 
                             // 날짜/시간 기록 (과제 설정값 기준)
+                            // 예방지도 연동 시 미반영되는 문제 방지: 값이 있으면 항상 기록(덮어쓰기)
                             if (deadlineDate) targetSession.date = deadlineDate;
                             if (assignment.timeSpent) targetSession.time = assignment.timeSpent;
 
@@ -14758,7 +14801,7 @@
                             targetSession.originalAttendance[id] = methodToApply;
 
                             // 수업일지 반영 (과제 설명 내용)
-                            if (assignment.title && !targetSession.learningTopic) targetSession.learningTopic = assignment.title;
+                            if (assignment.title) targetSession.learningTopic = assignment.title;
                             if (assignment.description) {
                                 if (!targetSession.content) {
                                     targetSession.content = assignment.description;
