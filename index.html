@@ -15293,16 +15293,19 @@
                     async loadFromSpreadsheet(assignmentId) {
                         // Google 스프레드시트에서 학생 응답 로드
                         if (!this.assignmentSpreadsheetUrl) {
+                            console.log('[스프레드시트 로드] 스프레드시트 링크가 설정되지 않았습니다.');
                             return;
                         }
                         
                         const spreadsheetId = this.extractSpreadsheetId(this.assignmentSpreadsheetUrl);
                         if (!spreadsheetId) {
+                            console.log('[스프레드시트 로드] 스프레드시트 ID를 추출할 수 없습니다.');
                             return;
                         }
                         
                         const appsScriptUrl = await this.getGoogleAppsScriptUrl();
                         if (!appsScriptUrl) {
+                            console.log('[스프레드시트 로드] Google Apps Script URL이 설정되지 않았습니다.');
                             return;
                         }
                         
@@ -15311,6 +15314,8 @@
                             const proxyUrl = window.location.hostname === 'localhost' 
                                 ? 'http://localhost:8888/.netlify/functions/apps-script-proxy'
                                 : '/.netlify/functions/apps-script-proxy';
+                            
+                            console.log('[스프레드시트 로드] 요청 시작:', { assignmentId, spreadsheetId });
                             
                             const response = await fetch(proxyUrl, {
                                 method: 'POST',
@@ -15324,15 +15329,19 @@
                                 })
                             });
                             
+                            if (!response.ok) {
+                                const errorText = await response.text().catch(() => 'Unknown error');
+                                console.error('[스프레드시트 로드] HTTP 오류:', response.status, errorText);
+                                return;
+                            }
+                            
                             const result = await response.json();
+                            console.log('[스프레드시트 로드] 응답:', result);
+                            
                             if (result.success && result.data) {
                                 // 스프레드시트에서 로드한 데이터로 assignmentResponseData 업데이트
-                                if (!this.assignmentResponseData[assignmentId]) {
-                                    this.assignmentResponseData[assignmentId] = {};
-                                }
-                                
-                                // 스프레드시트 데이터와 기존 데이터 병합
-                                Object.assign(this.assignmentResponseData[assignmentId], result.data);
+                                // Vue 3의 반응성을 보장하기 위해 새 객체로 할당 (완전 교체)
+                                this.assignmentResponseData[assignmentId] = { ...result.data };
                                 
                                 // responseCount 업데이트
                                 const assignment = this.assignmentList.find(a => a.id === assignmentId);
@@ -15340,10 +15349,20 @@
                                     assignment.responseCount = Object.keys(this.assignmentResponseData[assignmentId]).length;
                                 }
                                 
-                                console.log('스프레드시트에서 데이터를 로드했습니다:', assignmentId);
+                                console.log('[스프레드시트 로드] 성공:', {
+                                    assignmentId,
+                                    responseCount: Object.keys(this.assignmentResponseData[assignmentId]).length,
+                                    studentIds: Object.keys(this.assignmentResponseData[assignmentId])
+                                });
+                            } else {
+                                console.log('[스프레드시트 로드] 데이터 없음:', result);
+                                // 데이터가 없으면 빈 객체로 초기화
+                                if (!this.assignmentResponseData[assignmentId]) {
+                                    this.assignmentResponseData[assignmentId] = {};
+                                }
                             }
                         } catch (error) {
-                            console.error('스프레드시트 로드 중 오류:', error);
+                            console.error('[스프레드시트 로드] 오류:', error);
                         }
                     },
 
