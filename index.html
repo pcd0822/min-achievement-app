@@ -5457,16 +5457,6 @@
                         const storageKey = this.getTeacherLocalStorageKey();
                         if (!storageKey) return;
 
-                        // 이미 데이터가 로드되어 있고, localStorage의 데이터와 동일한지 확인
-                        // 중복 로드를 방지하기 위해 한 번만 로드하도록 함
-                        if (this.teacherPlanList && this.teacherPlanList.length > 0) {
-                            console.log('이미 교과 데이터가 로드되어 있습니다. 중복 로드를 방지합니다.', { 
-                                currentCount: this.teacherPlanList.length,
-                                storageKey 
-                            });
-                            return;
-                        }
-
                         try {
                             const raw = localStorage.getItem(storageKey);
                             if (!raw) {
@@ -5474,9 +5464,42 @@
                                 // 데이터가 없으면 빈 배열로 초기화
                                 this.teacherPlanList = [];
                                 this.teacherGuidanceDataList = [];
+                                this.assignmentList = [];
+                                this.assignmentResponseData = {};
                                 return;
                             }
                             const data = JSON.parse(raw);
+                            
+                            // 과제 데이터는 항상 로드 (과목 데이터와 독립적)
+                            if (data.assignmentList && Array.isArray(data.assignmentList)) {
+                                this.assignmentList = data.assignmentList;
+                                console.log('과제 데이터를 로드했습니다:', { assignmentCount: this.assignmentList.length });
+                            } else {
+                                // localStorage에 과제 데이터가 없으면 빈 배열로 초기화
+                                if (!this.assignmentList || this.assignmentList.length === 0) {
+                                    this.assignmentList = [];
+                                }
+                            }
+                            
+                            if (data.assignmentResponseData && typeof data.assignmentResponseData === 'object') {
+                                this.assignmentResponseData = data.assignmentResponseData;
+                                console.log('과제 응답 데이터를 로드했습니다:', { responseCount: Object.keys(this.assignmentResponseData).length });
+                            } else {
+                                // localStorage에 응답 데이터가 없으면 빈 객체로 초기화
+                                if (!this.assignmentResponseData || Object.keys(this.assignmentResponseData).length === 0) {
+                                    this.assignmentResponseData = {};
+                                }
+                            }
+                            
+                            // 이미 데이터가 로드되어 있고, localStorage의 데이터와 동일한지 확인
+                            // 중복 로드를 방지하기 위해 한 번만 로드하도록 함 (과목 데이터만)
+                            if (this.teacherPlanList && this.teacherPlanList.length > 0) {
+                                console.log('이미 교과 데이터가 로드되어 있습니다. 중복 로드를 방지합니다.', { 
+                                    currentCount: this.teacherPlanList.length,
+                                    storageKey 
+                                });
+                                return;
+                            }
                             
                             // 데이터 중복 방지: 기존 데이터가 있으면 덮어쓰지 않음
                                 if (data.planList && Array.isArray(data.planList)) {
@@ -5510,27 +5533,6 @@
                                 }
                             } else {
                                 this.teacherGuidanceDataList = [];
-                            }
-                            
-                            // 과제 데이터 로드 (항상 localStorage에서 로드)
-                            if (data.assignmentList && Array.isArray(data.assignmentList)) {
-                                this.assignmentList = data.assignmentList;
-                                console.log('과제 데이터를 로드했습니다:', { assignmentCount: this.assignmentList.length });
-                            } else {
-                                // localStorage에 과제 데이터가 없으면 빈 배열로 초기화
-                                if (!this.assignmentList || this.assignmentList.length === 0) {
-                                    this.assignmentList = [];
-                                }
-                            }
-                            
-                            if (data.assignmentResponseData && typeof data.assignmentResponseData === 'object') {
-                                this.assignmentResponseData = data.assignmentResponseData;
-                                console.log('과제 응답 데이터를 로드했습니다:', { responseCount: Object.keys(this.assignmentResponseData).length });
-                            } else {
-                                // localStorage에 응답 데이터가 없으면 빈 객체로 초기화
-                                if (!this.assignmentResponseData || Object.keys(this.assignmentResponseData).length === 0) {
-                                    this.assignmentResponseData = {};
-                                }
                             }
 
                             // 배열 길이 동기화 (planList와 guidanceDataList의 길이가 다를 수 있음)
@@ -14428,7 +14430,7 @@
                             })),
                             deadline: this.assignmentForm.deadline,
                             passingScore: this.assignmentForm.passingScore || 0,
-                            timeSpent: this.assignmentForm.timeSpent || 0,
+                            timeSpent: this.assignmentForm.timeSpent || '',
                             guidanceMethod: this.assignmentForm.guidanceMethod || '',
                             maxScore: this.assignmentForm.questions.reduce((sum, q) => sum + (q.points || 1), 0)
                             // responseCount는 기존 값 유지 (this.currentAssignment에서 가져옴)
