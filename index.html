@@ -14739,12 +14739,20 @@
                     async showSubmissionStatus(assignmentId) {
                         const assignment = this.assignmentList.find(a => a.id === assignmentId);
                         if (assignment) {
-                            // 스프레드시트에서 최신 데이터 로드
+                            // 스프레드시트에서 최신 데이터 로드 (localStorage 로드 제거)
                             await this.loadFromSpreadsheet(assignmentId);
-                            // localStorage에서도 최신 데이터 로드
-                            this.loadLatestAssignmentResponseData(assignmentId);
+                            
+                            // Vue 반응성을 보장하기 위해 $nextTick 사용
+                            await this.$nextTick();
+                            
                             this.currentSubmissionAssignment = assignment;
                             this.showSubmissionStatusModal = true;
+                            
+                            console.log('[제출현황] 모달 표시:', {
+                                assignmentId,
+                                responseCount: this.assignmentResponseData[assignmentId] ? Object.keys(this.assignmentResponseData[assignmentId]).length : 0,
+                                data: this.assignmentResponseData[assignmentId]
+                            });
                         }
                     },
                     
@@ -15339,24 +15347,38 @@
                             console.log('[스프레드시트 로드] 응답:', result);
                             
                             if (result.success && result.data) {
-                                // 스프레드시트에서 로드한 데이터로 assignmentResponseData 업데이트
-                                // Vue 3의 반응성을 보장하기 위해 새 객체로 할당 (완전 교체)
-                                this.assignmentResponseData[assignmentId] = { ...result.data };
+                                console.log('[스프레드시트 로드] 받은 데이터:', result.data);
+                                
+                                // Vue 3의 반응성을 보장하기 위해 전체 객체를 새로 생성
+                                // assignmentResponseData가 반응형 객체이므로 직접 속성 할당
+                                if (!this.assignmentResponseData) {
+                                    this.assignmentResponseData = {};
+                                }
+                                
+                                // 새 객체로 완전 교체하여 Vue 반응성 보장
+                                this.assignmentResponseData = {
+                                    ...this.assignmentResponseData,
+                                    [assignmentId]: { ...result.data }
+                                };
                                 
                                 // responseCount 업데이트
                                 const assignment = this.assignmentList.find(a => a.id === assignmentId);
                                 if (assignment) {
-                                    assignment.responseCount = Object.keys(this.assignmentResponseData[assignmentId]).length;
+                                    assignment.responseCount = Object.keys(result.data).length;
                                 }
                                 
                                 console.log('[스프레드시트 로드] 성공:', {
                                     assignmentId,
-                                    responseCount: Object.keys(this.assignmentResponseData[assignmentId]).length,
-                                    studentIds: Object.keys(this.assignmentResponseData[assignmentId])
+                                    responseCount: Object.keys(result.data).length,
+                                    studentIds: Object.keys(result.data),
+                                    assignmentResponseData: this.assignmentResponseData[assignmentId]
                                 });
                             } else {
                                 console.log('[스프레드시트 로드] 데이터 없음:', result);
                                 // 데이터가 없으면 빈 객체로 초기화
+                                if (!this.assignmentResponseData) {
+                                    this.assignmentResponseData = {};
+                                }
                                 if (!this.assignmentResponseData[assignmentId]) {
                                     this.assignmentResponseData[assignmentId] = {};
                                 }
