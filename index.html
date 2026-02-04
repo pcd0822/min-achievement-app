@@ -3155,6 +3155,10 @@
                                         <th class="border border-gray-300 px-4 py-2 text-left">이름</th>
                                         <th class="border border-gray-300 px-4 py-2 text-center">점수</th>
                                         <th class="border border-gray-300 px-4 py-2 text-center">통과 여부</th>
+                                        <th class="border border-gray-300 px-4 py-2 text-center">수업방법(연동)</th>
+                                        <th class="border border-gray-300 px-4 py-2 text-center">수업날짜(연동)</th>
+                                        <th class="border border-gray-300 px-4 py-2 text-center">시간(연동)</th>
+                                        <th class="border border-gray-300 px-4 py-2 text-left">수업일지 내용(연동)</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -3168,6 +3172,18 @@
                                         </td>
                                         <td class="border border-gray-300 px-4 py-2 text-center" :class="response.completed ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'">
                                             {{ response.completed ? '통과' : '미통과' }}
+                                        </td>
+                                        <td class="border border-gray-300 px-4 py-2 text-center text-sm">
+                                            {{ currentSubmissionAssignment.guidanceMethod || '미설정' }}
+                                        </td>
+                                        <td class="border border-gray-300 px-4 py-2 text-center text-sm">
+                                            {{ currentSubmissionAssignment.deadline ? formatDate(currentSubmissionAssignment.deadline) : '미설정' }}
+                                        </td>
+                                        <td class="border border-gray-300 px-4 py-2 text-center text-sm">
+                                            {{ currentSubmissionAssignment.timeSpent || '미설정' }}
+                                        </td>
+                                        <td class="border border-gray-300 px-4 py-2 text-sm">
+                                            <div class="whitespace-pre-wrap">{{ currentSubmissionAssignment.description || '' }}</div>
                                         </td>
                                     </tr>
                                 </tbody>
@@ -14656,6 +14672,18 @@
                         return '';
                     },
 
+                    findLastParticipatedSession(guidanceData, studentId) {
+                        if (!guidanceData || !Array.isArray(guidanceData.sessions)) return null;
+                        const id = studentId != null ? String(studentId).trim() : '';
+                        if (!id) return null;
+                        for (let i = guidanceData.sessions.length - 1; i >= 0; i--) {
+                            const ses = guidanceData.sessions[i];
+                            if (!ses || !ses.attendance) continue;
+                            if (ses.attendance[id]) return ses;
+                        }
+                        return null;
+                    },
+
                     async performAssignmentSyncToGuidance(assignmentId, targetType, methodOverride = '') {
                         if (!assignmentId) return 0;
                         const assignment = (this.assignmentList || []).find(a => a.id === assignmentId);
@@ -14680,80 +14708,79 @@
                         if (!guidanceData.students) guidanceData.students = [];
                         if (!Array.isArray(guidanceData.sessions)) guidanceData.sessions = [];
 
-                        // 마감일 기준 세션 찾기/생성
-                        let targetSession = null;
-                        if (assignment.deadline) {
-                            const deadlineDate = new Date(assignment.deadline).toISOString().split('T')[0];
-                            targetSession = guidanceData.sessions.find(s => s && s.date && s.date.trim() === deadlineDate);
-                            if (!targetSession) {
-                                const initialAttendance = {};
-                                const initialOriginalAttendance = {};
-                                guidanceData.students.forEach(s => {
-                                    initialAttendance[s.id] = '';
-                                    initialOriginalAttendance[s.id] = '';
-                                });
-                                targetSession = {
-                                    date: deadlineDate,
-                                    time: assignment.timeSpent || '',
-                                    isSaved: false,
-                                    place: '',
-                                    learningTopic: assignment.title || '',
-                                    content: assignment.description || '',
-                                    attendance: initialAttendance,
-                                    originalAttendance: initialOriginalAttendance
-                                };
-                                guidanceData.sessions.push(targetSession);
-                            }
-                        } else {
-                            // 마감일이 없으면 마지막 세션 사용, 없으면 생성
-                            targetSession = guidanceData.sessions.length > 0 ? guidanceData.sessions[guidanceData.sessions.length - 1] : null;
-                            if (!targetSession) {
-                                targetSession = { date: '', time: assignment.timeSpent || '', isSaved: false, place: '', learningTopic: assignment.title || '', content: assignment.description || '', attendance: {}, originalAttendance: {} };
-                                guidanceData.sessions.push(targetSession);
-                            }
-                        }
-
-                        if (!targetSession.attendance) targetSession.attendance = {};
-                        if (!targetSession.originalAttendance) targetSession.originalAttendance = {};
-
-                        // 세션 정보 반영(비어있을 때만)
-                        if (assignment.title && !targetSession.learningTopic) targetSession.learningTopic = assignment.title;
-                        if (assignment.description && !targetSession.content) targetSession.content = assignment.description;
-                        if (assignment.timeSpent && !targetSession.time) targetSession.time = assignment.timeSpent;
-
                         const methodToApply = methodOverride || assignment.guidanceMethod || this.getDefaultGuidanceMethodForSync(targetType);
+                        const deadlineDate = assignment.deadline ? new Date(assignment.deadline).toISOString().split('T')[0] : '';
 
                         let syncedCount = 0;
+                        const missingInSupplementary = [];
                         for (const studentId of Object.keys(responses)) {
                             const response = responses[studentId];
+                            // 통과한 경우에만 연동
                             if (!response || !response.completed) continue;
 
                             const id = String(studentId).trim();
                             if (!id) continue;
 
-                            // 출석부에 학번이 없으면 자동 추가
+                            // 출석부에 학번이 있는지 확인
                             let student = guidanceData.students.find(s => s && String(s.id) === id);
                             if (!student) {
+                                if (targetType === 'supplementary') {
+                                    // 보충지도에는 자동 추가하지 않음
+                                    missingInSupplementary.push(id);
+                                    continue;
+                                }
+                                // 예방지도는 자동 추가
                                 const name = this.resolveStudentNameFromFirestore(id) || '이름 없음';
                                 student = { id, name };
                                 guidanceData.students.push(student);
-
-                                // 모든 세션에 attendance 키 추가
-                                guidanceData.sessions.forEach(ses => {
-                                    if (!ses) return;
-                                    if (!ses.attendance) ses.attendance = {};
-                                    if (!ses.originalAttendance) ses.originalAttendance = {};
-                                    if (!Object.prototype.hasOwnProperty.call(ses.attendance, id)) ses.attendance[id] = '';
-                                    if (!Object.prototype.hasOwnProperty.call(ses.originalAttendance, id)) ses.originalAttendance[id] = '';
-                                });
                             }
 
-                            // 출석부 반영
-                            if (!targetSession.attendance[id]) {
-                                targetSession.attendance[id] = methodToApply;
-                                targetSession.originalAttendance[id] = methodToApply; // 변경 표시 방지
-                                syncedCount++;
+                            // 마지막 참여 차시 찾기 (없으면 마지막 차시, 그래도 없으면 새로 생성)
+                            let targetSession = this.findLastParticipatedSession(guidanceData, id);
+                            if (!targetSession) {
+                                targetSession = guidanceData.sessions.length > 0 ? guidanceData.sessions[guidanceData.sessions.length - 1] : null;
                             }
+                            if (!targetSession) {
+                                // 세션이 하나도 없으면 생성(차시 추가 → 수업일지에도 함께 생성됨)
+                                targetSession = { date: '', time: '', isSaved: false, place: '', learningTopic: '', content: '', attendance: {}, originalAttendance: {} };
+                                guidanceData.sessions.push(targetSession);
+                            }
+
+                            if (!targetSession.attendance) targetSession.attendance = {};
+                            if (!targetSession.originalAttendance) targetSession.originalAttendance = {};
+
+                            // 날짜/시간 기록 (과제 설정값 기준)
+                            if (deadlineDate) targetSession.date = deadlineDate;
+                            if (assignment.timeSpent) targetSession.time = assignment.timeSpent;
+
+                            // 출석부(지도방법) 기록 (덮어쓰기)
+                            targetSession.attendance[id] = methodToApply;
+                            targetSession.originalAttendance[id] = methodToApply;
+
+                            // 수업일지 반영 (과제 설명 내용)
+                            if (assignment.title && !targetSession.learningTopic) targetSession.learningTopic = assignment.title;
+                            if (assignment.description) {
+                                if (!targetSession.content) {
+                                    targetSession.content = assignment.description;
+                                } else if (!String(targetSession.content).includes(assignment.description)) {
+                                    targetSession.content = `${targetSession.content}\n\n[과제 연동]\n${assignment.description}`;
+                                }
+                            }
+
+                            // 학생이 목록에 추가된 경우, 모든 세션에 attendance 키 보장
+                            guidanceData.sessions.forEach(ses => {
+                                if (!ses) return;
+                                if (!ses.attendance) ses.attendance = {};
+                                if (!ses.originalAttendance) ses.originalAttendance = {};
+                                if (!Object.prototype.hasOwnProperty.call(ses.attendance, id)) ses.attendance[id] = '';
+                                if (!Object.prototype.hasOwnProperty.call(ses.originalAttendance, id)) ses.originalAttendance[id] = '';
+                            });
+
+                            syncedCount++;
+                        }
+
+                        if (missingInSupplementary.length > 0) {
+                            alert(`다음 학생은 보충지도 대상자가 아니므로 보충지도 출석부에 연동하지 않습니다.\n${missingInSupplementary.join(', ')}`);
                         }
 
                         if (syncedCount > 0) {
