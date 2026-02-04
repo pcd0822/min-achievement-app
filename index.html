@@ -15097,6 +15097,16 @@
                             console.log('요청 URL:', appsScriptUrl);
                             console.log('요청 데이터:', { action: 'test', spreadsheetId: spreadsheetId });
                             
+                            // URL 유효성 검사
+                            if (!appsScriptUrl.startsWith('http://') && !appsScriptUrl.startsWith('https://')) {
+                                throw new Error('Google Apps Script URL이 올바르지 않습니다. http:// 또는 https://로 시작해야 합니다.');
+                            }
+                            
+                            // Google Apps Script URL은 exec로 끝나야 함
+                            if (!appsScriptUrl.includes('/exec') && !appsScriptUrl.includes('/dev')) {
+                                console.warn('[2단계 경고] Google Apps Script URL이 /exec 또는 /dev로 끝나지 않습니다. 올바른 웹앱 URL인지 확인하세요.');
+                            }
+                            
                             const response = await fetch(appsScriptUrl, {
                                 method: 'POST',
                                 headers: {
@@ -15106,7 +15116,9 @@
                                     action: 'test',
                                     spreadsheetId: spreadsheetId
                                 }),
-                                mode: 'cors'
+                                mode: 'cors',
+                                redirect: 'follow', // 리다이렉트 따라가기
+                                cache: 'no-cache' // 캐시 사용 안 함
                             });
                             
                             console.log('[2단계 응답] Status:', response.status, response.statusText);
@@ -15133,21 +15145,43 @@
                             
                             let errorMessage = '스프레드시트 연결 테스트 중 오류가 발생했습니다.\n\n';
                             
-                            if (error.message && error.message.includes('Failed to fetch')) {
-                                errorMessage += '❌ "Failed to fetch" 오류\n\n';
+                            // 네트워크 오류인지 확인
+                            const isNetworkError = error.message && (
+                                error.message.includes('Failed to fetch') ||
+                                error.message.includes('NetworkError') ||
+                                error.message.includes('Network request failed') ||
+                                error.name === 'TypeError'
+                            );
+                            
+                            if (isNetworkError) {
+                                errorMessage += '❌ 네트워크 연결 오류 ("Failed to fetch")\n\n';
+                                errorMessage += '🔍 진단 정보:\n';
+                                errorMessage += `- 요청 URL: ${appsScriptUrl || '가져오기 실패'}\n`;
+                                errorMessage += `- 스프레드시트 ID: ${spreadsheetId}\n\n`;
+                                
                                 errorMessage += '가능한 원인:\n';
-                                errorMessage += '1. Google Apps Script URL이 올바르지 않습니다\n';
-                                errorMessage += '   - Netlify 환경 변수 GOOGLE_APPS_SCRIPT_URL 확인\n';
-                                errorMessage += '   - Google Apps Script 웹앱이 배포되었는지 확인\n';
-                                errorMessage += '2. Google Apps Script 웹앱 접근 권한 문제\n';
-                                errorMessage += '   - 배포 시 "액세스 권한: 모든 사용자"로 설정했는지 확인\n';
-                                errorMessage += '3. CORS 또는 네트워크 문제\n';
-                                errorMessage += '   - 브라우저 콘솔의 상세 오류 확인\n';
-                                errorMessage += '   - 네트워크 탭에서 요청 상태 확인\n\n';
+                                errorMessage += '1. Google Apps Script URL이 올바르지 않거나 접근할 수 없습니다\n';
+                                errorMessage += '   ✓ Netlify 환경 변수 GOOGLE_APPS_SCRIPT_URL 확인\n';
+                                errorMessage += '   ✓ URL 형식: https://script.google.com/macros/s/.../exec\n';
+                                errorMessage += '   ✓ URL이 /exec 또는 /dev로 끝나는지 확인\n';
+                                errorMessage += '2. Google Apps Script 웹앱이 배포되지 않았습니다\n';
+                                errorMessage += '   ✓ Google Apps Script 편집기에서 "배포" > "새 배포" 확인\n';
+                                errorMessage += '   ✓ 배포 유형: "웹 앱" 선택\n';
+                                errorMessage += '   ✓ 실행 사용자: "나" 선택\n';
+                                errorMessage += '   ✓ 액세스 권한: "모든 사용자" 선택\n';
+                                errorMessage += '3. CORS 또는 보안 정책 문제\n';
+                                errorMessage += '   ✓ 브라우저 콘솔의 상세 오류 확인\n';
+                                errorMessage += '   ✓ 네트워크 탭에서 요청 상태 확인\n';
+                                errorMessage += '4. 네트워크 연결 문제\n';
+                                errorMessage += '   ✓ 인터넷 연결 확인\n';
+                                errorMessage += '   ✓ 방화벽 또는 프록시 설정 확인\n\n';
+                                
                                 errorMessage += '💡 해결 방법:\n';
-                                errorMessage += '1. Google Apps Script 편집기에서 "배포" > "새 배포" 확인\n';
-                                errorMessage += '2. 웹앱 URL이 올바른지 확인 (https://script.google.com/macros/s/...)\n';
-                                errorMessage += '3. Netlify 환경 변수에 정확한 URL이 설정되었는지 확인';
+                                errorMessage += '1. Google Apps Script 편집기 열기\n';
+                                errorMessage += '2. "배포" > "배포 관리" 클릭\n';
+                                errorMessage += '3. 최신 배포의 웹앱 URL 복사\n';
+                                errorMessage += '4. Netlify 환경 변수에 정확한 URL 설정\n';
+                                errorMessage += '5. 페이지 새로고침 후 다시 시도';
                             } else {
                                 errorMessage += '오류: ' + (error.message || '알 수 없는 오류');
                             }
