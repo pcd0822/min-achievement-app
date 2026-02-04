@@ -952,7 +952,7 @@
 
                             <div v-if="showAdminCodeInput" class="mt-2">
 
-                                <input type="password" v-model="adminCode" @keyup.enter="submitAdminCode" placeholder="관리자 코드 입력 (0822)" class="w-full p-2 border rounded-md">
+                                <input type="password" v-model="adminCode" @keyup.enter="submitAdminCode" placeholder="관리자 코드 입력" class="w-full p-2 border rounded-md">
 
                                 <button @click="submitAdminCode" class="w-full mt-2 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition">확인</button>
 
@@ -1484,6 +1484,8 @@
 
                                    <input type="text" v-model="newsletterForm.dispatchDate" placeholder="발송일 (예: 2025.7.14.)" class="w-full p-2 border rounded">
 
+                                   <input type="text" v-model="newsletterForm.schoolName" placeholder="학교명 (예: 설악고등학교)" class="w-full p-2 border rounded">
+
                                    <div class="flex items-center space-x-2">
 
                                        <input type="checkbox" v-model="newsletterForm.includeSeal" id="newsletterSealCheck">
@@ -1527,6 +1529,8 @@
                                     <textarea v-model="pledgeForm.content" placeholder="서약서 동의 내용" rows="10" class="w-full p-2 border rounded"></textarea>
 
                                     <input type="text" v-model="pledgeForm.dispatchDate" placeholder="서약일 (예: 2025.7.14.)" class="w-full p-2 border rounded">
+
+                                    <input type="text" v-model="pledgeForm.schoolName" placeholder="학교명 (예: 설악고등학교)" class="w-full p-2 border rounded">
 
                                     <div class="flex items-center space-x-2">
 
@@ -2265,7 +2269,7 @@
                                                        <p class="text-xs text-gray-500" v-if="student.exceptionReason">예외처리: {{ student.exceptionReason }}</p>
                                                    </div>
                                                    <div v-else>
-                                                       {{ student.note || '' }}
+                                                   {{ student.note || '' }}
                                                    </div>
                                                </td>
 
@@ -2362,7 +2366,9 @@
 
                                                        <input type="text" class="flatpickr-single w-full p-1 border rounded text-center text-xs mb-1" placeholder="날짜 선택" :value="session.date" @change="session.date = $event.target.value; saveGuidanceData()" :disabled="session.isSaved">
 
-                                                       <input type="text" class="w-full p-1 border rounded text-center text-xs" placeholder="예: 16:00~17:00" v-model="session.time" @change="saveGuidanceData" :disabled="session.isSaved">
+                                                       <input type="text" class="w-full p-1 border rounded text-center text-xs mb-1" placeholder="예: 16:00~17:00" v-model="session.time" @change="saveGuidanceData" :disabled="session.isSaved">
+
+                                                       <button v-if="!session.isSaved" @click="resetSession(session, index)" class="w-full mb-1 px-2 py-1 text-xs rounded text-white bg-gray-500 hover:bg-gray-600">초기화</button>
 
                                                        <button v-if="!session.isSaved" @click="toggleSaveSession(session)" :disabled="!isSessionReadyToSave(session)" class="w-full mt-1 px-2 py-1 text-xs rounded text-white bg-green-500 hover:bg-green-600 disabled:bg-gray-400">저장</button>
 
@@ -3634,13 +3640,13 @@
 
                             title: '최소 성취수준 보장지도 참여 안내', docNumber: '교무기획부-000', department: '담당부서 (연락처)',
 
-                            logoUrl: null, body: '학부모님, 안녕하십니까?\n\n귀 자녀는 다음과 같은 사유로 최소 성취수준 보장지도 대상자로 선정되었음을 알려드립니다. 본교에서는 학생의 학업 능력 향상을 위해 보충 학습 프로그램을 운영하고 있으니, 학생이 프로그램에 성실히 참여할 수 있도록 가정에서도 많은 격려와 지도 부탁드립니다.\n\n[대상 학생 정보는 하단 참조]', dispatchDate: 'YYYY.MM.DD.', includeSeal: false, sealUrl: null
+                            logoUrl: null, body: '학부모님, 안녕하십니까?\n\n귀 자녀는 다음과 같은 사유로 최소 성취수준 보장지도 대상자로 선정되었음을 알려드립니다. 본교에서는 학생의 학업 능력 향상을 위해 보충 학습 프로그램을 운영하고 있으니, 학생이 프로그램에 성실히 참여할 수 있도록 가정에서도 많은 격려와 지도 부탁드립니다.\n\n[대상 학생 정보는 하단 참조]', dispatchDate: 'YYYY.MM.DD.', schoolName: '', includeSeal: false, sealUrl: null
 
                         },
 
                         pledgeForm: {
 
-                            content: '본인은 최소 성취수준 보장지도 프로그램의 모든 활동에 성실하게 참여할 것을 서약합니다.\n\n[대상 학생 정보는 하단 참조]', dispatchDate: 'YYYY.MM.DD.', includeSeal: false, sealUrl: null
+                            content: '본인은 최소 성취수준 보장지도 프로그램의 모든 활동에 성실하게 참여할 것을 서약합니다.\n\n[대상 학생 정보는 하단 참조]', dispatchDate: 'YYYY.MM.DD.', schoolName: '', includeSeal: false, sealUrl: null
 
                         },
 
@@ -4572,29 +4578,29 @@
 
                                 if (this.teacherTab === 'supplementary' || this.teacherTab === 'additional') {
 
-                                    const emotionalData = this.emotionalSupportData.find(e => String(e['학번']) === student.id);
+                                const emotionalData = this.emotionalSupportData.find(e => String(e['학번']) === student.id);
 
-                                    const uploadedHours = emotionalData ? Number(emotionalData['정서지원프로그램 참여시간']) : 0;
+                                const uploadedHours = emotionalData ? Number(emotionalData['정서지원프로그램 참여시간']) : 0;
 
-                                    // 표시용(정서지원) 시간: 학점당 이수시간 × 연계비율로 산출한 최대시수까지만 표시
+                                // 표시용(정서지원) 시간: 학점당 이수시간 × 연계비율로 산출한 최대시수까지만 표시
 
-                                    const displayEmotionalHours = Math.min(uploadedHours, maxEmotionalSupportHours);
+                                const displayEmotionalHours = Math.min(uploadedHours, maxEmotionalSupportHours);
 
-                                    // 표시값은 소수점 절삭
+                                // 표시값은 소수점 절삭
 
-                                    status[student.id].emotionalSupportHours = Math.floor(displayEmotionalHours || 0);
+                                status[student.id].emotionalSupportHours = Math.floor(displayEmotionalHours || 0);
 
-                                    // 합산용: 비율 기반 1차 캡 (소수점 유지)
+                                // 합산용: 비율 기반 1차 캡 (소수점 유지)
 
-                                    const baseEmotionalHours = Math.min((displayEmotionalHours || 0), maxEmotionalSupportHours);
+                                const baseEmotionalHours = Math.min((displayEmotionalHours || 0), maxEmotionalSupportHours);
 
-                                    // 예방지도 최대 연계 가능 시수 내에서 남은 여유
+                                // 예방지도 최대 연계 가능 시수 내에서 남은 여유
 
-                                    const remainingPreventiveCapacity = Math.max(0, maxPreventiveLinkedHours - creditedPreventiveHours);
+                                const remainingPreventiveCapacity = Math.max(0, maxPreventiveLinkedHours - creditedPreventiveHours);
 
-                                    const creditedEmotionalHours = Math.min(baseEmotionalHours, remainingPreventiveCapacity);
+                                const creditedEmotionalHours = Math.min(baseEmotionalHours, remainingPreventiveCapacity);
 
-                                    currentStudentTotal += creditedEmotionalHours;
+                                currentStudentTotal += creditedEmotionalHours;
 
                                 }
 
@@ -10007,7 +10013,7 @@
 
                             ? `<div class="seal-section"><p style="margin-bottom: 20px;">${form.dispatchDate || 'YYYY.MM.DD.'}</p><img src="${form.sealUrl}" alt="Principal Seal"></div>`
 
-                            : `<div class="seal-section"><p>${form.dispatchDate || 'YYYY.MM.DD.'}</p><p class="school-name">00고등학교장 (직인생략)</p></div>`;
+                            : `<div class="seal-section"><p>${form.dispatchDate || 'YYYY.MM.DD.'}</p><p class="school-name">${form.schoolName || '00고등학교'}장 (직인생략)</p></div>`;
 
 
 
@@ -12297,6 +12303,22 @@
 
                         if (this.role !== '교과교사' || !session) return;
 
+                        // 저장하기 전에 중복 체크
+                        if (!session.isSaved) {
+                            const duplicateSession = this.currentGuidanceData?.sessions?.find(s => 
+                                s !== session && 
+                                s.date && 
+                                s.time && 
+                                s.date.trim() === session.date.trim() && 
+                                s.time.trim() === session.time.trim()
+                            );
+
+                            if (duplicateSession) {
+                                alert('중복된 수업 일자 및 시간이 있습니다. 다른 차시에 동일한 일자와 시간이 입력되어 있습니다. 일자나 시간을 변경해주세요.');
+                                return;
+                            }
+                        }
+
                         const wasSaved = session.isSaved;
                         session.isSaved = !session.isSaved;
 
@@ -12327,6 +12349,25 @@
                         }
                         this.saveGuidanceData();
 
+                    },
+
+                    resetSession(session, index) {
+                        if (this.role !== '교과교사' || !session) return;
+                        
+                        if (confirm('해당 차시의 날짜, 시간, 지도방법을 모두 초기화하시겠습니까?')) {
+                            // 날짜, 시간 초기화
+                            session.date = '';
+                            session.time = '';
+                            
+                            // 지도방법 초기화 (모든 학생의 출석 정보 초기화)
+                            if (session.attendance) {
+                                Object.keys(session.attendance).forEach(studentId => {
+                                    session.attendance[studentId] = '';
+                                });
+                            }
+                            
+                            this.saveGuidanceData();
+                        }
                     },
 
                     scrollAttendance(direction, event) {
@@ -12396,7 +12437,7 @@
                                 학번: student.id,
                                 이름: student.name || '',
                                 ...(this.teacherTab === 'supplementary' || this.teacherTab === 'additional' ? {
-                                    특기사항: status.specialNotes || '일반학생',
+                                특기사항: status.specialNotes || '일반학생',
                                     미도달항목: this.teacherTab === 'additional' ? (student.reason || '과목출석률') : (student.reason || '')
                                 } : {}),
                                 예방지도시간: status.preventiveHours || 0,
