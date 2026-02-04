@@ -3185,6 +3185,53 @@
             </div>
         </div>
 
+        <!-- 과제방 출석부 연동 모달 (예방지도/보충지도 선택) -->
+        <div v-if="showAssignmentAttendanceSyncModal" class="modal-overlay">
+            <div class="modal-content" style="max-width: 560px; max-height: 90vh; overflow-y: auto;">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold">출석부 연동</h3>
+                    <button @click="closeAssignmentAttendanceSyncModal" class="text-gray-500 hover:text-gray-700">×</button>
+                </div>
+
+                <div class="space-y-4">
+                    <div class="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                        <p class="text-sm text-yellow-800">
+                            <strong>안내:</strong> 스프레드시트 제출현황(통과한 학생)을 선택한 출석부로 반영합니다.
+                            출석부에 학번이 없으면 자동으로 추가됩니다.
+                        </p>
+                    </div>
+
+                    <div>
+                        <label class="font-semibold text-sm block mb-2">전송할 출석부 선택</label>
+                        <div class="flex gap-4">
+                            <label class="flex items-center gap-2">
+                                <input type="radio" value="preventive" v-model="assignmentAttendanceSyncTarget">
+                                <span>예방지도</span>
+                            </label>
+                            <label class="flex items-center gap-2">
+                                <input type="radio" value="supplementary" v-model="assignmentAttendanceSyncTarget">
+                                <span>보충지도</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="font-semibold text-sm block mb-2">지도방법(출석부)</label>
+                        <select v-model="assignmentAttendanceSyncMethodOverride" class="w-full p-2 border rounded-md text-sm">
+                            <option value="">과제 설정값 사용</option>
+                            <option v-for="rh in moduleConfig.recognizedHours" :key="rh.name" :value="rh.name">{{ rh.name }}</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">비워두면 과제 생성 시 설정한 수업방법(없으면 기본값)을 사용합니다.</p>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex justify-end gap-2">
+                    <button @click="closeAssignmentAttendanceSyncModal" class="px-4 py-2 bg-gray-300 rounded-md">닫기</button>
+                    <button @click="confirmAssignmentAttendanceSync" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">연동</button>
+                </div>
+            </div>
+        </div>
+
 
 
          <!-- Import Modal (Teacher - Upload Underachiever Excel) -->
@@ -4145,6 +4192,10 @@
                         showAssignmentModal: false, // 과제 생성 모달 표시 여부
                         showAssignmentDetailsModal: false, // 과제 상세 모달 표시 여부
                         showSubmissionStatusModal: false, // 제출현황 모달 표시 여부
+                        showAssignmentAttendanceSyncModal: false, // 과제방 출석부 연동 모달 표시 여부
+                        assignmentAttendanceSyncTarget: 'supplementary', // 'preventive' | 'supplementary'
+                        assignmentAttendanceSyncMethodOverride: '', // ''이면 과제 설정값 사용
+                        assignmentAttendanceSyncContext: { scope: 'all', assignmentId: null }, // {scope:'all'|'single', assignmentId}
                         currentAssignment: null, // 현재 선택된 과제
                         currentSubmissionAssignment: null, // 제출현황을 보는 과제
                         assignmentForm: {
@@ -14523,66 +14574,123 @@
                     },
                     
                     syncAllAssignmentsToAttendance() {
-                        // 모든 과제를 출석부에 연동
-                        if (this.assignmentList.length === 0) {
+                        // 과제방 → 출석부 연동 (예방/보충 선택 모달 오픈)
+                        if (!this.assignmentList || this.assignmentList.length === 0) {
                             alert('연동할 과제가 없습니다.');
                             return;
                         }
-                        
-                        // 현재 선택된 과목의 출석부 데이터 확인
-                        if (!this.currentGuidanceData || !this.currentGuidanceData.sessions) {
-                            alert('출석부 데이터를 먼저 로드해주세요.');
-                            return;
-                        }
-                        
-                        let totalSynced = 0;
-                        this.assignmentList.forEach(assignment => {
-                            const synced = this.syncSingleAssignmentToAttendance(assignment.id);
-                            totalSynced += synced;
-                        });
-                        
-                        if (totalSynced > 0) {
-                            alert(`${totalSynced}명의 학생이 출석부에 연동되었습니다.`);
-                        } else {
-                            alert('연동할 학생이 없습니다.');
-                        }
+                        this.assignmentAttendanceSyncContext = { scope: 'all', assignmentId: null };
+                        this.assignmentAttendanceSyncMethodOverride = '';
+                        this.showAssignmentAttendanceSyncModal = true;
                     },
                     
                     syncSingleAssignmentToAttendance(assignmentId) {
+                        // 과제방 → 출석부 연동 (예방/보충 선택 모달 오픈)
                         if (!assignmentId) {
                             alert('과제 ID가 없습니다.');
-                            return 0;
+                            return;
                         }
-                        
                         const assignment = this.assignmentList.find(a => a.id === assignmentId);
                         if (!assignment) {
                             alert('과제를 찾을 수 없습니다.');
-                            return 0;
+                            return;
                         }
-                        
-                        const responses = this.assignmentResponseData[assignmentId];
+                        this.assignmentAttendanceSyncContext = { scope: 'single', assignmentId };
+                        this.assignmentAttendanceSyncMethodOverride = assignment.guidanceMethod || '';
+                        this.showAssignmentAttendanceSyncModal = true;
+                    },
+
+                    closeAssignmentAttendanceSyncModal() {
+                        this.showAssignmentAttendanceSyncModal = false;
+                    },
+
+                    async confirmAssignmentAttendanceSync() {
+                        const ctx = this.assignmentAttendanceSyncContext || { scope: 'all', assignmentId: null };
+                        const targetType = this.assignmentAttendanceSyncTarget; // preventive | supplementary
+                        const methodOverride = this.assignmentAttendanceSyncMethodOverride || '';
+
+                        this.showAssignmentAttendanceSyncModal = false;
+
+                        if (!targetType || (targetType !== 'preventive' && targetType !== 'supplementary')) {
+                            alert('전송할 출석부를 선택해주세요.');
+                            return;
+                        }
+
+                        try {
+                            if (ctx.scope === 'all') {
+                                let totalSynced = 0;
+                                for (const a of (this.assignmentList || [])) {
+                                    totalSynced += await this.performAssignmentSyncToGuidance(a.id, targetType, methodOverride);
+                                }
+                                alert(totalSynced > 0 ? `${totalSynced}명의 학생이 출석부에 연동되었습니다.` : '연동할 학생이 없습니다.');
+                            } else {
+                                const count = await this.performAssignmentSyncToGuidance(ctx.assignmentId, targetType, methodOverride);
+                                alert(count > 0 ? `${count}명의 학생이 출석부에 연동되었습니다.` : '연동할 학생이 없습니다.');
+                            }
+                        } catch (e) {
+                            console.error('[출석부 연동] 오류:', e);
+                            alert('출석부 연동 중 오류가 발생했습니다. 콘솔 로그를 확인해주세요.');
+                        }
+                    },
+
+                    getDefaultGuidanceMethodForSync(targetType) {
+                        // recognizedHours 중 첫 항목을 기본값으로 사용
+                        const first = Array.isArray(this.moduleConfig?.recognizedHours) && this.moduleConfig.recognizedHours.length > 0
+                            ? this.moduleConfig.recognizedHours[0]?.name
+                            : '';
+                        if (first) return first;
+                        // 그래도 없으면 탭별 기본 텍스트
+                        return targetType === 'preventive' ? '예방지도' : '보충지도';
+                    },
+
+                    resolveStudentNameFromFirestore(studentId) {
+                        // Firestore에서 로드된 studentData(학적 정보)에서 이름을 반환
+                        const id = studentId != null ? String(studentId).trim() : '';
+                        if (!id) return '';
+                        if (Array.isArray(this.studentData) && this.studentData.length > 0) {
+                            const info = this.studentData.find(s => String(s['학번'] ?? s['학번 ']) === id);
+                            if (info) {
+                                return String(info['이름'] || info['성명'] || info['학생명'] || info['name'] || '').trim();
+                            }
+                        }
+                        return '';
+                    },
+
+                    async performAssignmentSyncToGuidance(assignmentId, targetType, methodOverride = '') {
+                        if (!assignmentId) return 0;
+                        const assignment = (this.assignmentList || []).find(a => a.id === assignmentId);
+                        if (!assignment) return 0;
+
+                        // 최신 제출 데이터 로드(스프레드시트)
+                        await this.loadFromSpreadsheet(assignmentId);
+
+                        const responses = this.assignmentResponseData?.[assignmentId];
                         if (!responses || Object.keys(responses).length === 0) {
-                            alert('제출한 학생이 없습니다.');
                             return 0;
                         }
-                        
-                        const guidanceData = this.currentGuidanceData;
-                        if (!guidanceData || !guidanceData.sessions) {
-                            alert('출석부 데이터를 먼저 로드해주세요.');
-                            return 0;
+
+                        if (!this.teacherGuidanceData) {
+                            this.teacherGuidanceData = this.getInitialGuidanceData();
                         }
-                        
-                        // 마감일이 있으면 해당 날짜의 세션을 찾거나 생성
+                        if (!this.teacherGuidanceData[targetType]) {
+                            this.teacherGuidanceData[targetType] = this.getInitialGuidanceData()[targetType];
+                        }
+
+                        const guidanceData = this.teacherGuidanceData[targetType];
+                        if (!guidanceData.students) guidanceData.students = [];
+                        if (!Array.isArray(guidanceData.sessions)) guidanceData.sessions = [];
+
+                        // 마감일 기준 세션 찾기/생성
                         let targetSession = null;
                         if (assignment.deadline) {
                             const deadlineDate = new Date(assignment.deadline).toISOString().split('T')[0];
-                            targetSession = guidanceData.sessions.find(s => s.date === deadlineDate);
-                            
+                            targetSession = guidanceData.sessions.find(s => s && s.date && s.date.trim() === deadlineDate);
                             if (!targetSession) {
-                                // 세션이 없으면 새로 생성
                                 const initialAttendance = {};
+                                const initialOriginalAttendance = {};
                                 guidanceData.students.forEach(s => {
                                     initialAttendance[s.id] = '';
+                                    initialOriginalAttendance[s.id] = '';
                                 });
                                 targetSession = {
                                     date: deadlineDate,
@@ -14592,51 +14700,65 @@
                                     learningTopic: assignment.title || '',
                                     content: assignment.description || '',
                                     attendance: initialAttendance,
-                                    originalAttendance: JSON.parse(JSON.stringify(initialAttendance))
+                                    originalAttendance: initialOriginalAttendance
                                 };
                                 guidanceData.sessions.push(targetSession);
                             }
                         } else {
-                            // 마감일이 없으면 가장 최근 세션 사용
-                            targetSession = guidanceData.sessions[guidanceData.sessions.length - 1];
-                        }
-                        
-                        if (!targetSession) return 0;
-                        
-                        let syncedCount = 0;
-                        Object.keys(responses).forEach(studentId => {
-                            const response = responses[studentId];
-                            // 응답한 학생이 출석부에 등록되어 있는지 확인
-                            const student = guidanceData.students.find(s => s.id === studentId);
-                            if (student && response.completed) {
-                                // 수업방법이 설정되어 있으면 사용, 없으면 기본값
-                                const method = assignment.guidanceMethod || '보충과제부여';
-                                if (!targetSession.attendance[studentId] || targetSession.attendance[studentId] === '') {
-                                    targetSession.attendance[studentId] = method;
-                                    syncedCount++;
-                                }
-                                
-                                // 학습 주제와 내용 업데이트
-                                if (assignment.deadline && !targetSession.learningTopic) {
-                                    targetSession.learningTopic = assignment.title;
-                                }
-                                if (assignment.description && !targetSession.content) {
-                                    targetSession.content = assignment.description;
-                                }
-                                // 수행 시간 업데이트
-                                if (assignment.timeSpent && !targetSession.time) {
-                                    targetSession.time = assignment.timeSpent;
-                                }
+                            // 마감일이 없으면 마지막 세션 사용, 없으면 생성
+                            targetSession = guidanceData.sessions.length > 0 ? guidanceData.sessions[guidanceData.sessions.length - 1] : null;
+                            if (!targetSession) {
+                                targetSession = { date: '', time: assignment.timeSpent || '', isSaved: false, place: '', learningTopic: assignment.title || '', content: assignment.description || '', attendance: {}, originalAttendance: {} };
+                                guidanceData.sessions.push(targetSession);
                             }
-                        });
-                        
-                        if (syncedCount > 0) {
-                            this.saveGuidanceData();
-                            alert(`${syncedCount}명의 학생이 출석부에 연동되었습니다.`);
-                        } else {
-                            alert('연동할 학생이 없습니다. (출석부에 등록된 학생만 연동됩니다)');
                         }
-                        
+
+                        if (!targetSession.attendance) targetSession.attendance = {};
+                        if (!targetSession.originalAttendance) targetSession.originalAttendance = {};
+
+                        // 세션 정보 반영(비어있을 때만)
+                        if (assignment.title && !targetSession.learningTopic) targetSession.learningTopic = assignment.title;
+                        if (assignment.description && !targetSession.content) targetSession.content = assignment.description;
+                        if (assignment.timeSpent && !targetSession.time) targetSession.time = assignment.timeSpent;
+
+                        const methodToApply = methodOverride || assignment.guidanceMethod || this.getDefaultGuidanceMethodForSync(targetType);
+
+                        let syncedCount = 0;
+                        for (const studentId of Object.keys(responses)) {
+                            const response = responses[studentId];
+                            if (!response || !response.completed) continue;
+
+                            const id = String(studentId).trim();
+                            if (!id) continue;
+
+                            // 출석부에 학번이 없으면 자동 추가
+                            let student = guidanceData.students.find(s => s && String(s.id) === id);
+                            if (!student) {
+                                const name = this.resolveStudentNameFromFirestore(id) || '이름 없음';
+                                student = { id, name };
+                                guidanceData.students.push(student);
+
+                                // 모든 세션에 attendance 키 추가
+                                guidanceData.sessions.forEach(ses => {
+                                    if (!ses) return;
+                                    if (!ses.attendance) ses.attendance = {};
+                                    if (!ses.originalAttendance) ses.originalAttendance = {};
+                                    if (!Object.prototype.hasOwnProperty.call(ses.attendance, id)) ses.attendance[id] = '';
+                                    if (!Object.prototype.hasOwnProperty.call(ses.originalAttendance, id)) ses.originalAttendance[id] = '';
+                                });
+                            }
+
+                            // 출석부 반영
+                            if (!targetSession.attendance[id]) {
+                                targetSession.attendance[id] = methodToApply;
+                                targetSession.originalAttendance[id] = methodToApply; // 변경 표시 방지
+                                syncedCount++;
+                            }
+                        }
+
+                        if (syncedCount > 0) {
+                            await this.saveGuidanceData(false);
+                        }
                         return syncedCount;
                     },
                     
@@ -14653,36 +14775,6 @@
                     },
                     
                     
-                    async showSubmissionStatus(assignmentId) {
-                        const assignment = this.assignmentList.find(a => a.id === assignmentId);
-                        if (assignment) {
-                            // 스프레드시트에서 최신 데이터 로드
-                            await this.loadFromSpreadsheet(assignmentId);
-                            // localStorage에서도 최신 데이터 로드
-                            this.loadLatestAssignmentResponseData(assignmentId);
-                            this.currentSubmissionAssignment = assignment;
-                            this.showSubmissionStatusModal = true;
-                        }
-                    },
-                    
-                    getStudentName(studentId) {
-                        // 현재 선택된 과목의 출석부에서 학생 이름 찾기
-                        if (this.currentGuidanceData && this.currentGuidanceData.students) {
-                            const student = this.currentGuidanceData.students.find(s => s.id === studentId);
-                            if (student) return student.name;
-                        }
-                        // 모든 과목의 출석부에서 찾기
-                        if (this.teacherGuidanceDataList) {
-                            for (const guidanceData of this.teacherGuidanceDataList) {
-                                if (guidanceData && guidanceData.students) {
-                                    const student = guidanceData.students.find(s => s.id === studentId);
-                                    if (student) return student.name;
-                                }
-                            }
-                        }
-                        return '이름 없음';
-                    },
-                    
                     deleteAssignment(assignmentId) {
                         if (!confirm('정말 이 과제를 삭제하시겠습니까?')) return;
                         
@@ -14697,18 +14789,8 @@
                     
                     syncAssignmentToAttendance(assignmentId) {
                         // 단일 과제 연동 (하위 호환성 유지)
-                        if (this.teacherTab !== 'supplementary' && this.teacherTab !== 'additional') {
-                            alert('보충지도 또는 추가학습 탭에서만 출석부 연동이 가능합니다.');
-                            return;
-                        }
-                        
-                        const syncedCount = this.syncSingleAssignmentToAttendance(assignmentId);
-                        
-                        if (syncedCount > 0) {
-                            alert(`${syncedCount}명의 학생이 출석부에 연동되었습니다.`);
-                        } else {
-                            alert('연동할 학생이 없습니다. (과제를 완료한 학생이 출석부에 없거나 이미 출석 처리되었습니다.)');
-                        }
+                        // 과제방에서 예방/보충 선택 모달을 통해 연동하도록 변경
+                        this.syncSingleAssignmentToAttendance(assignmentId);
                     },
                     
                     // saveAssignmentData와 loadAssignmentData는 saveAllTeacherData와 loadAllTeacherData에 통합됨
@@ -14807,20 +14889,24 @@
                     },
                     
                     getStudentName(studentId) {
-                        // 현재 선택된 과목의 출석부에서 학생 이름 찾기
-                        if (this.currentGuidanceData && this.currentGuidanceData.students) {
-                            const student = this.currentGuidanceData.students.find(s => s.id === studentId);
-                            if (student) return student.name;
-                        }
-                        // 모든 과목의 출석부에서 찾기
-                        if (this.teacherGuidanceDataList) {
-                            for (const guidanceData of this.teacherGuidanceDataList) {
-                                if (guidanceData && guidanceData.students) {
-                                    const student = guidanceData.students.find(s => s.id === studentId);
-                                    if (student) return student.name;
-                                }
+                        const id = studentId != null ? String(studentId).trim() : '';
+                        if (!id) return '이름 없음';
+
+                        // 1) Firestore에 저장된 학적 정보(studentData)에서 우선 조회
+                        if (Array.isArray(this.studentData) && this.studentData.length > 0) {
+                            const info = this.studentData.find(s => String(s['학번'] ?? '') === id);
+                            if (info) {
+                                const name = String(info['이름'] || info['성명'] || info['학생명'] || info['name'] || '').trim();
+                                if (name) return name;
                             }
                         }
+
+                        // 2) 현재 출석부/수업일지 데이터에서 fallback
+                        if (this.currentGuidanceData && Array.isArray(this.currentGuidanceData.students)) {
+                            const student = this.currentGuidanceData.students.find(s => s && String(s.id) === id);
+                            if (student && student.name) return student.name;
+                        }
+
                         return '이름 없음';
                     },
                     
