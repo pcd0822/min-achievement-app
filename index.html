@@ -2665,6 +2665,12 @@
                                                     <button @click="editAssignment(assignment.id)" class="text-sm text-blue-600 hover:text-blue-800 mr-4">
                                                         상세보기/수정
                                                     </button>
+                                                    <button @click="showSubmissionStatus(assignment.id)" class="text-sm text-green-600 hover:text-green-800 mr-4">
+                                                        제출현황
+                                                    </button>
+                                                    <button @click="syncSingleAssignmentToAttendance(assignment.id)" class="text-sm text-purple-600 hover:text-purple-800">
+                                                        출석부 연동
+                                                    </button>
                                                 </div>
                                             </div>
                                             <button @click="deleteAssignment(assignment.id)" class="text-red-600 hover:text-red-800 ml-4">
@@ -3109,6 +3115,54 @@
                 
                 <div class="mt-6 flex justify-end space-x-2">
                     <button @click="showAssignmentDetailsModal = false" class="px-4 py-2 bg-gray-300 rounded-md">닫기</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 제출현황 모달 -->
+        <div v-if="showSubmissionStatusModal && currentSubmissionAssignment" class="modal-overlay">
+            <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold">{{ currentSubmissionAssignment.title }} - 제출현황</h3>
+                    <button @click="showSubmissionStatusModal = false" class="text-gray-500 hover:text-gray-700">×</button>
+                </div>
+                
+                <div class="space-y-4">
+                    <div v-if="assignmentResponseData[currentSubmissionAssignment.id] && Object.keys(assignmentResponseData[currentSubmissionAssignment.id]).length > 0">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full border-collapse border border-gray-300">
+                                <thead>
+                                    <tr class="bg-gray-100">
+                                        <th class="border border-gray-300 px-4 py-2 text-left">학번</th>
+                                        <th class="border border-gray-300 px-4 py-2 text-left">이름</th>
+                                        <th class="border border-gray-300 px-4 py-2 text-center">점수</th>
+                                        <th class="border border-gray-300 px-4 py-2 text-center">통과 여부</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="(response, studentId) in assignmentResponseData[currentSubmissionAssignment.id]" :key="studentId">
+                                        <td class="border border-gray-300 px-4 py-2">{{ studentId }}</td>
+                                        <td class="border border-gray-300 px-4 py-2">
+                                            {{ getStudentName(studentId) }}
+                                        </td>
+                                        <td class="border border-gray-300 px-4 py-2 text-center">
+                                            {{ response.score || 0 }} / {{ currentSubmissionAssignment.maxScore || 0 }}
+                                        </td>
+                                        <td class="border border-gray-300 px-4 py-2 text-center" :class="response.completed ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'">
+                                            {{ response.completed ? '통과' : '미통과' }}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div v-else class="text-center text-gray-500 py-8">
+                        아직 제출한 학생이 없습니다.
+                    </div>
+                </div>
+                
+                <div class="mt-6 flex justify-end">
+                    <button @click="showSubmissionStatusModal = false" class="px-4 py-2 bg-gray-300 rounded-md">닫기</button>
                 </div>
             </div>
         </div>
@@ -4071,7 +4125,9 @@
                         assignmentList: [], // 과제 목록
                         showAssignmentModal: false, // 과제 생성 모달 표시 여부
                         showAssignmentDetailsModal: false, // 과제 상세 모달 표시 여부
+                        showSubmissionStatusModal: false, // 제출현황 모달 표시 여부
                         currentAssignment: null, // 현재 선택된 과제
+                        currentSubmissionAssignment: null, // 제출현황을 보는 과제
                         assignmentForm: {
                             title: '',
                             description: '',
@@ -14447,8 +14503,9 @@
                             return;
                         }
                         
-                        if (this.teacherTab !== 'supplementary' && this.teacherTab !== 'additional') {
-                            alert('보충지도 또는 추가학습 탭에서만 출석부 연동이 가능합니다.');
+                        // 현재 선택된 과목의 출석부 데이터 확인
+                        if (!this.currentGuidanceData || !this.currentGuidanceData.sessions) {
+                            alert('출석부 데이터를 먼저 로드해주세요.');
                             return;
                         }
                         
@@ -14466,16 +14523,28 @@
                     },
                     
                     syncSingleAssignmentToAttendance(assignmentId) {
-                        if (!assignmentId) return 0;
+                        if (!assignmentId) {
+                            alert('과제 ID가 없습니다.');
+                            return 0;
+                        }
                         
                         const assignment = this.assignmentList.find(a => a.id === assignmentId);
-                        if (!assignment) return 0;
+                        if (!assignment) {
+                            alert('과제를 찾을 수 없습니다.');
+                            return 0;
+                        }
                         
                         const responses = this.assignmentResponseData[assignmentId];
-                        if (!responses || Object.keys(responses).length === 0) return 0;
+                        if (!responses || Object.keys(responses).length === 0) {
+                            alert('제출한 학생이 없습니다.');
+                            return 0;
+                        }
                         
                         const guidanceData = this.currentGuidanceData;
-                        if (!guidanceData || !guidanceData.sessions) return 0;
+                        if (!guidanceData || !guidanceData.sessions) {
+                            alert('출석부 데이터를 먼저 로드해주세요.');
+                            return 0;
+                        }
                         
                         // 마감일이 있으면 해당 날짜의 세션을 찾거나 생성
                         let targetSession = null;
@@ -14537,6 +14606,9 @@
                         
                         if (syncedCount > 0) {
                             this.saveGuidanceData();
+                            alert(`${syncedCount}명의 학생이 출석부에 연동되었습니다.`);
+                        } else {
+                            alert('연동할 학생이 없습니다. (출석부에 등록된 학생만 연동됩니다)');
                         }
                         
                         return syncedCount;
@@ -14554,6 +14626,32 @@
                         });
                     },
                     
+                    
+                    showSubmissionStatus(assignmentId) {
+                        const assignment = this.assignmentList.find(a => a.id === assignmentId);
+                        if (assignment) {
+                            this.currentSubmissionAssignment = assignment;
+                            this.showSubmissionStatusModal = true;
+                        }
+                    },
+                    
+                    getStudentName(studentId) {
+                        // 현재 선택된 과목의 출석부에서 학생 이름 찾기
+                        if (this.currentGuidanceData && this.currentGuidanceData.students) {
+                            const student = this.currentGuidanceData.students.find(s => s.id === studentId);
+                            if (student) return student.name;
+                        }
+                        // 모든 과목의 출석부에서 찾기
+                        if (this.teacherGuidanceDataList) {
+                            for (const guidanceData of this.teacherGuidanceDataList) {
+                                if (guidanceData && guidanceData.students) {
+                                    const student = guidanceData.students.find(s => s.id === studentId);
+                                    if (student) return student.name;
+                                }
+                            }
+                        }
+                        return '이름 없음';
+                    },
                     
                     deleteAssignment(assignmentId) {
                         if (!confirm('정말 이 과제를 삭제하시겠습니까?')) return;
@@ -14608,6 +14706,32 @@
                         }
                     },
                     
+                    showSubmissionStatus(assignmentId) {
+                        const assignment = this.assignmentList.find(a => a.id === assignmentId);
+                        if (assignment) {
+                            this.currentSubmissionAssignment = assignment;
+                            this.showSubmissionStatusModal = true;
+                        }
+                    },
+                    
+                    getStudentName(studentId) {
+                        // 현재 선택된 과목의 출석부에서 학생 이름 찾기
+                        if (this.currentGuidanceData && this.currentGuidanceData.students) {
+                            const student = this.currentGuidanceData.students.find(s => s.id === studentId);
+                            if (student) return student.name;
+                        }
+                        // 모든 과목의 출석부에서 찾기
+                        if (this.teacherGuidanceDataList) {
+                            for (const guidanceData of this.teacherGuidanceDataList) {
+                                if (guidanceData && guidanceData.students) {
+                                    const student = guidanceData.students.find(s => s.id === studentId);
+                                    if (student) return student.name;
+                                }
+                            }
+                        }
+                        return '이름 없음';
+                    },
+                    
                     // 학생용 과제 페이지 관련 함수
                     loadStudentAssignment(assignmentId) {
                         // localStorage에서 과제 데이터 로드
@@ -14615,6 +14739,15 @@
                         if (this.assignmentList && this.assignmentList.length > 0) {
                             this.studentAssignment = this.assignmentList.find(a => a.id === assignmentId);
                             if (this.studentAssignment) {
+                                // 객관식 문제의 응답을 배열로 초기화
+                                this.studentResponseForm.responses = {};
+                                this.studentAssignment.questions.forEach(q => {
+                                    if (q.type === 'multipleChoice' || q.type === 'trueFalse') {
+                                        this.studentResponseForm.responses[q.id] = [];
+                                    } else {
+                                        this.studentResponseForm.responses[q.id] = '';
+                                    }
+                                });
                                 this.studentResponseForm.startTime = Date.now();
                                 return true;
                             }
@@ -14629,6 +14762,15 @@
                                         const assignment = data.assignmentList.find(a => a.id === assignmentId);
                                         if (assignment) {
                                             this.studentAssignment = assignment;
+                                            // 객관식 문제의 응답을 배열로 초기화
+                                            this.studentResponseForm.responses = {};
+                                            assignment.questions.forEach(q => {
+                                                if (q.type === 'multipleChoice' || q.type === 'trueFalse') {
+                                                    this.studentResponseForm.responses[q.id] = [];
+                                                } else {
+                                                    this.studentResponseForm.responses[q.id] = '';
+                                                }
+                                            });
                                             this.studentResponseForm.startTime = Date.now();
                                             return true;
                                         }
