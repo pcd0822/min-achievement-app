@@ -949,15 +949,6 @@
                             <div v-if="question.type === 'multipleChoice' || question.type === 'trueFalse'">
                                 <div v-for="(option, optIndex) in question.options" :key="optIndex" class="mb-2">
                                     <label class="flex items-center space-x-2 cursor-pointer">
-                                        <input type="radio" :name="'question' + question.id" :value="optIndex" v-model="studentResponseForm.responses[question.id]">
-                                        <span>{{ option }}</span>
-                                    </label>
-                                </div>
-                            </div>
-                            
-                            <div v-else-if="question.type === 'multipleSelect'">
-                                <div v-for="(option, optIndex) in question.options" :key="optIndex" class="mb-2">
-                                    <label class="flex items-center space-x-2 cursor-pointer">
                                         <input type="checkbox" :value="optIndex" v-model="studentResponseForm.responses[question.id]">
                                         <span>{{ option }}</span>
                                     </label>
@@ -2644,11 +2635,16 @@
                         <div v-if="teacherTab === 'assignment' && teacherPlan.subjectName" class="space-y-6">
                             <div class="bg-white p-6 rounded-lg shadow-md">
                                 <div class="flex justify-between items-center mb-4">
-                                    <h3 class="text-xl font-semibold">과제방 관리</h3>
-                                    <button @click="showAssignmentModal = true" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition">
+                                <h3 class="text-xl font-semibold">과제방 관리</h3>
+                                <div class="flex space-x-2">
+                                    <button @click="showAssignmentModal = true; isEditingAssignment = false; resetAssignmentForm()" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition">
                                         + 새 과제 생성
                                     </button>
+                                    <button v-if="assignmentList.length > 0" @click="syncAllAssignmentsToAttendance" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition">
+                                        출석부 연동
+                                    </button>
                                 </div>
+                            </div>
 
                                 <!-- 과제 목록 -->
                                 <div v-if="assignmentList.length > 0" class="space-y-4">
@@ -2666,11 +2662,8 @@
                                                     <button @click="copyAssignmentLink(assignment.id)" class="text-sm text-indigo-600 hover:text-indigo-800 mr-4">
                                                         링크 복사
                                                     </button>
-                                                    <button @click="viewAssignmentDetails(assignment.id)" class="text-sm text-blue-600 hover:text-blue-800 mr-4">
-                                                        상세보기
-                                                    </button>
-                                                    <button @click="syncAssignmentToAttendance(assignment.id)" class="text-sm text-green-600 hover:text-green-800">
-                                                        출석부 연동
+                                                    <button @click="editAssignment(assignment.id)" class="text-sm text-blue-600 hover:text-blue-800 mr-4">
+                                                        상세보기/수정
                                                     </button>
                                                 </div>
                                             </div>
@@ -2960,10 +2953,10 @@
         <!-- 과제 생성 모달 -->
         <div v-if="showAssignmentModal" class="modal-overlay" @click.self="showAssignmentModal = false">
             <div class="modal-content" style="max-width: 900px; max-height: 90vh; overflow-y: auto;">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-xl font-semibold">새 과제 생성</h3>
-                    <button @click="showAssignmentModal = false" class="text-gray-500 hover:text-gray-700">×</button>
-                </div>
+                                <div class="flex justify-between items-center mb-4">
+                                    <h3 class="text-xl font-semibold">{{ isEditingAssignment ? '과제 수정' : '새 과제 생성' }}</h3>
+                                    <button @click="closeAssignmentModal" class="text-gray-500 hover:text-gray-700">×</button>
+                                </div>
                 
                 <div class="space-y-4">
                     <div>
@@ -2999,18 +2992,19 @@
                                 <div class="space-y-2">
                                     <input type="text" v-model="question.questionText" class="w-full p-2 border rounded-md" placeholder="문제 내용">
                                     <select v-model="question.type" class="w-full p-2 border rounded-md">
-                                        <option value="multipleChoice">객관식 (단일 선택)</option>
-                                        <option value="multipleSelect">객관식 (다중 선택)</option>
+                                        <option value="multipleChoice">객관식</option>
                                         <option value="shortAnswer">단답형</option>
                                         <option value="essay">서술형</option>
                                         <option value="trueFalse">O/X</option>
                                         <option value="fillBlank">빈칸 채우기</option>
                                     </select>
-                                    <div v-if="question.type === 'multipleChoice' || question.type === 'multipleSelect' || question.type === 'trueFalse'">
+                                    <div v-if="question.type === 'multipleChoice' || question.type === 'trueFalse'">
                                         <div v-for="(option, optIndex) in question.options" :key="optIndex" class="flex items-center space-x-2 mt-2">
                                             <input type="text" v-model="question.options[optIndex]" class="flex-1 p-2 border rounded-md" placeholder="선택지">
-                                            <input type="checkbox" v-model="question.correctAnswers" :value="optIndex" v-if="question.type === 'multipleSelect'">
-                                            <input type="radio" v-model="question.correctAnswer" :value="optIndex" :name="'correctAnswer' + index" v-else>
+                                            <label class="flex items-center space-x-1 cursor-pointer">
+                                                <input type="checkbox" v-model="question.correctAnswers" :value="optIndex">
+                                                <span class="text-sm text-gray-600">정답</span>
+                                            </label>
                                         </div>
                                         <button @click="question.options.push('')" class="mt-2 px-4 py-2 bg-gray-200 rounded-md">+ 선택지 추가</button>
                                     </div>
@@ -3020,21 +3014,48 @@
                                     <div v-else-if="question.type === 'essay'">
                                         <textarea v-model="question.correctAnswer" class="w-full p-2 border rounded-md" placeholder="모범 답안 (선택사항)"></textarea>
                                     </div>
-                                    <input type="number" v-model.number="question.points" class="w-full p-2 border rounded-md" placeholder="배점" min="1">
+                                    <div>
+                                        <input type="number" v-model.number="question.points" class="w-full p-2 border rounded-md" placeholder="배점" min="1">
+                                        <p class="text-xs text-gray-500 mt-1">점수를 입력하세요</p>
+                                    </div>
                                 </div>
                             </div>
-                            <button @click="assignmentForm.questions.push({ questionText: '', type: 'multipleChoice', options: [''], correctAnswer: null, correctAnswers: [], points: 1 })" class="px-4 py-2 bg-gray-200 rounded-md">+ 문제 추가</button>
+                            <button @click="assignmentForm.questions.push({ questionText: '', type: 'multipleChoice', options: [''], correctAnswers: [], points: 1 })" class="px-4 py-2 bg-gray-200 rounded-md">+ 문제 추가</button>
                         </div>
                     </div>
                     
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">마감일 (선택사항)</label>
                         <input type="date" v-model="assignmentForm.deadline" class="w-full p-2 border rounded-md">
+                        <p class="text-xs text-gray-500 mt-1">오른쪽 캘린더를 클릭해 날짜 선택하세요</p>
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">통과 점수 (%)</label>
-                        <input type="number" v-model.number="assignmentForm.passingScore" min="0" max="100" class="w-full p-2 border rounded-md">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">과제 수행 시간 (분)</label>
+                        <input type="number" v-model.number="assignmentForm.timeSpent" min="0" class="w-full p-2 border rounded-md" placeholder="과제 수행 시간 입력">
+                        <p class="text-xs text-gray-500 mt-1">출석부와 수업일지에 반영될 수행 시간을 입력하세요</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">수업방법</label>
+                        <select v-model="assignmentForm.guidanceMethod" class="w-full p-2 border rounded-md">
+                            <option value="">선택하세요</option>
+                            <option v-for="method in moduleConfig.recognizedHours" :key="method.name" :value="method.name">{{ method.name }}</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">출석부에 표시될 수업방법을 선택하세요</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">통과 점수</label>
+                        <input type="number" v-model.number="assignmentForm.passingScore" min="0" class="w-full p-2 border rounded-md" placeholder="통과 점수 입력">
+                        <p class="text-xs text-gray-500 mt-1">점수로 입력하세요 (예: 80점)</p>
+                    </div>
+                    
+                    <div class="bg-blue-50 border border-blue-200 rounded-md p-3">
+                        <p class="text-sm text-blue-800">
+                            <strong>안내:</strong> 마감일과 수행시간은 출석부와 수업일지에 자동으로 연동됩니다. 
+                            과제 설명은 수업일지의 수업내용으로 반영됩니다.
+                        </p>
                     </div>
                 </div>
                 
@@ -4054,8 +4075,11 @@
                             learningMaterials: [], // 학습 자료 (파일, 영상 링크 등)
                             questions: [], // 문제 목록
                             deadline: null, // 마감일
-                            passingScore: 80 // 통과 점수 (기본 80%)
+                            passingScore: 0, // 통과 점수 (점수로 저장)
+                            timeSpent: 0, // 과제 수행 시간 (분)
+                            guidanceMethod: '' // 수업방법
                         },
+                        isEditingAssignment: false, // 과제 수정 모드 여부
                         assignmentResponseData: {}, // 학생 응답 데이터 { assignmentId: { studentId: { responses, score, timeSpent, completed } } }
                         // 학생용 과제 페이지 관련
                         showStudentAssignmentView: false, // 학생용 과제 페이지 표시 여부
@@ -14271,7 +14295,10 @@
                                 id: Date.now().toString() + Math.random()
                             })),
                             deadline: this.assignmentForm.deadline,
-                            passingScore: this.assignmentForm.passingScore || 80,
+                            passingScore: this.assignmentForm.passingScore || 0, // 점수로 저장
+                            timeSpent: this.assignmentForm.timeSpent || 0, // 수행 시간 (분)
+                            guidanceMethod: this.assignmentForm.guidanceMethod || '', // 수업방법
+                            maxScore: this.assignmentForm.questions.reduce((sum, q) => sum + (q.points || 1), 0), // 총점 계산
                             createdAt: new Date().toISOString(),
                             subjectName: this.teacherPlan.subjectName,
                             responseCount: 0
@@ -14291,8 +14318,166 @@
                             learningMaterials: [],
                             questions: [],
                             deadline: null,
-                            passingScore: 80
+                            passingScore: 0, // 점수로 초기화
+                            timeSpent: 0,
+                            guidanceMethod: ''
                         };
+                    },
+                    
+                    closeAssignmentModal() {
+                        this.showAssignmentModal = false;
+                        this.isEditingAssignment = false;
+                        this.resetAssignmentForm();
+                    },
+                    
+                    editAssignment(assignmentId) {
+                        const assignment = this.assignmentList.find(a => a.id === assignmentId);
+                        if (!assignment) return;
+                        
+                        this.currentAssignment = assignment;
+                        this.assignmentForm = {
+                            title: assignment.title,
+                            description: assignment.description,
+                            learningMaterials: [...(assignment.learningMaterials || [])],
+                            questions: assignment.questions.map(q => ({ ...q })),
+                            deadline: assignment.deadline,
+                            passingScore: assignment.passingScore || 0,
+                            timeSpent: assignment.timeSpent || 0,
+                            guidanceMethod: assignment.guidanceMethod || ''
+                        };
+                        this.isEditingAssignment = true;
+                        this.showAssignmentModal = true;
+                    },
+                    
+                    updateAssignment() {
+                        if (!this.currentAssignment || !this.assignmentForm.title || this.assignmentForm.questions.length === 0) {
+                            alert('과제 제목과 최소 1개 이상의 문제가 필요합니다.');
+                            return;
+                        }
+                        
+                        const index = this.assignmentList.findIndex(a => a.id === this.currentAssignment.id);
+                        if (index === -1) return;
+                        
+                        this.assignmentList[index] = {
+                            ...this.currentAssignment,
+                            title: this.assignmentForm.title,
+                            description: this.assignmentForm.description,
+                            learningMaterials: [...this.assignmentForm.learningMaterials],
+                            questions: this.assignmentForm.questions.map(q => ({
+                                ...q,
+                                id: q.id || Date.now().toString() + Math.random()
+                            })),
+                            deadline: this.assignmentForm.deadline,
+                            passingScore: this.assignmentForm.passingScore || 0,
+                            timeSpent: this.assignmentForm.timeSpent || 0,
+                            guidanceMethod: this.assignmentForm.guidanceMethod || '',
+                            maxScore: this.assignmentForm.questions.reduce((sum, q) => sum + (q.points || 1), 0)
+                        };
+                        
+                        this.closeAssignmentModal();
+                        this.saveAllTeacherData();
+                    },
+                    
+                    syncAllAssignmentsToAttendance() {
+                        // 모든 과제를 출석부에 연동
+                        if (this.assignmentList.length === 0) {
+                            alert('연동할 과제가 없습니다.');
+                            return;
+                        }
+                        
+                        if (this.teacherTab !== 'supplementary' && this.teacherTab !== 'additional') {
+                            alert('보충지도 또는 추가학습 탭에서만 출석부 연동이 가능합니다.');
+                            return;
+                        }
+                        
+                        let totalSynced = 0;
+                        this.assignmentList.forEach(assignment => {
+                            const synced = this.syncSingleAssignmentToAttendance(assignment.id);
+                            totalSynced += synced;
+                        });
+                        
+                        if (totalSynced > 0) {
+                            alert(`${totalSynced}명의 학생이 출석부에 연동되었습니다.`);
+                        } else {
+                            alert('연동할 학생이 없습니다.');
+                        }
+                    },
+                    
+                    syncSingleAssignmentToAttendance(assignmentId) {
+                        if (!assignmentId) return 0;
+                        
+                        const assignment = this.assignmentList.find(a => a.id === assignmentId);
+                        if (!assignment) return 0;
+                        
+                        const responses = this.assignmentResponseData[assignmentId];
+                        if (!responses || Object.keys(responses).length === 0) return 0;
+                        
+                        const guidanceData = this.currentGuidanceData;
+                        if (!guidanceData || !guidanceData.sessions) return 0;
+                        
+                        // 마감일이 있으면 해당 날짜의 세션을 찾거나 생성
+                        let targetSession = null;
+                        if (assignment.deadline) {
+                            const deadlineDate = new Date(assignment.deadline).toISOString().split('T')[0];
+                            targetSession = guidanceData.sessions.find(s => s.date === deadlineDate);
+                            
+                            if (!targetSession) {
+                                // 세션이 없으면 새로 생성
+                                const initialAttendance = {};
+                                guidanceData.students.forEach(s => {
+                                    initialAttendance[s.id] = '';
+                                });
+                                targetSession = {
+                                    date: deadlineDate,
+                                    time: assignment.timeSpent ? `${assignment.timeSpent}분` : '',
+                                    isSaved: false,
+                                    place: '',
+                                    learningTopic: assignment.title || '',
+                                    content: assignment.description || '',
+                                    attendance: initialAttendance,
+                                    originalAttendance: JSON.parse(JSON.stringify(initialAttendance))
+                                };
+                                guidanceData.sessions.push(targetSession);
+                            }
+                        } else {
+                            // 마감일이 없으면 가장 최근 세션 사용
+                            targetSession = guidanceData.sessions[guidanceData.sessions.length - 1];
+                        }
+                        
+                        if (!targetSession) return 0;
+                        
+                        let syncedCount = 0;
+                        Object.keys(responses).forEach(studentId => {
+                            const response = responses[studentId];
+                            // 응답한 학생이 출석부에 등록되어 있는지 확인
+                            const student = guidanceData.students.find(s => s.id === studentId);
+                            if (student && response.completed) {
+                                // 수업방법이 설정되어 있으면 사용, 없으면 기본값
+                                const method = assignment.guidanceMethod || '보충과제부여';
+                                if (!targetSession.attendance[studentId] || targetSession.attendance[studentId] === '') {
+                                    targetSession.attendance[studentId] = method;
+                                    syncedCount++;
+                                }
+                                
+                                // 학습 주제와 내용 업데이트
+                                if (assignment.deadline && !targetSession.learningTopic) {
+                                    targetSession.learningTopic = assignment.title;
+                                }
+                                if (assignment.description && !targetSession.content) {
+                                    targetSession.content = assignment.description;
+                                }
+                                // 수행 시간 업데이트
+                                if (assignment.timeSpent && !targetSession.time) {
+                                    targetSession.time = `${assignment.timeSpent}분`;
+                                }
+                            }
+                        });
+                        
+                        if (syncedCount > 0) {
+                            this.saveGuidanceData();
+                        }
+                        
+                        return syncedCount;
                     },
                     
                     copyAssignmentLink(assignmentId) {
@@ -14307,12 +14492,6 @@
                         });
                     },
                     
-                    viewAssignmentDetails(assignmentId) {
-                        this.currentAssignment = this.assignmentList.find(a => a.id === assignmentId);
-                        if (this.currentAssignment) {
-                            this.showAssignmentDetailsModal = true;
-                        }
-                    },
                     
                     deleteAssignment(assignmentId) {
                         if (!confirm('정말 이 과제를 삭제하시겠습니까?')) return;
@@ -14327,58 +14506,15 @@
                     },
                     
                     syncAssignmentToAttendance(assignmentId) {
-                        if (!assignmentId) return;
-                        
-                        const assignment = this.assignmentList.find(a => a.id === assignmentId);
-                        if (!assignment) {
-                            alert('과제를 찾을 수 없습니다.');
-                            return;
-                        }
-                        
-                        const responses = this.assignmentResponseData[assignmentId];
-                        if (!responses || Object.keys(responses).length === 0) {
-                            alert('과제 응답이 없습니다.');
-                            return;
-                        }
-                        
-                        // 보충지도 또는 추가학습 탭 선택 확인
+                        // 단일 과제 연동 (하위 호환성 유지)
                         if (this.teacherTab !== 'supplementary' && this.teacherTab !== 'additional') {
                             alert('보충지도 또는 추가학습 탭에서만 출석부 연동이 가능합니다.');
                             return;
                         }
                         
-                        // 학생별로 과제 완료 여부 확인하여 출석부에 반영
-                        const guidanceData = this.currentGuidanceData;
-                        if (!guidanceData || !guidanceData.sessions) {
-                            alert('출석부 데이터를 찾을 수 없습니다.');
-                            return;
-                        }
-                        
-                        // 가장 최근 세션에 과제 완료 학생 추가
-                        const latestSession = guidanceData.sessions[guidanceData.sessions.length - 1];
-                        if (!latestSession) {
-                            alert('출석부에 세션이 없습니다. 먼저 차시를 추가해주세요.');
-                            return;
-                        }
-                        
-                        let syncedCount = 0;
-                        Object.keys(responses).forEach(studentId => {
-                            const response = responses[studentId];
-                            if (response.completed) {
-                                // 해당 학생이 출석부에 있는지 확인
-                                const student = guidanceData.students.find(s => s.id === studentId);
-                                if (student) {
-                                    // 과제 완료를 지도방법으로 표시
-                                    if (!latestSession.attendance[studentId]) {
-                                        latestSession.attendance[studentId] = '보충과제부여';
-                                        syncedCount++;
-                                    }
-                                }
-                            }
-                        });
+                        const syncedCount = this.syncSingleAssignmentToAttendance(assignmentId);
                         
                         if (syncedCount > 0) {
-                            this.saveGuidanceData();
                             alert(`${syncedCount}명의 학생이 출석부에 연동되었습니다.`);
                         } else {
                             alert('연동할 학생이 없습니다. (과제를 완료한 학생이 출석부에 없거나 이미 출석 처리되었습니다.)');
@@ -14467,12 +14603,13 @@
                             let isCorrect = false;
                             
                             if (question.type === 'multipleChoice' || question.type === 'trueFalse') {
-                                isCorrect = parseInt(studentAnswer) === question.correctAnswer;
-                            } else if (question.type === 'multipleSelect') {
-                                const studentAnswers = Array.isArray(studentAnswer) ? studentAnswer : [studentAnswer];
-                                const correctAnswers = question.correctAnswers || [];
+                                // 객관식: 체크박스로 선택된 정답과 학생 답안 비교
+                                const studentAnswers = Array.isArray(studentAnswer) ? studentAnswer.map(a => parseInt(a)) : [parseInt(studentAnswer)].filter(a => !isNaN(a));
+                                const correctAnswers = (question.correctAnswers || []).map(a => parseInt(a));
+                                // 정답과 학생 답안이 정확히 일치하는지 확인
                                 isCorrect = studentAnswers.length === correctAnswers.length &&
-                                           studentAnswers.every(ans => correctAnswers.includes(parseInt(ans)));
+                                           studentAnswers.every(ans => correctAnswers.includes(ans)) &&
+                                           correctAnswers.every(ans => studentAnswers.includes(ans));
                             } else if (question.type === 'shortAnswer' || question.type === 'fillBlank') {
                                 isCorrect = String(studentAnswer).trim().toLowerCase() === 
                                            String(question.correctAnswer || '').trim().toLowerCase();
@@ -14487,7 +14624,8 @@
                         });
                         
                         const percentage = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
-                        const completed = percentage >= this.studentAssignment.passingScore;
+                        // 통과 점수를 점수로 비교 (passingScore는 점수로 저장됨)
+                        const completed = totalScore >= (this.studentAssignment.passingScore || 0);
                         
                         // 응답 저장
                         const endTime = Date.now();
