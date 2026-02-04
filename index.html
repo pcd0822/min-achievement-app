@@ -15092,11 +15092,6 @@
                             
                             console.log('[1단계 성공] Google Apps Script URL:', appsScriptUrl);
                             
-                            // 2단계: Google Apps Script에 연결 테스트 요청
-                            console.log('[2단계] Google Apps Script에 연결 테스트 요청 중...');
-                            console.log('요청 URL:', appsScriptUrl);
-                            console.log('요청 데이터:', { action: 'test', spreadsheetId: spreadsheetId });
-                            
                             // URL 유효성 검사
                             if (!appsScriptUrl.startsWith('http://') && !appsScriptUrl.startsWith('https://')) {
                                 throw new Error('Google Apps Script URL이 올바르지 않습니다. http:// 또는 https://로 시작해야 합니다.');
@@ -15104,10 +15099,22 @@
                             
                             // Google Apps Script URL은 exec로 끝나야 함
                             if (!appsScriptUrl.includes('/exec') && !appsScriptUrl.includes('/dev')) {
-                                console.warn('[2단계 경고] Google Apps Script URL이 /exec 또는 /dev로 끝나지 않습니다. 올바른 웹앱 URL인지 확인하세요.');
+                                console.warn('[2단계 경고] Google Apps Script URL이 /exec 또는 /dev로 끝나지 않습니다.');
+                                console.warn('올바른 웹앱 URL 형식: https://script.google.com/macros/s/SCRIPT_ID/exec');
                             }
                             
-                            const response = await fetch(appsScriptUrl, {
+                            // 2단계: Netlify Function 프록시를 통해 Google Apps Script에 연결 테스트 요청
+                            console.log('[2단계] Netlify Function 프록시를 통해 Google Apps Script에 연결 테스트 요청 중...');
+                            console.log('요청 데이터:', { action: 'test', spreadsheetId: spreadsheetId });
+                            
+                            // Netlify Function 프록시 사용 (CORS 문제 해결)
+                            const proxyUrl = window.location.hostname === 'localhost' 
+                                ? 'http://localhost:8888/.netlify/functions/apps-script-proxy'
+                                : '/.netlify/functions/apps-script-proxy';
+                            
+                            console.log('[2단계] 프록시 URL:', proxyUrl);
+                            
+                            const response = await fetch(proxyUrl, {
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/json',
@@ -15115,10 +15122,7 @@
                                 body: JSON.stringify({
                                     action: 'test',
                                     spreadsheetId: spreadsheetId
-                                }),
-                                mode: 'cors',
-                                redirect: 'follow', // 리다이렉트 따라가기
-                                cache: 'no-cache' // 캐시 사용 안 함
+                                })
                             });
                             
                             console.log('[2단계 응답] Status:', response.status, response.statusText);
@@ -15229,7 +15233,12 @@
                                 }
                             }
                             
-                            const response = await fetch(appsScriptUrl, {
+                            // Netlify Function 프록시 사용 (CORS 문제 해결)
+                            const proxyUrl = window.location.hostname === 'localhost' 
+                                ? 'http://localhost:8888/.netlify/functions/apps-script-proxy'
+                                : '/.netlify/functions/apps-script-proxy';
+                            
+                            const response = await fetch(proxyUrl, {
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/json',
@@ -15272,7 +15281,12 @@
                         }
                         
                         try {
-                            const response = await fetch(appsScriptUrl, {
+                            // Netlify Function 프록시 사용 (CORS 문제 해결)
+                            const proxyUrl = window.location.hostname === 'localhost' 
+                                ? 'http://localhost:8888/.netlify/functions/apps-script-proxy'
+                                : '/.netlify/functions/apps-script-proxy';
+                            
+                            const response = await fetch(proxyUrl, {
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/json',
