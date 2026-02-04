@@ -3032,9 +3032,9 @@
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">과제 수행 시간 (분)</label>
-                        <input type="number" v-model.number="assignmentForm.timeSpent" min="0" class="w-full p-2 border rounded-md" placeholder="과제 수행 시간 입력">
-                        <p class="text-xs text-gray-500 mt-1">출석부와 수업일지에 반영될 수행 시간을 입력하세요</p>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">과제 수행 시간</label>
+                        <input type="text" v-model="assignmentForm.timeSpent" class="w-full p-2 border rounded-md" placeholder="00:00~00:00 (예: 16:00~17:00)">
+                        <p class="text-xs text-gray-500 mt-1">출석부와 수업일지에 반영될 수행 시간을 입력하세요 (예: 16:00~17:00)</p>
                     </div>
                     
                     <div>
@@ -4079,7 +4079,7 @@
                             questions: [], // 문제 목록
                             deadline: null, // 마감일
                             passingScore: 0, // 통과 점수 (점수로 저장)
-                            timeSpent: 0, // 과제 수행 시간 (분)
+                            timeSpent: '', // 과제 수행 시간 (00:00~00:00 형식)
                             guidanceMethod: '' // 수업방법
                         },
                         isEditingAssignment: false, // 과제 수정 모드 여부
@@ -5510,6 +5510,27 @@
                                 }
                             } else {
                                 this.teacherGuidanceDataList = [];
+                            }
+                            
+                            // 과제 데이터 로드 (항상 localStorage에서 로드)
+                            if (data.assignmentList && Array.isArray(data.assignmentList)) {
+                                this.assignmentList = data.assignmentList;
+                                console.log('과제 데이터를 로드했습니다:', { assignmentCount: this.assignmentList.length });
+                            } else {
+                                // localStorage에 과제 데이터가 없으면 빈 배열로 초기화
+                                if (!this.assignmentList || this.assignmentList.length === 0) {
+                                    this.assignmentList = [];
+                                }
+                            }
+                            
+                            if (data.assignmentResponseData && typeof data.assignmentResponseData === 'object') {
+                                this.assignmentResponseData = data.assignmentResponseData;
+                                console.log('과제 응답 데이터를 로드했습니다:', { responseCount: Object.keys(this.assignmentResponseData).length });
+                            } else {
+                                // localStorage에 응답 데이터가 없으면 빈 객체로 초기화
+                                if (!this.assignmentResponseData || Object.keys(this.assignmentResponseData).length === 0) {
+                                    this.assignmentResponseData = {};
+                                }
                             }
 
                             // 배열 길이 동기화 (planList와 guidanceDataList의 길이가 다를 수 있음)
@@ -14312,7 +14333,7 @@
                             })),
                             deadline: this.assignmentForm.deadline,
                             passingScore: this.assignmentForm.passingScore || 0, // 점수로 저장
-                            timeSpent: this.assignmentForm.timeSpent || 0, // 수행 시간 (분)
+                            timeSpent: this.assignmentForm.timeSpent || '', // 수행 시간 (00:00~00:00 형식)
                             guidanceMethod: this.assignmentForm.guidanceMethod || '', // 수업방법
                             maxScore: this.assignmentForm.questions.reduce((sum, q) => sum + (q.points || 1), 0), // 총점 계산
                             createdAt: new Date().toISOString(),
@@ -14336,7 +14357,7 @@
                             questions: [],
                             deadline: null,
                             passingScore: 0, // 점수로 초기화
-                            timeSpent: 0,
+                            timeSpent: '',
                             guidanceMethod: ''
                         };
                     },
@@ -14375,7 +14396,7 @@
                             questions: assignment.questions.map(q => ({ ...q })),
                             deadline: assignment.deadline,
                             passingScore: assignment.passingScore || 0,
-                            timeSpent: assignment.timeSpent || 0,
+                            timeSpent: assignment.timeSpent || '',
                             guidanceMethod: assignment.guidanceMethod || ''
                         };
                         this.isEditingAssignment = true;
@@ -14468,7 +14489,7 @@
                                 });
                                 targetSession = {
                                     date: deadlineDate,
-                                    time: assignment.timeSpent ? `${assignment.timeSpent}분` : '',
+                                    time: assignment.timeSpent || '',
                                     isSaved: false,
                                     place: '',
                                     learningTopic: assignment.title || '',
@@ -14507,7 +14528,7 @@
                                 }
                                 // 수행 시간 업데이트
                                 if (assignment.timeSpent && !targetSession.time) {
-                                    targetSession.time = `${assignment.timeSpent}분`;
+                                    targetSession.time = assignment.timeSpent;
                                 }
                             }
                         });
