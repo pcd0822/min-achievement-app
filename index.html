@@ -15012,23 +15012,36 @@
                                 ? 'http://localhost:8888/.netlify/functions/get-apps-script-url'
                                 : '/.netlify/functions/get-apps-script-url';
                             
+                            console.log('[getGoogleAppsScriptUrl] Netlify Function 호출:', functionUrl);
+                            
                             const response = await fetch(functionUrl);
+                            console.log('[getGoogleAppsScriptUrl] 응답 상태:', response.status, response.statusText);
+                            
                             if (response.ok) {
                                 const data = await response.json();
+                                console.log('[getGoogleAppsScriptUrl] 응답 데이터:', data);
+                                
                                 if (data.url) {
+                                    console.log('[getGoogleAppsScriptUrl] 성공 - URL:', data.url);
                                     return data.url;
                                 } else if (data.error) {
-                                    console.error('Google Apps Script URL 환경 변수 오류:', data.error);
+                                    console.error('[getGoogleAppsScriptUrl] 환경 변수 오류:', data.error);
+                                } else {
+                                    console.error('[getGoogleAppsScriptUrl] URL이 응답에 없습니다:', data);
                                 }
                             } else {
                                 const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-                                console.error('Netlify Function 응답 오류:', response.status, errorData);
+                                console.error('[getGoogleAppsScriptUrl] Netlify Function 응답 오류:', response.status, errorData);
                             }
                         } catch (error) {
-                            console.error('Google Apps Script URL 로드 실패:', error);
+                            console.error('[getGoogleAppsScriptUrl] 로드 실패:', error);
+                            console.error('오류 타입:', error.constructor.name);
+                            console.error('오류 메시지:', error.message);
+                            
                             // 로컬 개발 환경에서는 환경 변수가 없을 수 있으므로 경고만 표시
                             if (window.location.hostname === 'localhost') {
-                                console.warn('로컬 개발 환경에서는 Netlify Function이 작동하지 않을 수 있습니다.');
+                                console.warn('[getGoogleAppsScriptUrl] 로컬 개발 환경에서는 Netlify Function이 작동하지 않을 수 있습니다.');
+                                console.warn('[getGoogleAppsScriptUrl] Netlify CLI를 사용하여 로컬에서 테스트하거나 프로덕션 환경에서 테스트하세요.');
                             }
                         }
                         return '';
@@ -15058,15 +15071,31 @@
                             return;
                         }
                         
+                        console.log('[연결 테스트 시작]');
+                        console.log('스프레드시트 링크:', this.assignmentSpreadsheetUrl);
+                        console.log('추출된 스프레드시트 ID:', spreadsheetId);
+                        
                         try {
+                            // 1단계: Netlify Function에서 Google Apps Script URL 가져오기
+                            console.log('[1단계] Netlify Function에서 Google Apps Script URL 가져오는 중...');
                             const appsScriptUrl = await this.getGoogleAppsScriptUrl();
+                            
                             if (!appsScriptUrl) {
-                                alert('Google Apps Script URL이 설정되지 않았습니다.\n\nNetlify 환경 변수 GOOGLE_APPS_SCRIPT_URL을 확인해주세요.\n또는 로컬 개발 환경에서는 Netlify Function이 작동하지 않을 수 있습니다.');
+                                console.error('[1단계 실패] Google Apps Script URL을 가져올 수 없습니다.');
+                                alert('Google Apps Script URL이 설정되지 않았습니다.\n\n' +
+                                    '확인 사항:\n' +
+                                    '1. Netlify 환경 변수 GOOGLE_APPS_SCRIPT_URL이 설정되었는지 확인\n' +
+                                    '2. Netlify Function이 정상적으로 배포되었는지 확인\n' +
+                                    '3. 브라우저 콘솔의 상세 오류 메시지 확인');
                                 return;
                             }
                             
-                            console.log('Google Apps Script URL:', appsScriptUrl);
-                            console.log('스프레드시트 ID:', spreadsheetId);
+                            console.log('[1단계 성공] Google Apps Script URL:', appsScriptUrl);
+                            
+                            // 2단계: Google Apps Script에 연결 테스트 요청
+                            console.log('[2단계] Google Apps Script에 연결 테스트 요청 중...');
+                            console.log('요청 URL:', appsScriptUrl);
+                            console.log('요청 데이터:', { action: 'test', spreadsheetId: spreadsheetId });
                             
                             const response = await fetch(appsScriptUrl, {
                                 method: 'POST',
@@ -15077,34 +15106,50 @@
                                     action: 'test',
                                     spreadsheetId: spreadsheetId
                                 }),
-                                mode: 'cors' // CORS 모드 명시
+                                mode: 'cors'
                             });
+                            
+                            console.log('[2단계 응답] Status:', response.status, response.statusText);
                             
                             if (!response.ok) {
                                 const errorText = await response.text().catch(() => 'Unknown error');
-                                console.error('응답 오류:', response.status, errorText);
+                                console.error('[2단계 실패] 응답 오류:', response.status, errorText);
                                 throw new Error(`HTTP ${response.status}: ${errorText}`);
                             }
                             
                             const result = await response.json();
+                            console.log('[2단계 성공] 응답 데이터:', result);
+                            
                             if (result.success) {
-                                alert('스프레드시트 연결이 성공했습니다.');
+                                alert('스프레드시트 연결이 성공했습니다!');
                             } else {
                                 alert('스프레드시트 연결 실패: ' + (result.error || '알 수 없는 오류'));
                             }
                         } catch (error) {
-                            console.error('스프레드시트 연결 테스트 실패:', error);
+                            console.error('[연결 테스트 실패] 전체 오류:', error);
+                            console.error('오류 타입:', error.constructor.name);
+                            console.error('오류 메시지:', error.message);
+                            console.error('오류 스택:', error.stack);
+                            
                             let errorMessage = '스프레드시트 연결 테스트 중 오류가 발생했습니다.\n\n';
                             
                             if (error.message && error.message.includes('Failed to fetch')) {
+                                errorMessage += '❌ "Failed to fetch" 오류\n\n';
                                 errorMessage += '가능한 원인:\n';
-                                errorMessage += '1. Google Apps Script URL이 올바르지 않습니다.\n';
-                                errorMessage += '2. Google Apps Script 웹앱이 배포되지 않았거나 접근 권한이 없습니다.\n';
-                                errorMessage += '3. CORS 설정 문제입니다.\n';
-                                errorMessage += '4. 네트워크 연결 문제입니다.\n\n';
-                                errorMessage += '자세한 내용은 브라우저 콘솔을 확인해주세요.';
+                                errorMessage += '1. Google Apps Script URL이 올바르지 않습니다\n';
+                                errorMessage += '   - Netlify 환경 변수 GOOGLE_APPS_SCRIPT_URL 확인\n';
+                                errorMessage += '   - Google Apps Script 웹앱이 배포되었는지 확인\n';
+                                errorMessage += '2. Google Apps Script 웹앱 접근 권한 문제\n';
+                                errorMessage += '   - 배포 시 "액세스 권한: 모든 사용자"로 설정했는지 확인\n';
+                                errorMessage += '3. CORS 또는 네트워크 문제\n';
+                                errorMessage += '   - 브라우저 콘솔의 상세 오류 확인\n';
+                                errorMessage += '   - 네트워크 탭에서 요청 상태 확인\n\n';
+                                errorMessage += '💡 해결 방법:\n';
+                                errorMessage += '1. Google Apps Script 편집기에서 "배포" > "새 배포" 확인\n';
+                                errorMessage += '2. 웹앱 URL이 올바른지 확인 (https://script.google.com/macros/s/...)\n';
+                                errorMessage += '3. Netlify 환경 변수에 정확한 URL이 설정되었는지 확인';
                             } else {
-                                errorMessage += error.message || '알 수 없는 오류';
+                                errorMessage += '오류: ' + (error.message || '알 수 없는 오류');
                             }
                             
                             alert(errorMessage);
