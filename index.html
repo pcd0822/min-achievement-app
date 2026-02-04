@@ -14915,15 +14915,11 @@
                         // 통과 점수를 점수로 비교 (passingScore는 점수로 저장됨)
                         const completed = totalScore >= (this.studentAssignment.passingScore || 0);
                         
-                        // 응답 저장
+                        // 응답 데이터 준비
                         const endTime = Date.now();
                         const timeSpent = Math.floor((endTime - (this.studentResponseForm.startTime || endTime)) / 1000);
                         
-                        if (!this.assignmentResponseData[this.studentAssignment.id]) {
-                            this.assignmentResponseData[this.studentAssignment.id] = {};
-                        }
-                        
-                        this.assignmentResponseData[this.studentAssignment.id][this.studentResponseForm.studentId] = {
+                        const responseData = {
                             responses: {...this.studentResponseForm.responses},
                             score: totalScore,
                             maxScore: maxScore,
@@ -14933,19 +14929,13 @@
                             submittedAt: new Date().toISOString()
                         };
                         
-                        // 교사의 localStorage에 저장 (과제를 생성한 교사의 데이터에 저장)
-                        this.saveStudentAssignmentResponse();
+                        // Google 스프레드시트에만 저장 (로컬 저장 제거)
+                        const saveResult = await this.saveToSpreadsheet(this.studentAssignment.id, this.studentResponseForm.studentId, responseData);
                         
-                        // Google 스프레드시트에 저장
-                        await this.saveToSpreadsheet(this.studentAssignment.id, this.studentResponseForm.studentId, {
-                            responses: {...this.studentResponseForm.responses},
-                            score: totalScore,
-                            maxScore: maxScore,
-                            percentage: percentage,
-                            completed: completed,
-                            timeSpent: timeSpent,
-                            submittedAt: new Date().toISOString()
-                        });
+                        if (!saveResult) {
+                            alert('과제 제출 중 오류가 발생했습니다. 스프레드시트 연결을 확인해주세요.');
+                            return;
+                        }
                         
                         alert(`과제 제출이 완료되었습니다.\n점수: ${totalScore}/${maxScore}점 (${percentage}%)\n${completed ? '통과' : '미통과'}`);
                         
@@ -15130,7 +15120,18 @@
                             if (!response.ok) {
                                 const errorText = await response.text().catch(() => 'Unknown error');
                                 console.error('[2단계 실패] 응답 오류:', response.status, errorText);
-                                throw new Error(`HTTP ${response.status}: ${errorText}`);
+                                
+                                // 404 오류인 경우 특별한 안내
+                                if (response.status === 404) {
+                                    throw new Error(`HTTP 404: Netlify Function 'apps-script-proxy'을 찾을 수 없습니다.\n\n` +
+                                        `확인 사항:\n` +
+                                        `1. netlify/functions/apps-script-proxy.js 파일이 GitHub에 커밋되었는지 확인\n` +
+                                        `2. Netlify 배포가 완료되었는지 확인 (배포 로그 확인)\n` +
+                                        `3. Netlify 대시보드 > Functions에서 함수가 표시되는지 확인\n` +
+                                        `4. 파일 이름이 정확히 'apps-script-proxy.js'인지 확인`);
+                                } else {
+                                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                                }
                             }
                             
                             const result = await response.json();
@@ -15197,20 +15198,20 @@
                     async saveToSpreadsheet(assignmentId, studentId, responseData) {
                         // Google 스프레드시트에 학생 응답 저장
                         if (!this.assignmentSpreadsheetUrl) {
-                            console.log('스프레드시트 링크가 설정되지 않아 스프레드시트에 저장하지 않습니다.');
-                            return;
+                            console.error('[스프레드시트 저장] 스프레드시트 링크가 설정되지 않았습니다.');
+                            return false;
                         }
                         
                         const spreadsheetId = this.extractSpreadsheetId(this.assignmentSpreadsheetUrl);
                         if (!spreadsheetId) {
-                            console.error('스프레드시트 ID를 추출할 수 없습니다.');
-                            return;
+                            console.error('[스프레드시트 저장] 스프레드시트 ID를 추출할 수 없습니다.');
+                            return false;
                         }
                         
                         const appsScriptUrl = await this.getGoogleAppsScriptUrl();
                         if (!appsScriptUrl) {
-                            console.log('Google Apps Script URL이 설정되지 않아 스프레드시트에 저장하지 않습니다.');
-                            return;
+                            console.error('[스프레드시트 저장] Google Apps Script URL이 설정되지 않았습니다.');
+                            return false;
                         }
                         
                         try {
@@ -15253,14 +15254,23 @@
                                 })
                             });
                             
+                            if (!response.ok) {
+                                const errorText = await response.text().catch(() => 'Unknown error');
+                                console.error('[스프레드시트 저장] HTTP 오류:', response.status, errorText);
+                                return false;
+                            }
+                            
                             const result = await response.json();
                             if (result.success) {
-                                console.log('스프레드시트에 저장되었습니다:', studentId);
+                                console.log('[스프레드시트 저장] 성공:', studentId);
+                                return true;
                             } else {
-                                console.error('스프레드시트 저장 실패:', result.error);
+                                console.error('[스프레드시트 저장] 실패:', result.error);
+                                return false;
                             }
                         } catch (error) {
-                            console.error('스프레드시트 저장 중 오류:', error);
+                            console.error('[스프레드시트 저장] 오류:', error);
+                            return false;
                         }
                     },
                     
