@@ -4673,8 +4673,7 @@
                                     // 계열 정보가 있으면 사용, 없으면 전체에서 검색
                                     const series = student.series || (student.category && (student.category === '인문계열' || student.category === '전문계열') ? student.category : '인문계열');
                                     const curriculumInfo = this.findSubjectInCurriculum(subjectName, student.grade, student.semester, series, null);
-
-                                    const credits = curriculumInfo ? curriculumInfo.학점 : 'N/A';
+                                    const credits = (curriculumInfo ? this.getCreditsFromCurriculumRow(curriculumInfo) : this.getCreditsForSubject(subjectName, student.grade, student.semester, series, null)) ?? 'N/A';
                                     const category = curriculumInfo ? (curriculumInfo['분류'] || '') : '';
 
                                     allSubjects.set(subjectName, { grade: false, attendance: true, credits: credits, category: category, series: series });
@@ -6590,9 +6589,9 @@
 
                                 if (!subjectName) return;
 
-                                const credits = Number(row['학점']);
-
-                                curriculumMap.set(subjectName, isNaN(credits) ? 0 : credits);
+                                const creditsRaw = this.getCreditsFromCurriculumRow(row);
+                                const credits = typeof creditsRaw === 'number' ? creditsRaw : Number(creditsRaw);
+                                curriculumMap.set(subjectName, (credits != null && !isNaN(credits)) ? credits : 0);
 
                                 // 과목명을 키로 하되, 학년/학기/분류 정보도 함께 저장
 
@@ -6608,7 +6607,7 @@
 
                                     category: row['분류'] ? String(row['분류']).trim() : '',
 
-                                    credits: isNaN(credits) ? 0 : credits
+                                    credits: (credits != null && !isNaN(credits)) ? credits : 0
 
                                 });
 
@@ -9021,10 +9020,11 @@
 
 
 
-                            this.curriculumData = curriculumSnap.exists() ? curriculumSnap.data().data || [] : [];
+                            let loadedCurriculum = curriculumSnap.exists() ? curriculumSnap.data().data || [] : [];
+                            this.curriculumData = this.normalizeCurriculumData(loadedCurriculum);
 
-                            
-                            
+
+
                             // 업로드 상태 표시 (관리자인 경우)
 
                             if (this.role === '관리자') {
@@ -9303,9 +9303,9 @@
 
                                 const worksheet = workbook.Sheets[sheetName];
 
-                                const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                                let jsonData = XLSX.utils.sheet_to_json(worksheet);
 
-
+                                if (type === 'curriculum') jsonData = this.normalizeCurriculumData(jsonData || []);
 
                                 // 문서 이름 매핑 (일관성 유지)
 
@@ -9936,6 +9936,46 @@
 
                     },
 
+                    normalizeCurriculumData(rows) {
+                        if (!Array.isArray(rows)) return rows || [];
+                        return rows.map(row => {
+                            if (!row || typeof row !== 'object') return row;
+                            const normalized = {};
+                            const creditAliases = ['학점', '학점수', '단위'];
+                            const subjectAliases = ['과목명', '과목'];
+                            for (const [k, v] of Object.entries(row)) {
+                                const trimmedKey = String(k).trim();
+                                normalized[trimmedKey] = v;
+                            }
+                            const creditsVal = creditAliases.reduce((val, key) => val ?? normalized[key], undefined);
+                            if (creditsVal != null && creditsVal !== '') normalized['학점'] = creditsVal;
+                            const subjectVal = subjectAliases.reduce((val, key) => val ?? normalized[key], undefined);
+                            if (subjectVal != null && subjectVal !== '') normalized['과목명'] = subjectVal;
+                            return normalized;
+                        });
+                    },
+                    getCreditsFromCurriculumRow(row) {
+                        // 교육과정 편제표 행에서 학점 추출 (학점/학점수/단위 등 다양한 열명 지원)
+                        if (!row || typeof row !== 'object') return undefined;
+                        const val = row['학점'] ?? row['학점수'] ?? row['단위'];
+                        if (val == null || val === '') return undefined;
+                        const num = Number(val);
+                        return isNaN(num) ? val : num;
+                    },
+                    getCreditsForSubject(subjectName, grade, semester, series, category) {
+                        // 과목별 학점 조회: findSubjectInCurriculum 우선, 실패 시 과목명만으로 폴백
+                        let info = this.findSubjectInCurriculum(subjectName, grade, semester, series, category);
+                        if (info) {
+                            const credits = this.getCreditsFromCurriculumRow(info);
+                            if (credits != null && credits !== '') return credits;
+                        }
+                        const nameTrimmed = String(subjectName || '').trim();
+                        if (!nameTrimmed || !this.curriculumData || !this.curriculumData.length) return undefined;
+                        const fallback = this.curriculumData.find(row =>
+                            row && String(row['과목명'] || row['과목'] || '').trim() === nameTrimmed
+                        );
+                        return fallback ? this.getCreditsFromCurriculumRow(fallback) : undefined;
+                    },
                     getHoursPerCredit(category) {
                         // 교과별(분류별) 학점당 시수를 가져오는 헬퍼 함수
                         // category는 분류(보통교과/전문교과)를 의미
@@ -10684,10 +10724,12 @@
                                 
                                 (fullStudent.attendanceSubjects || []).forEach(sName => {
                                     if (sName) {
-                                        const curriculumInfo = this.curriculumData.find(c => c.과목명 === sName);
+                                        const sNameTrimmed = String(sName).trim();
+                                        const curriculumInfo = this.curriculumData.find(c => String(c.과목명 || c.과목 || '').trim() === sNameTrimmed);
                                         const category = curriculumInfo ? (curriculumInfo['분류'] || fullStudent.category || '') : (fullStudent.category || '');
+                                        const credits = (curriculumInfo ? this.getCreditsFromCurriculumRow(curriculumInfo) : this.getCreditsForSubject(sName, fullStudent.grade, fullStudent.semester, fullStudent.series, fullStudent.category)) ?? 'N/A';
                                         if (!subjectsMap.has(`${category}|${sName}`)) {
-                                            subjectsMap.set(`${category}|${sName}`, { name: sName, category: category, reasons: new Set(['과목출석률']), credits: curriculumInfo ? curriculumInfo.학점 : 'N/A' });
+                                            subjectsMap.set(`${category}|${sName}`, { name: sName, category: category, reasons: new Set(['과목출석률']), credits: credits });
                                         } else {
                                             subjectsMap.get(`${category}|${sName}`).reasons.add('과목출석률');
                                         }
@@ -11298,12 +11340,13 @@
 
                                                     // 분류는 교육과정 편제표에서 찾은 값 사용 (보통교과/전문교과)
                                                     const subjectCategory = curriculumInfo ? curriculumInfo['분류'] : null;
+                                                    const creditsVal = curriculumInfo ? this.getCreditsFromCurriculumRow(curriculumInfo) : this.getCreditsForSubject(subjectInfo.name, subjectInfo.grade, subjectInfo.semester, subjectInfo.series, null);
 
                                                     return { 
 
                                                         name: subjectInfo.name, 
 
-                                                        credits: curriculumInfo ? curriculumInfo.학점 : 'N/A',
+                                                        credits: creditsVal ?? 'N/A',
 
                                                         grade: subjectInfo.grade,
 
@@ -11534,8 +11577,9 @@
                         const subjectsWithCredits = validSubjects.map(subjectName => {
 
                             const curriculumInfo = this.findSubjectInCurriculum(subjectName, grade, semester, null, category);
+                            const creditsVal = curriculumInfo ? this.getCreditsFromCurriculumRow(curriculumInfo) : this.getCreditsForSubject(subjectName, grade, semester, null, category);
 
-                            return { name: subjectName, credits: curriculumInfo ? curriculumInfo.학점 : 'N/A' };
+                            return { name: subjectName, credits: creditsVal ?? 'N/A' };
 
                         });
 
@@ -15635,6 +15679,7 @@
 </body>
 
 </html>
+
 
 
 
